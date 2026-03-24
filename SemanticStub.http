@@ -1,0 +1,9 @@
+@host = http://localhost:5000
+
+### Hello world stub
+GET {{host}}/hello
+Accept: application/json
+
+### Unknown route returns 404
+GET {{host}}/missing
+Accept: application/json
