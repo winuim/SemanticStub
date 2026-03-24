@@ -13,6 +13,11 @@ public sealed class StubService
         document = loader.LoadHelloWorldDefinition();
     }
 
+    public StubService(StubDocument document)
+    {
+        this.document = document;
+    }
+
     public bool TryGetResponse(string method, string path, out StubResponse response)
     {
         response = null!;
@@ -27,19 +32,25 @@ public sealed class StubService
             return false;
         }
 
-        if (!pathItem.Get.Responses.TryGetValue("200", out var responseDefinition))
+        var matchedResponse = pathItem.Get.Responses
+            .FirstOrDefault(entry =>
+                int.TryParse(entry.Key, out _) &&
+                entry.Value.Content.ContainsKey(JsonContentType));
+
+        if (string.IsNullOrEmpty(matchedResponse.Key) ||
+            !int.TryParse(matchedResponse.Key, out var statusCode))
         {
             return false;
         }
 
-        if (!responseDefinition.Content.TryGetValue(JsonContentType, out var mediaType))
+        if (!matchedResponse.Value.Content.TryGetValue(JsonContentType, out var mediaType))
         {
             return false;
         }
 
         response = new StubResponse
         {
-            StatusCode = StatusCodes.Status200OK,
+            StatusCode = statusCode,
             ContentType = JsonContentType,
             Body = StubDefinitionLoader.SerializeExample(mediaType.Example)
         };
