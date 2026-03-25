@@ -1,0 +1,95 @@
+openapi: 3.1.0
+info:
+  title: Basic Routing Sample
+  version: 1.0.0
+
+paths:
+  /hello:
+    get:
+      operationId: getHello
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  message:
+                    type: string
+                required:
+                  - message
+              example:
+                message: Hello from SemanticStub
+
+  /users:
+    get:
+      operationId: listUsers
+      responses:
+        '200':
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                      required:
+                        - id
+                        - name
+                required:
+                  - users
+              example:
+                users:
+                  - id: 1
+                    name: Alice
+                  - id: 2
+                    name: Bob
+
+  /login:
+    post:
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+                - password
+            example:
+              username: demo
+              password: secret
+      responses:
+        '200':
+          description: Login success
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  result:
+                    type: string
+                required:
+                  - result
+              example:
+                result: ok

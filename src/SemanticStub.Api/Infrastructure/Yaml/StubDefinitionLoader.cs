@@ -7,6 +7,7 @@ namespace SemanticStub.Api.Infrastructure.Yaml;
 
 public sealed class StubDefinitionLoader
 {
+    private const string DefaultStubFileName = "basic-routing.yaml";
     private readonly IWebHostEnvironment environment;
     private readonly IDeserializer deserializer;
 
@@ -19,9 +20,9 @@ public sealed class StubDefinitionLoader
             .Build();
     }
 
-    public StubDocument LoadHelloWorldDefinition()
+    public StubDocument LoadDefaultDefinition()
     {
-        var path = ResolveHelloWorldPath();
+        var path = ResolveSamplePath(DefaultStubFileName);
         var yaml = File.ReadAllText(path);
         var document = deserializer.Deserialize<StubDocument>(yaml);
 
@@ -33,13 +34,13 @@ public sealed class StubDefinitionLoader
         return document;
     }
 
-    private string ResolveHelloWorldPath()
+    private string ResolveSamplePath(string fileName)
     {
         var current = new DirectoryInfo(environment.ContentRootPath);
 
         while (current is not null)
         {
-            var candidate = Path.Combine(current.FullName, "samples", "hello-world.yaml");
+            var candidate = Path.Combine(current.FullName, "samples", fileName);
 
             if (File.Exists(candidate))
             {
@@ -49,7 +50,7 @@ public sealed class StubDefinitionLoader
             current = current.Parent;
         }
 
-        throw new FileNotFoundException("Could not locate samples/hello-world.yaml from the current content root.", "samples/hello-world.yaml");
+        throw new FileNotFoundException($"Could not locate samples/{fileName} from the current content root.", Path.Combine("samples", fileName));
     }
 
     public static string SerializeExample(object? example)

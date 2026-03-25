@@ -43,7 +43,7 @@ public sealed class StubServiceTests
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
 
-        Assert.True(matched);
+        Assert.Equal(StubMatchResult.Matched, matched);
         Assert.Equal(201, response.StatusCode);
         Assert.Equal("{\"message\":\"Created\"}", response.Body);
     }
