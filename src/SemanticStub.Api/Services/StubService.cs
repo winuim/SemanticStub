@@ -10,7 +10,7 @@ public sealed class StubService
 
     public StubService(StubDefinitionLoader loader)
     {
-        document = loader.LoadHelloWorldDefinition();
+        document = loader.LoadDefaultDefinition();
     }
 
     public StubService(StubDocument document)
@@ -18,21 +18,23 @@ public sealed class StubService
         this.document = document;
     }
 
-    public bool TryGetResponse(string method, string path, out StubResponse response)
+    public StubMatchResult TryGetResponse(string method, string path, out StubResponse response)
     {
         response = null!;
 
-        if (!HttpMethods.IsGet(method))
+        if (!document.Paths.TryGetValue(path, out var pathItem))
         {
-            return false;
+            return StubMatchResult.PathNotFound;
         }
 
-        if (!document.Paths.TryGetValue(path, out var pathItem) || pathItem.Get is null)
+        var operation = GetOperation(method, pathItem);
+
+        if (operation is null)
         {
-            return false;
+            return StubMatchResult.MethodNotAllowed;
         }
 
-        var matchedResponse = pathItem.Get.Responses
+        var matchedResponse = operation.Responses
             .FirstOrDefault(entry =>
                 int.TryParse(entry.Key, out _) &&
                 entry.Value.Content.ContainsKey(JsonContentType));
@@ -40,12 +42,12 @@ public sealed class StubService
         if (string.IsNullOrEmpty(matchedResponse.Key) ||
             !int.TryParse(matchedResponse.Key, out var statusCode))
         {
-            return false;
+            return StubMatchResult.ResponseNotConfigured;
         }
 
         if (!matchedResponse.Value.Content.TryGetValue(JsonContentType, out var mediaType))
         {
-            return false;
+            return StubMatchResult.ResponseNotConfigured;
         }
 
         response = new StubResponse
@@ -55,6 +57,21 @@ public sealed class StubService
             Body = StubDefinitionLoader.SerializeExample(mediaType.Example)
         };
 
-        return true;
+        return StubMatchResult.Matched;
+    }
+
+    private static OperationDefinition? GetOperation(string method, PathItemDefinition pathItem)
+    {
+        if (HttpMethods.IsGet(method))
+        {
+            return pathItem.Get;
+        }
+
+        if (HttpMethods.IsPost(method))
+        {
+            return pathItem.Post;
+        }
+
+        return null;
     }
 }
