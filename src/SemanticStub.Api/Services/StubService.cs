@@ -18,15 +18,20 @@ public sealed class StubService
         this.document = document;
     }
 
-    public bool TryGetResponse(string method, string path, out StubResponse response)
+    public StubMatchResult TryGetResponse(string method, string path, out StubResponse response)
     {
         response = null!;
 
-        var operation = GetOperation(method, path);
+        if (!document.Paths.TryGetValue(path, out var pathItem))
+        {
+            return StubMatchResult.PathNotFound;
+        }
+
+        var operation = GetOperation(method, pathItem);
 
         if (operation is null)
         {
-            return false;
+            return StubMatchResult.MethodNotAllowed;
         }
 
         var matchedResponse = operation.Responses
@@ -37,12 +42,12 @@ public sealed class StubService
         if (string.IsNullOrEmpty(matchedResponse.Key) ||
             !int.TryParse(matchedResponse.Key, out var statusCode))
         {
-            return false;
+            return StubMatchResult.ResponseNotConfigured;
         }
 
         if (!matchedResponse.Value.Content.TryGetValue(JsonContentType, out var mediaType))
         {
-            return false;
+            return StubMatchResult.ResponseNotConfigured;
         }
 
         response = new StubResponse
@@ -52,16 +57,11 @@ public sealed class StubService
             Body = StubDefinitionLoader.SerializeExample(mediaType.Example)
         };
 
-        return true;
+        return StubMatchResult.Matched;
     }
 
-    private OperationDefinition? GetOperation(string method, string path)
+    private static OperationDefinition? GetOperation(string method, PathItemDefinition pathItem)
     {
-        if (!document.Paths.TryGetValue(path, out var pathItem))
-        {
-            return null;
-        }
-
         if (HttpMethods.IsGet(method))
         {
             return pathItem.Get;

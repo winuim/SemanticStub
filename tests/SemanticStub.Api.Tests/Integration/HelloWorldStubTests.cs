@@ -68,19 +68,19 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
-    public async Task GetLogin_ReturnsNotFound()
+    public async Task GetLogin_ReturnsMethodNotAllowed()
     {
         var response = await client.GetAsync("/login");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
     }
 
     [Fact]
-    public async Task PostHello_ReturnsNotFound()
+    public async Task PostHello_ReturnsMethodNotAllowed()
     {
         var response = await client.PostAsync("/hello", content: null);
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
     }
 
     public sealed class HelloResponse

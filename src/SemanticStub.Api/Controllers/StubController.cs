@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
 
 namespace SemanticStub.Api.Controllers;
@@ -29,8 +30,19 @@ public sealed class StubController : ControllerBase
     private IActionResult HandleRequest(string method, string? path)
     {
         var requestPath = string.IsNullOrEmpty(path) ? "/" : "/" + path;
+        var matchResult = stubService.TryGetResponse(method, requestPath, out var response);
 
-        if (!stubService.TryGetResponse(method, requestPath, out var response))
+        if (matchResult == StubMatchResult.PathNotFound)
+        {
+            return NotFound();
+        }
+
+        if (matchResult == StubMatchResult.MethodNotAllowed)
+        {
+            return StatusCode(StatusCodes.Status405MethodNotAllowed);
+        }
+
+        if (matchResult != StubMatchResult.Matched)
         {
             return NotFound();
         }
