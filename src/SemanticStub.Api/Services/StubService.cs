@@ -10,7 +10,7 @@ public sealed class StubService
 
     public StubService(StubDefinitionLoader loader)
     {
-        document = loader.LoadHelloWorldDefinition();
+        document = loader.LoadDefaultDefinition();
     }
 
     public StubService(StubDocument document)
@@ -22,17 +22,14 @@ public sealed class StubService
     {
         response = null!;
 
-        if (!HttpMethods.IsGet(method))
+        var operation = GetOperation(method, path);
+
+        if (operation is null)
         {
             return false;
         }
 
-        if (!document.Paths.TryGetValue(path, out var pathItem) || pathItem.Get is null)
-        {
-            return false;
-        }
-
-        var matchedResponse = pathItem.Get.Responses
+        var matchedResponse = operation.Responses
             .FirstOrDefault(entry =>
                 int.TryParse(entry.Key, out _) &&
                 entry.Value.Content.ContainsKey(JsonContentType));
@@ -56,5 +53,25 @@ public sealed class StubService
         };
 
         return true;
+    }
+
+    private OperationDefinition? GetOperation(string method, string path)
+    {
+        if (!document.Paths.TryGetValue(path, out var pathItem))
+        {
+            return null;
+        }
+
+        if (HttpMethods.IsGet(method))
+        {
+            return pathItem.Get;
+        }
+
+        if (HttpMethods.IsPost(method))
+        {
+            return pathItem.Post;
+        }
+
+        return null;
     }
 }

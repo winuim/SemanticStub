@@ -17,9 +17,20 @@ public sealed class StubController : ControllerBase
     [HttpGet]
     public IActionResult Get(string? path)
     {
+        return HandleRequest(HttpMethods.Get, path);
+    }
+
+    [HttpPost]
+    public IActionResult Post(string? path)
+    {
+        return HandleRequest(HttpMethods.Post, path);
+    }
+
+    private IActionResult HandleRequest(string method, string? path)
+    {
         var requestPath = string.IsNullOrEmpty(path) ? "/" : "/" + path;
 
-        if (!stubService.TryGetResponse(HttpMethods.Get, requestPath, out var response))
+        if (!stubService.TryGetResponse(method, requestPath, out var response))
         {
             return NotFound();
         }
