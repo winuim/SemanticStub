@@ -53,11 +53,6 @@ public sealed class StubService
             return StubMatchResult.Matched;
         }
 
-        if (operation.Matches.Count > 0)
-        {
-            return StubMatchResult.ResponseNotConfigured;
-        }
-
         var matchedResponse = operation.Responses
             .FirstOrDefault(entry =>
                 int.TryParse(entry.Key, out _) &&
@@ -139,11 +134,6 @@ public sealed class StubService
 
     private static bool IsExactQueryMatch(IReadOnlyDictionary<string, string> expected, IReadOnlyDictionary<string, string> actual)
     {
-        if (expected.Count != actual.Count)
-        {
-            return false;
-        }
-
         foreach (var pair in expected)
         {
             if (!actual.TryGetValue(pair.Key, out var value) || value != pair.Value)

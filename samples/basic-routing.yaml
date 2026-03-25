@@ -40,6 +40,20 @@ paths:
                       role: admin
 
         - query:
+            role: admin
+            view: summary
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  users:
+                    - id: 1
+                      name: Alice
+                      role: admin
+                      view: summary
+
+        - query:
             role: guest
           response:
             statusCode: 200

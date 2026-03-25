@@ -61,6 +61,21 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Single(payload.Users);
         Assert.Equal("Alice", payload.Users[0].Name);
         Assert.Equal("admin", payload.Users[0].Role);
+        Assert.Equal(string.Empty, payload.Users[0].View);
+    }
+
+    [Fact]
+    public async Task GetUsersWithAdminRoleAndSummaryView_PrefersMoreSpecificMatch()
+    {
+        var response = await client.GetAsync("/users?role=admin&view=summary");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Single(payload.Users);
+        Assert.Equal("Alice", payload.Users[0].Name);
+        Assert.Equal("admin", payload.Users[0].Role);
+        Assert.Equal("summary", payload.Users[0].View);
     }
 
     [Fact]
@@ -77,19 +92,27 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
-    public async Task GetUsersWithUnknownRole_ReturnsNotFound()
+    public async Task GetUsersWithUnknownRole_ReturnsDefaultUsers()
     {
         var response = await client.GetAsync("/users?role=other");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal(2, payload.Users.Count);
     }
 
     [Fact]
-    public async Task GetUsersWithExtraQueryParameter_ReturnsNotFound()
+    public async Task GetUsersWithGuestRoleAndExtraQueryParameter_ReturnsGuestUsers()
     {
-        var response = await client.GetAsync("/users?role=admin&view=summary");
+        var response = await client.GetAsync("/users?role=guest&view=summary");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Single(payload.Users);
+        Assert.Equal("Bob", payload.Users[0].Name);
+        Assert.Equal("guest", payload.Users[0].Role);
     }
 
     [Fact]
@@ -142,6 +165,8 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
         public string Name { get; init; } = string.Empty;
 
         public string Role { get; init; } = string.Empty;
+
+        public string View { get; init; } = string.Empty;
     }
 
     public sealed class LoginRequest
