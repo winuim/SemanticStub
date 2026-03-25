@@ -27,7 +27,7 @@ public sealed class StubDefinitionLoader
         return LoadDefinition(path);
     }
 
-    public StubDocument LoadDefinition(string path)
+    private StubDocument LoadDefinition(string path)
     {
         var yaml = File.ReadAllText(path);
         var document = deserializer.Deserialize<StubDocument>(yaml);
@@ -71,18 +71,30 @@ public sealed class StubDefinitionLoader
     private void ValidateDocument(StubDocument document)
     {
         var errors = new List<string>();
+        var paths = document.Paths;
 
         if (string.IsNullOrWhiteSpace(document.OpenApi))
         {
             errors.Add("The 'openapi' field is required.");
         }
 
-        if (document.Paths.Count == 0)
+        if (paths is null || paths.Count == 0)
         {
             errors.Add("At least one path must be configured under 'paths'.");
         }
 
-        foreach (var pathEntry in document.Paths)
+        if (paths is null)
+        {
+            if (errors.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    "Invalid stub definition:" + Environment.NewLine + string.Join(Environment.NewLine, errors.Select(error => "- " + error)));
+            }
+
+            return;
+        }
+
+        foreach (var pathEntry in paths)
         {
             if (pathEntry.Value.Get is null && pathEntry.Value.Post is null)
             {
@@ -106,6 +118,11 @@ public sealed class StubDefinitionLoader
         if (operation is null)
         {
             return;
+        }
+
+        if (operation.Responses.Count == 0 && operation.Matches.Count == 0)
+        {
+            errors.Add($"Path '{path}' {method.ToUpperInvariant()} must define at least one response or x-match entry.");
         }
 
         foreach (var responseEntry in operation.Responses)
@@ -164,6 +181,14 @@ public sealed class StubDefinitionLoader
             {
                 errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} references missing response file '{responseFile}'.");
             }
+        }
+
+        if (content.Count == 0)
+        {
+            if (string.IsNullOrWhiteSpace(responseFile))
+            {
+                errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define '{JsonContentType}' content or 'x-response-file'.");
+            }
 
             return;
         }
@@ -171,6 +196,11 @@ public sealed class StubDefinitionLoader
         if (!content.TryGetValue(JsonContentType, out var mediaType))
         {
             errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define '{JsonContentType}' content or 'x-response-file'.");
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(responseFile))
+        {
             return;
         }
 

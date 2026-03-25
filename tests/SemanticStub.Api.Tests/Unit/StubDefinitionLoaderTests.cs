@@ -8,6 +8,81 @@ namespace SemanticStub.Api.Tests.Unit;
 public sealed class StubDefinitionLoaderTests
 {
     [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenOpenApiIsMissing()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            paths:
+              /hello:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: hello
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("The 'openapi' field is required.", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenPathsIsNull()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("At least one path must be configured under 'paths'.", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenPathHasNoSupportedOperation()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /hello: {}
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("Path '/hello' must define at least one supported operation.", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenOperationHasNoResponses()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /hello:
+                get: {}
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("Path '/hello' GET must define at least one response or x-match entry.", exception.Message);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_ThrowsForMissingResponseFile()
     {
         using var workspace = TestWorkspace.Create(
@@ -62,6 +137,31 @@ public sealed class StubDefinitionLoaderTests
         var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
 
         Assert.Contains("x-match[0] must define a positive statusCode", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenResponseFileContentTypeIsInvalid()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      x-response-file: users.json
+                      content:
+                        text/plain: {}
+            """,
+            ("users.json", "[{\"id\":1,\"name\":\"Alice\"}]"));
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("must define 'application/json' content or 'x-response-file'", exception.Message);
     }
 
     [Fact]
