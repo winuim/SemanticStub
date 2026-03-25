@@ -29,6 +29,7 @@ paths:
       responses:
         '200':
           description: User list
+          x-response-file: users.json
           content:
             application/json:
               schema:
@@ -50,12 +51,6 @@ paths:
                         - name
                 required:
                   - users
-              example:
-                users:
-                  - id: 1
-                    name: Alice
-                  - id: 2
-                    name: Bob
 
   /login:
     post:

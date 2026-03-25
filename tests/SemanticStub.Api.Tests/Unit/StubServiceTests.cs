@@ -47,4 +47,40 @@ public sealed class StubServiceTests
         Assert.Equal(201, response.StatusCode);
         Assert.Equal("{\"message\":\"Created\"}", response.Body);
     }
+
+    [Fact]
+    public void TryGetResponse_UsesResponseFileContentWhenConfigured()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                ResponseFile = "users.json",
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document, _ => "{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}");
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/users", out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal(200, response.StatusCode);
+        Assert.Equal("{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}", response.Body);
+    }
 }

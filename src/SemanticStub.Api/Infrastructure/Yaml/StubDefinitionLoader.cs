@@ -34,6 +34,13 @@ public sealed class StubDefinitionLoader
         return document;
     }
 
+    public string LoadResponseFileContent(string fileName)
+    {
+        var path = ResolveSamplePath(fileName);
+
+        return File.ReadAllText(path);
+    }
+
     private string ResolveSamplePath(string fileName)
     {
         var current = new DirectoryInfo(environment.ContentRootPath);
