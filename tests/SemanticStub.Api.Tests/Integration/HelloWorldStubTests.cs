@@ -51,6 +51,84 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
+    public async Task GetUsersWithAdminRole_ReturnsAdminUsers()
+    {
+        var response = await client.GetAsync("/users?role=admin");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Single(payload.Users);
+        Assert.Equal("Alice", payload.Users[0].Name);
+        Assert.Equal("admin", payload.Users[0].Role);
+        Assert.Equal(string.Empty, payload.Users[0].View);
+    }
+
+    [Fact]
+    public async Task GetUsersWithAdminRoleAndSummaryView_PrefersMoreSpecificMatch()
+    {
+        var response = await client.GetAsync("/users?role=admin&view=summary");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Single(payload.Users);
+        Assert.Equal("Alice", payload.Users[0].Name);
+        Assert.Equal("admin", payload.Users[0].Role);
+        Assert.Equal("summary", payload.Users[0].View);
+    }
+
+    [Fact]
+    public async Task GetUsersWithGuestRole_ReturnsGuestUsers()
+    {
+        var response = await client.GetAsync("/users?role=guest");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Single(payload.Users);
+        Assert.Equal("Bob", payload.Users[0].Name);
+        Assert.Equal("guest", payload.Users[0].Role);
+    }
+
+    [Fact]
+    public async Task GetUsersWithUnknownRole_ReturnsDefaultUsers()
+    {
+        var response = await client.GetAsync("/users?role=other");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal(2, payload.Users.Count);
+    }
+
+    [Fact]
+    public async Task GetUsersWithNoMatchingQueryAndNoWildcard_UsesResponsesFallback()
+    {
+        var response = await client.GetAsync("/users?view=compact");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal(2, payload.Users.Count);
+        Assert.Equal("Alice", payload.Users[0].Name);
+        Assert.Equal("Bob", payload.Users[1].Name);
+    }
+
+    [Fact]
+    public async Task GetUsersWithGuestRoleAndExtraQueryParameter_ReturnsGuestUsers()
+    {
+        var response = await client.GetAsync("/users?role=guest&view=summary");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Single(payload.Users);
+        Assert.Equal("Bob", payload.Users[0].Name);
+        Assert.Equal("guest", payload.Users[0].Role);
+    }
+
+    [Fact]
     public async Task PostLogin_ReturnsJsonExampleFromYaml()
     {
         var response = await client.PostAsJsonAsync("/login", new LoginRequest
@@ -98,6 +176,10 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
         public int Id { get; init; }
 
         public string Name { get; init; } = string.Empty;
+
+        public string Role { get; init; } = string.Empty;
+
+        public string View { get; init; } = string.Empty;
     }
 
     public sealed class LoginRequest

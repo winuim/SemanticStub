@@ -8,6 +8,14 @@ Accept: application/json
 GET {{host}}/users
 Accept: application/json
 
+### Users stub filtered by exact query match
+GET {{host}}/users?role=admin
+Accept: application/json
+
+### Users stub filtered by another exact query match
+GET {{host}}/users?role=guest
+Accept: application/json
+
 ### Login stub
 POST {{host}}/login
 Content-Type: application/json
