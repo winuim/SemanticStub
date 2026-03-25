@@ -7,15 +7,24 @@ public sealed class StubService
 {
     private const string JsonContentType = "application/json";
     private readonly StubDocument document;
+    private readonly Func<string, string> responseFileReader;
 
     public StubService(StubDefinitionLoader loader)
     {
         document = loader.LoadDefaultDefinition();
+        responseFileReader = loader.LoadResponseFileContent;
     }
 
     public StubService(StubDocument document)
     {
         this.document = document;
+        responseFileReader = _ => throw new InvalidOperationException("No response file reader configured.");
+    }
+
+    public StubService(StubDocument document, Func<string, string> responseFileReader)
+    {
+        this.document = document;
+        this.responseFileReader = responseFileReader;
     }
 
     public StubMatchResult TryGetResponse(string method, string path, out StubResponse response)
@@ -45,7 +54,9 @@ public sealed class StubService
             return StubMatchResult.ResponseNotConfigured;
         }
 
-        if (!matchedResponse.Value.Content.TryGetValue(JsonContentType, out var mediaType))
+        var body = BuildResponseBody(matchedResponse.Value);
+
+        if (body is null)
         {
             return StubMatchResult.ResponseNotConfigured;
         }
@@ -54,7 +65,7 @@ public sealed class StubService
         {
             StatusCode = statusCode,
             ContentType = JsonContentType,
-            Body = StubDefinitionLoader.SerializeExample(mediaType.Example)
+            Body = body
         };
 
         return StubMatchResult.Matched;
@@ -73,5 +84,20 @@ public sealed class StubService
         }
 
         return null;
+    }
+
+    private string? BuildResponseBody(ResponseDefinition responseDefinition)
+    {
+        if (!string.IsNullOrEmpty(responseDefinition.ResponseFile))
+        {
+            return responseFileReader(responseDefinition.ResponseFile);
+        }
+
+        if (!responseDefinition.Content.TryGetValue(JsonContentType, out var mediaType))
+        {
+            return null;
+        }
+
+        return StubDefinitionLoader.SerializeExample(mediaType.Example);
     }
 }

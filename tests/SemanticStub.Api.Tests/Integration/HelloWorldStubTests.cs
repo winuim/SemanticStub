@@ -36,7 +36,7 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
-    public async Task GetUsers_ReturnsJsonExampleFromYaml()
+    public async Task GetUsers_ReturnsJsonFromResponseFile()
     {
         var response = await client.GetAsync("/users");
 
