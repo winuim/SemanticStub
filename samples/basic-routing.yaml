@@ -64,19 +64,6 @@ paths:
                     - id: 2
                       name: Bob
                       role: guest
-
-        - query: {}
-          response:
-            statusCode: 200
-            x-response-file: users.json
-            content:
-              application/json:
-                example:
-                  users:
-                    - id: 1
-                      name: Alice
-                    - id: 2
-                      name: Bob
       responses:
         '200':
           description: Default user list

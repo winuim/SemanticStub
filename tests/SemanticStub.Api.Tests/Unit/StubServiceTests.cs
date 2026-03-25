@@ -226,4 +226,71 @@ public sealed class StubServiceTests
         Assert.Equal(StubMatchResult.Matched, matched);
         Assert.Equal("{\"message\":\"default\"}", response.Body);
     }
+
+    [Fact]
+    public void TryGetResponse_ReturnsResponseNotConfigured_WhenMatchedQueryResponseIsInvalid()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["role"] = "admin"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 0,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new()
+                                        {
+                                            Example = new Dictionary<object, object>
+                                            {
+                                                ["message"] = "broken"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["message"] = "default"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+        var query = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["role"] = "admin"
+        };
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out _);
+
+        Assert.Equal(StubMatchResult.ResponseNotConfigured, matched);
+    }
 }

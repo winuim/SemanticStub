@@ -103,6 +103,19 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
+    public async Task GetUsersWithNoMatchingQueryAndNoWildcard_UsesResponsesFallback()
+    {
+        var response = await client.GetAsync("/users?view=compact");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal(2, payload.Users.Count);
+        Assert.Equal("Alice", payload.Users[0].Name);
+        Assert.Equal("Bob", payload.Users[1].Name);
+    }
+
+    [Fact]
     public async Task GetUsersWithGuestRoleAndExtraQueryParameter_ReturnsGuestUsers()
     {
         var response = await client.GetAsync("/users?role=guest&view=summary");

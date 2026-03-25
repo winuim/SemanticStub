@@ -48,9 +48,16 @@ public sealed class StubService
             return StubMatchResult.MethodNotAllowed;
         }
 
-        if (TryBuildMatchedQueryResponse(operation, query, out response))
+        var queryMatchResult = TryBuildMatchedQueryResponse(operation, query, out response);
+
+        if (queryMatchResult == QueryMatchEvaluationResult.Matched)
         {
             return StubMatchResult.Matched;
+        }
+
+        if (queryMatchResult == QueryMatchEvaluationResult.MatchedButInvalidResponse)
+        {
+            return StubMatchResult.ResponseNotConfigured;
         }
 
         var matchedResponse = operation.Responses
@@ -96,13 +103,13 @@ public sealed class StubService
         return null;
     }
 
-    private bool TryBuildMatchedQueryResponse(OperationDefinition operation, IReadOnlyDictionary<string, string> query, out StubResponse response)
+    private QueryMatchEvaluationResult TryBuildMatchedQueryResponse(OperationDefinition operation, IReadOnlyDictionary<string, string> query, out StubResponse response)
     {
         response = null!;
 
         if (operation.Matches.Count == 0)
         {
-            return false;
+            return QueryMatchEvaluationResult.NoMatch;
         }
 
         var matchedCandidate = operation.Matches
@@ -112,14 +119,14 @@ public sealed class StubService
 
         if (matchedCandidate is null)
         {
-            return false;
+            return QueryMatchEvaluationResult.NoMatch;
         }
 
         var body = BuildResponseBody(matchedCandidate.Response.ResponseFile, matchedCandidate.Response.Content);
 
         if (body is null || matchedCandidate.Response.StatusCode <= 0)
         {
-            return false;
+            return QueryMatchEvaluationResult.MatchedButInvalidResponse;
         }
 
         response = new StubResponse
@@ -129,7 +136,7 @@ public sealed class StubService
             Body = body
         };
 
-        return true;
+        return QueryMatchEvaluationResult.Matched;
     }
 
     private static bool IsExactQueryMatch(IReadOnlyDictionary<string, string> expected, IReadOnlyDictionary<string, string> actual)
