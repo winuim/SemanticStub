@@ -10,6 +10,10 @@
 - Do NOT change working behavior unless explicitly required
 - Prefer compatibility over redesign
 - When unsure, choose the safest implementation and explain assumptions
+- Use conventional commits format for commit messages and PR titles
+- Group related changes into logical commits
+- Do not create overly large commits
+- Prefer small, reviewable commits
 
 ---
 
@@ -192,7 +196,8 @@ Supports YAML-based stub definitions with optional semantic matching using embed
 - Prefer latest compatible versions
 - Avoid upgrading major versions unless explicitly requested
 - If using Directory.Packages.props:
-  - prefer major version ranges (e.g. 13.*)
+  - prefer explicit versions
+  - keep versions centrally managed in Directory.Packages.props
 - Ensure build and tests pass after updates
 
 ---
@@ -250,6 +255,40 @@ Unless explicitly requested:
 - Create checkpoints before risky changes
 - Keep commits small and logical
 - Review diffs before completion
+
+---
+
+## Commit Rules
+
+- Use conventional commits format for all commit messages
+- Format: <type>: <summary>
+- Allowed commit types:
+  - feat
+  - fix
+  - refactor
+  - test
+  - chore
+  - docs
+
+Examples:
+- feat: add query parameter matching
+- fix: handle missing route correctly
+- test: add controller tests
+- chore: update dependencies
+
+- Keep summary short and descriptive
+- Do not include unnecessary details in the title
+
+---
+
+## Pull Request Rules
+
+- PR title must follow conventional commits format
+- PR description should summarize:
+  - purpose
+  - changes
+  - validation
+  - impact
 
 ---
 
