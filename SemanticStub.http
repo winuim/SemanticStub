@@ -4,6 +4,20 @@
 GET {{host}}/hello
 Accept: application/json
 
+### Users stub from x-response-file
+GET {{host}}/users
+Accept: application/json
+
+### Login stub
+POST {{host}}/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": "demo",
+  "password": "secret"
+}
+
 ### Unknown route returns 404
 GET {{host}}/missing
 Accept: application/json
