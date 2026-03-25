@@ -30,7 +30,8 @@ public sealed class StubController : ControllerBase
     private IActionResult HandleRequest(string method, string? path)
     {
         var requestPath = string.IsNullOrEmpty(path) ? "/" : "/" + path;
-        var matchResult = stubService.TryGetResponse(method, requestPath, out var response);
+        var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.Ordinal);
+        var matchResult = stubService.TryGetResponse(method, requestPath, query, out var response);
 
         if (matchResult == StubMatchResult.PathNotFound)
         {

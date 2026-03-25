@@ -26,9 +26,46 @@ paths:
   /users:
     get:
       operationId: listUsers
+      x-match:
+        - query:
+            role: admin
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  users:
+                    - id: 1
+                      name: Alice
+                      role: admin
+
+        - query:
+            role: guest
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  users:
+                    - id: 2
+                      name: Bob
+                      role: guest
+
+        - query: {}
+          response:
+            statusCode: 200
+            x-response-file: users.json
+            content:
+              application/json:
+                example:
+                  users:
+                    - id: 1
+                      name: Alice
+                    - id: 2
+                      name: Bob
       responses:
         '200':
-          description: User list
+          description: Default user list
           x-response-file: users.json
           content:
             application/json:
