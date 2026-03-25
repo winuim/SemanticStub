@@ -29,6 +29,11 @@ public sealed class StubService
 
     public StubMatchResult TryGetResponse(string method, string path, out StubResponse response)
     {
+        return TryGetResponse(method, path, new Dictionary<string, string>(StringComparer.Ordinal), out response);
+    }
+
+    public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, out StubResponse response)
+    {
         response = null!;
 
         if (!document.Paths.TryGetValue(path, out var pathItem))
@@ -41,6 +46,18 @@ public sealed class StubService
         if (operation is null)
         {
             return StubMatchResult.MethodNotAllowed;
+        }
+
+        var queryMatchResult = TryBuildMatchedQueryResponse(operation, query, out response);
+
+        if (queryMatchResult == QueryMatchEvaluationResult.Matched)
+        {
+            return StubMatchResult.Matched;
+        }
+
+        if (queryMatchResult == QueryMatchEvaluationResult.MatchedButInvalidResponse)
+        {
+            return StubMatchResult.ResponseNotConfigured;
         }
 
         var matchedResponse = operation.Responses
@@ -86,14 +103,68 @@ public sealed class StubService
         return null;
     }
 
-    private string? BuildResponseBody(ResponseDefinition responseDefinition)
+    private QueryMatchEvaluationResult TryBuildMatchedQueryResponse(OperationDefinition operation, IReadOnlyDictionary<string, string> query, out StubResponse response)
     {
-        if (!string.IsNullOrEmpty(responseDefinition.ResponseFile))
+        response = null!;
+
+        if (operation.Matches.Count == 0)
         {
-            return responseFileReader(responseDefinition.ResponseFile);
+            return QueryMatchEvaluationResult.NoMatch;
         }
 
-        if (!responseDefinition.Content.TryGetValue(JsonContentType, out var mediaType))
+        var matchedCandidate = operation.Matches
+            .Where(candidate => IsExactQueryMatch(candidate.Query, query))
+            .OrderByDescending(candidate => candidate.Query.Count)
+            .FirstOrDefault();
+
+        if (matchedCandidate is null)
+        {
+            return QueryMatchEvaluationResult.NoMatch;
+        }
+
+        var body = BuildResponseBody(matchedCandidate.Response.ResponseFile, matchedCandidate.Response.Content);
+
+        if (body is null || matchedCandidate.Response.StatusCode <= 0)
+        {
+            return QueryMatchEvaluationResult.MatchedButInvalidResponse;
+        }
+
+        response = new StubResponse
+        {
+            StatusCode = matchedCandidate.Response.StatusCode,
+            ContentType = JsonContentType,
+            Body = body
+        };
+
+        return QueryMatchEvaluationResult.Matched;
+    }
+
+    private static bool IsExactQueryMatch(IReadOnlyDictionary<string, string> expected, IReadOnlyDictionary<string, string> actual)
+    {
+        foreach (var pair in expected)
+        {
+            if (!actual.TryGetValue(pair.Key, out var value) || value != pair.Value)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private string? BuildResponseBody(ResponseDefinition responseDefinition)
+    {
+        return BuildResponseBody(responseDefinition.ResponseFile, responseDefinition.Content);
+    }
+
+    private string? BuildResponseBody(string? responseFile, IReadOnlyDictionary<string, MediaTypeDefinition> content)
+    {
+        if (!string.IsNullOrEmpty(responseFile))
+        {
+            return responseFileReader(responseFile);
+        }
+
+        if (!content.TryGetValue(JsonContentType, out var mediaType))
         {
             return null;
         }
