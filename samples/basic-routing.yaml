@@ -10,6 +10,7 @@ paths:
       responses:
         '200':
           description: Successful response
+          x-delay: 200
           headers:
             X-Stub-Source:
               description: Response source identifier

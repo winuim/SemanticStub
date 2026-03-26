@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
@@ -17,11 +18,14 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
     [Fact]
     public async Task GetHello_ReturnsJsonExampleFromYaml()
     {
+        var stopwatch = Stopwatch.StartNew();
         var response = await client.GetAsync("/hello");
+        stopwatch.Stop();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal("hello", response.Headers.GetValues("X-Stub-Source").Single());
+        Assert.True(stopwatch.Elapsed >= TimeSpan.FromMilliseconds(150));
 
         var payload = await response.Content.ReadFromJsonAsync<HelloResponse>();
         Assert.NotNull(payload);
