@@ -85,6 +85,267 @@ public sealed class StubServiceTests
     }
 
     [Fact]
+    public void TryGetResponse_ReturnsConfiguredResponseHeaders()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/hello"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Headers = new Dictionary<string, HeaderDefinition>(StringComparer.OrdinalIgnoreCase)
+                                {
+                                    ["X-Stub-Source"] = new()
+                                    {
+                                        Example = "hello"
+                                    },
+                                    ["X-Trace-Id"] = new()
+                                    {
+                                        Schema = new HeaderSchemaDefinition
+                                        {
+                                            Example = 123
+                                        }
+                                    }
+                                },
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["message"] = "Hello"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("hello", response.Headers["X-Stub-Source"].Single());
+        Assert.Equal("123", response.Headers["X-Trace-Id"].Single());
+    }
+
+    [Fact]
+    public void TryGetResponse_ReturnsDateTimeHeaderExamplesWithoutJsonQuoting()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/hello"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Headers = new Dictionary<string, HeaderDefinition>(StringComparer.OrdinalIgnoreCase)
+                                {
+                                    ["Last-Modified"] = new()
+                                    {
+                                        Example = new DateTimeOffset(2026, 3, 26, 0, 0, 0, TimeSpan.Zero)
+                                    }
+                                },
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["message"] = "Hello"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("2026-03-26T00:00:00.0000000+00:00", response.Headers["Last-Modified"].Single());
+    }
+
+    [Fact]
+    public void TryGetResponse_JoinsArrayHeaderExamplesUsingHttpHeaderFormatting()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/hello"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Headers = new Dictionary<string, HeaderDefinition>(StringComparer.OrdinalIgnoreCase)
+                                {
+                                    ["Vary"] = new()
+                                    {
+                                        Schema = new HeaderSchemaDefinition
+                                        {
+                                            Example = new List<object> { "Accept-Encoding", "Origin" }
+                                        }
+                                    }
+                                },
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["message"] = "Hello"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("Accept-Encoding, Origin", response.Headers["Vary"].Single());
+    }
+
+    [Fact]
+    public void TryGetResponse_PreservesSeparateSetCookieHeaderValues()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/hello"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Headers = new Dictionary<string, HeaderDefinition>(StringComparer.OrdinalIgnoreCase)
+                                {
+                                    ["Set-Cookie"] = new()
+                                    {
+                                        Schema = new HeaderSchemaDefinition
+                                        {
+                                            Example = new List<object> { "a=1; Path=/", "b=2; Path=/" }
+                                        }
+                                    }
+                                },
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["message"] = "Hello"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal(new[] { "a=1; Path=/", "b=2; Path=/" }, response.Headers["Set-Cookie"].ToArray());
+    }
+
+    [Fact]
+    public void TryGetResponse_ReturnsConfiguredHeadersFromMatchedResponse()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["role"] = "admin"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Headers = new Dictionary<string, HeaderDefinition>(StringComparer.OrdinalIgnoreCase)
+                                    {
+                                        ["X-User-Role"] = new()
+                                        {
+                                            Example = "admin"
+                                        }
+                                    },
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new()
+                                        {
+                                            Example = new Dictionary<object, object>
+                                            {
+                                                ["message"] = "admin"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+        var query = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["role"] = "admin"
+        };
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("admin", response.Headers["X-User-Role"].Single());
+    }
+
+    [Fact]
     public void TryGetResponse_UsesPutOperationWhenConfigured()
     {
         var document = new StubDocument
