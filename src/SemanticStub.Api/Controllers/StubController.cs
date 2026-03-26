@@ -16,22 +16,23 @@ public sealed class StubController : ControllerBase
     }
 
     [HttpGet]
-    public IActionResult Get(string? path)
+    public Task<IActionResult> Get(string? path)
     {
         return HandleRequest(HttpMethods.Get, path);
     }
 
     [HttpPost]
-    public IActionResult Post(string? path)
+    public Task<IActionResult> Post(string? path)
     {
         return HandleRequest(HttpMethods.Post, path);
     }
 
-    private IActionResult HandleRequest(string method, string? path)
+    private async Task<IActionResult> HandleRequest(string method, string? path)
     {
         var requestPath = string.IsNullOrEmpty(path) ? "/" : "/" + path;
         var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.Ordinal);
-        var matchResult = stubService.TryGetResponse(method, requestPath, query, out var response);
+        var requestBody = await ReadRequestBodyAsync();
+        var matchResult = stubService.TryGetResponse(method, requestPath, query, requestBody, out var response);
 
         if (matchResult == StubMatchResult.PathNotFound)
         {
@@ -54,5 +55,13 @@ public sealed class StubController : ControllerBase
             ContentType = response.ContentType,
             Content = response.Body
         };
+    }
+
+    private async Task<string?> ReadRequestBodyAsync()
+    {
+        using var reader = new StreamReader(Request.Body);
+        var body = await reader.ReadToEndAsync();
+
+        return string.IsNullOrWhiteSpace(body) ? null : body;
     }
 }

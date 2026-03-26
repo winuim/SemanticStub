@@ -418,4 +418,218 @@ public sealed class StubServiceTests
 
         Assert.Equal(StubMatchResult.ResponseNotConfigured, matched);
     }
+
+    [Fact]
+    public void TryGetResponse_MatchesResponseUsingRequestBody()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/login"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Body = new Dictionary<object, object>
+                                {
+                                    ["username"] = "demo",
+                                    ["password"] = "secret"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new()
+                                        {
+                                            Example = new Dictionary<object, object>
+                                            {
+                                                ["result"] = "ok"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["result"] = "fallback"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var matched = service.TryGetResponse(
+            HttpMethods.Post,
+            "/login",
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            "{\"username\":\"demo\",\"password\":\"secret\",\"rememberMe\":true}",
+            out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("{\"result\":\"ok\"}", response.Body);
+    }
+
+    [Fact]
+    public void TryGetResponse_PrefersMoreSpecificBodyMatch()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/login"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Body = new Dictionary<object, object>
+                                {
+                                    ["username"] = "demo"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new()
+                                        {
+                                            Example = new Dictionary<object, object>
+                                            {
+                                                ["result"] = "basic"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            new QueryMatchDefinition
+                            {
+                                Body = new Dictionary<object, object>
+                                {
+                                    ["username"] = "demo",
+                                    ["password"] = "secret"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new()
+                                        {
+                                            Example = new Dictionary<object, object>
+                                            {
+                                                ["result"] = "specific"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var matched = service.TryGetResponse(
+            HttpMethods.Post,
+            "/login",
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            "{\"username\":\"demo\",\"password\":\"secret\"}",
+            out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("{\"result\":\"specific\"}", response.Body);
+    }
+
+    [Fact]
+    public void TryGetResponse_FallsBackToDefaultResponseWhenBodyIsInvalidJson()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/login"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Body = new Dictionary<object, object>
+                                {
+                                    ["username"] = "demo"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new()
+                                        {
+                                            Example = new Dictionary<object, object>
+                                            {
+                                                ["result"] = "matched"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["result"] = "fallback"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var matched = service.TryGetResponse(
+            HttpMethods.Post,
+            "/login",
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            "{not-json",
+            out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("{\"result\":\"fallback\"}", response.Body);
+    }
 }
