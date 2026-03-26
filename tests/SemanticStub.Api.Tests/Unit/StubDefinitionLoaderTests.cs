@@ -140,6 +140,92 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_ThrowsForMalformedMatchedResponseWithoutResponse()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  x-match:
+                    - query:
+                        role: admin
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: default
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0] must define a positive statusCode", exception.Message);
+        Assert.Contains("x-match[0].response must define 'application/json' content or 'x-response-file'", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsForMatchedResponseWithMissingResponseFile()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  x-match:
+                    - query:
+                        role: admin
+                      response:
+                        statusCode: 200
+                        x-response-file: admin-users.json
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: default
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("references missing response file 'admin-users.json'", exception.Message);
+        Assert.Contains("Path '/users' GET x-match[0].response", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsForUnsupportedResponseStatusKey()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /hello:
+                get:
+                  responses:
+                    default:
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: hello
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("uses unsupported response key 'default'", exception.Message);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_ThrowsWhenResponseFileContentTypeIsInvalid()
     {
         using var workspace = TestWorkspace.Create(

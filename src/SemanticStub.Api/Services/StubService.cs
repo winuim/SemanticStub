@@ -169,6 +169,11 @@ public sealed class StubService
             return null;
         }
 
+        if (mediaType.Example is null)
+        {
+            return null;
+        }
+
         return StubDefinitionLoader.SerializeExample(mediaType.Example);
     }
 }
