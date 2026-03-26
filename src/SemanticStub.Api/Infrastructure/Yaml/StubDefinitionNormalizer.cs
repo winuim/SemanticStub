@@ -50,6 +50,7 @@ internal sealed class StubDefinitionNormalizer
                     {
                         StatusCode = match.Response.StatusCode,
                         ResponseFile = StubDefinitionPathResolver.ResolveResponseFilePath(definitionDirectory, match.Response.ResponseFile),
+                        Headers = new Dictionary<string, HeaderDefinition>(match.Response.Headers, StringComparer.OrdinalIgnoreCase),
                         Content = new Dictionary<string, MediaTypeDefinition>(match.Response.Content, StringComparer.Ordinal)
                     }
                 })
@@ -60,6 +61,7 @@ internal sealed class StubDefinitionNormalizer
                 {
                     Description = entry.Value.Description,
                     ResponseFile = StubDefinitionPathResolver.ResolveResponseFilePath(definitionDirectory, entry.Value.ResponseFile),
+                    Headers = new Dictionary<string, HeaderDefinition>(entry.Value.Headers, StringComparer.OrdinalIgnoreCase),
                     Content = new Dictionary<string, MediaTypeDefinition>(entry.Value.Content, StringComparer.Ordinal)
                 },
                 StringComparer.Ordinal)
