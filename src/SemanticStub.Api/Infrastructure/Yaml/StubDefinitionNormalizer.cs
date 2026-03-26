@@ -22,7 +22,10 @@ internal sealed class StubDefinitionNormalizer
         return new PathItemDefinition
         {
             Get = NormalizeOperation(pathItem.Get, definitionDirectory),
-            Post = NormalizeOperation(pathItem.Post, definitionDirectory)
+            Post = NormalizeOperation(pathItem.Post, definitionDirectory),
+            Put = NormalizeOperation(pathItem.Put, definitionDirectory),
+            Patch = NormalizeOperation(pathItem.Patch, definitionDirectory),
+            Delete = NormalizeOperation(pathItem.Delete, definitionDirectory)
         };
     }
 
