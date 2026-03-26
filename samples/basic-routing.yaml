@@ -10,6 +10,10 @@ paths:
       responses:
         '200':
           description: Successful response
+          headers:
+            X-Stub-Source:
+              description: Response source identifier
+              example: hello
           content:
             application/json:
               schema:
@@ -31,6 +35,10 @@ paths:
             role: admin
           response:
             statusCode: 200
+            headers:
+              X-User-Role:
+                description: Matched user role
+                example: admin
             content:
               application/json:
                 example:

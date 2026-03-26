@@ -6,5 +6,7 @@ public sealed class StubResponse
 
     public string ContentType { get; init; } = "application/json";
 
+    public IReadOnlyDictionary<string, string> Headers { get; init; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
     public string Body { get; init; } = string.Empty;
 }

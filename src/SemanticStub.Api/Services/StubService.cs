@@ -1,6 +1,8 @@
 using SemanticStub.Api.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Utilities;
+using System.Collections;
+using System.Globalization;
 
 namespace SemanticStub.Api.Services;
 
@@ -131,6 +133,7 @@ public sealed class StubService
         {
             StatusCode = statusCode,
             ContentType = JsonContentType,
+            Headers = BuildResponseHeaders(matchedResponse.Value.Headers),
             Body = responseBody
         };
 
@@ -269,6 +272,7 @@ public sealed class StubService
         {
             StatusCode = matchedCandidate.Response.StatusCode,
             ContentType = JsonContentType,
+            Headers = BuildResponseHeaders(matchedCandidate.Response.Headers),
             Body = responseBody
         };
 
@@ -297,5 +301,60 @@ public sealed class StubService
         }
 
         return StubExampleSerializer.Serialize(mediaType.Example);
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildResponseHeaders(IReadOnlyDictionary<string, HeaderDefinition> headers)
+    {
+        if (headers.Count == 0)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var resolvedHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var header in headers)
+        {
+            var resolvedValue = ResolveHeaderValue(header.Value);
+
+            if (string.IsNullOrEmpty(resolvedValue))
+            {
+                continue;
+            }
+
+            resolvedHeaders[header.Key] = resolvedValue;
+        }
+
+        return resolvedHeaders;
+    }
+
+    private static string? ResolveHeaderValue(HeaderDefinition header)
+    {
+        return ConvertHeaderValueToString(header.Example)
+            ?? ConvertHeaderValueToString(header.Schema?.Example);
+    }
+
+    private static string? ConvertHeaderValueToString(object? value)
+    {
+        return value switch
+        {
+            null => null,
+            string text => text,
+            bool boolean => boolean ? "true" : "false",
+            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal
+                => Convert.ToString(value, CultureInfo.InvariantCulture),
+            IEnumerable sequence => ConvertHeaderSequenceToString(sequence),
+            _ => StubExampleSerializer.Serialize(value)
+        };
+    }
+
+    private static string? ConvertHeaderSequenceToString(IEnumerable sequence)
+    {
+        var values = sequence
+            .Cast<object?>()
+            .Select(ConvertHeaderValueToString)
+            .Where(static value => !string.IsNullOrEmpty(value))
+            .ToArray();
+
+        return values.Length == 0 ? null : string.Join(", ", values);
     }
 }

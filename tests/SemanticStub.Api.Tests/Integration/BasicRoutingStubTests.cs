@@ -21,6 +21,7 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("hello", response.Headers.GetValues("X-Stub-Source").Single());
 
         var payload = await response.Content.ReadFromJsonAsync<HelloResponse>();
         Assert.NotNull(payload);
@@ -56,6 +57,7 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
         var response = await client.GetAsync("/users?role=admin");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("admin", response.Headers.GetValues("X-User-Role").Single());
         var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
         Assert.NotNull(payload);
         Assert.Single(payload.Users);

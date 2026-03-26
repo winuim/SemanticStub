@@ -9,5 +9,7 @@ public sealed class ResponseDefinition
     [YamlMember(Alias = "x-response-file", ApplyNamingConventions = false)]
     public string? ResponseFile { get; init; }
 
+    public Dictionary<string, HeaderDefinition> Headers { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
     public Dictionary<string, MediaTypeDefinition> Content { get; init; } = new(StringComparer.Ordinal);
 }

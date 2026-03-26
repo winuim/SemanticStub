@@ -46,6 +46,42 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_PreservesResponseHeadersDuringNormalization()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /hello:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      headers:
+                        X-Stub-Source:
+                          description: Response source
+                          example: loader
+                        X-Trace-Id:
+                          schema:
+                            type: integer
+                            example: 42
+                      content:
+                        application/json:
+                          example:
+                            message: hello
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var operation = Assert.IsType<OperationDefinition>(document.Paths["/hello"].Get);
+        var response = operation.Responses["200"];
+
+        Assert.Equal("loader", response.Headers["X-Stub-Source"].Example);
+        Assert.Equal("42", Convert.ToString(response.Headers["X-Trace-Id"].Schema?.Example, System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_ThrowsWhenOpenApiIsMissing()
     {
         using var workspace = TestWorkspace.Create(

@@ -68,6 +68,16 @@ public sealed class StubController : ControllerBase
             return NotFound();
         }
 
+        foreach (var header in response.Headers)
+        {
+            if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            Response.Headers[header.Key] = header.Value;
+        }
+
         return new ContentResult
         {
             StatusCode = response.StatusCode,
