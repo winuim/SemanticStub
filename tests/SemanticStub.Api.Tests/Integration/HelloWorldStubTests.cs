@@ -129,6 +129,22 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
+    public async Task GetUsersWithEnvironmentHeader_ReturnsHeaderSpecificUsers()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/environment-users");
+        request.Headers.Add("X-Env", "staging");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Single(payload.Users);
+        Assert.Equal("Staging Alice", payload.Users[0].Name);
+        Assert.Equal("staging", payload.Users[0].Role);
+    }
+
+    [Fact]
     public async Task PostLogin_ReturnsJsonExampleFromYaml()
     {
         var response = await client.PostAsJsonAsync("/login", new LoginRequest
