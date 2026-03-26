@@ -154,6 +154,7 @@ internal sealed class StubDefinitionValidator
 
         if (!string.IsNullOrWhiteSpace(responseFile))
         {
+            // File-backed responses reuse the declared media type, so an inline example is optional.
             return;
         }
 

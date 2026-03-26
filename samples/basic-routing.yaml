@@ -282,3 +282,47 @@ paths:
                   - result
               example:
                 result: deleted
+
+  /orders/{orderId}:
+    get:
+      operationId: getOrderById
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order found by template path
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  result:
+                    type: string
+                required:
+                  - result
+              example:
+                result: pattern
+
+  /orders/special:
+    get:
+      operationId: getSpecialOrder
+      responses:
+        '200':
+          description: Special exact-match order
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  result:
+                    type: string
+                required:
+                  - result
+              example:
+                result: exact
