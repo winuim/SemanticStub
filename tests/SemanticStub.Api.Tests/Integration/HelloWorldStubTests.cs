@@ -143,6 +143,24 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
         var payload = await response.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(payload);
         Assert.Equal("ok", payload.Result);
+        Assert.Equal("demo-token", payload.Token);
+    }
+
+    [Fact]
+    public async Task PostLogin_WithUnknownCredentials_ReturnsDefaultResponse()
+    {
+        var response = await client.PostAsJsonAsync("/login", new LoginRequest
+        {
+            Username = "other",
+            Password = "wrong"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("invalid", payload.Result);
+        Assert.Null(payload.Token);
     }
 
     [Fact]
@@ -192,5 +210,7 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
     public sealed class LoginResponse
     {
         public string Result { get; init; } = string.Empty;
+
+        public string? Token { get; init; }
     }
 }

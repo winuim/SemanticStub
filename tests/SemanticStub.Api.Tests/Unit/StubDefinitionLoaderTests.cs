@@ -278,6 +278,44 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_LoadsBodyMatchDefinitions()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /login:
+                post:
+                  x-match:
+                    - body:
+                        username: demo
+                        password: secret
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              result: ok
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            result: fallback
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var match = Assert.Single(document.Paths["/login"].Post!.Matches);
+
+        var body = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(match.Body);
+        Assert.Equal("demo", body["username"]);
+        Assert.Equal("secret", body["password"]);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_LoadsValidDefinition()
     {
         using var workspace = TestWorkspace.Create(
