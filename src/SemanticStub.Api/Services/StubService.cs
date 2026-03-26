@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Text.Json;
 using SemanticStub.Api.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
 
@@ -10,23 +8,35 @@ public sealed class StubService
     private const string JsonContentType = "application/json";
     private readonly StubDocument document;
     private readonly Func<string, string> responseFileReader;
+    private readonly MatcherService matcherService;
 
     public StubService(StubDefinitionLoader loader)
+        : this(loader, new MatcherService())
+    {
+    }
+
+    public StubService(StubDefinitionLoader loader, MatcherService matcherService)
     {
         document = loader.LoadDefaultDefinition();
         responseFileReader = loader.LoadResponseFileContent;
+        this.matcherService = matcherService;
     }
 
     public StubService(StubDocument document)
+        : this(document, _ => throw new InvalidOperationException("No response file reader configured."), new MatcherService())
     {
-        this.document = document;
-        responseFileReader = _ => throw new InvalidOperationException("No response file reader configured.");
     }
 
     public StubService(StubDocument document, Func<string, string> responseFileReader)
+        : this(document, responseFileReader, new MatcherService())
+    {
+    }
+
+    internal StubService(StubDocument document, Func<string, string> responseFileReader, MatcherService matcherService)
     {
         this.document = document;
         this.responseFileReader = responseFileReader;
+        this.matcherService = matcherService;
     }
 
     public StubMatchResult TryGetResponse(string method, string path, out StubResponse response)
@@ -123,12 +133,7 @@ public sealed class StubService
             return QueryMatchEvaluationResult.NoMatch;
         }
 
-        using var bodyDocument = ParseRequestBody(body);
-        var matchedCandidate = operation.Matches
-            .Where(candidate => IsExactQueryMatch(candidate.Query, query))
-            .Where(candidate => IsBodyMatch(candidate.Body, bodyDocument?.RootElement))
-            .OrderByDescending(GetMatchSpecificity)
-            .FirstOrDefault();
+        var matchedCandidate = matcherService.FindBestMatch(operation, query, body);
 
         if (matchedCandidate is null)
         {
@@ -151,133 +156,6 @@ public sealed class StubService
 
         return QueryMatchEvaluationResult.Matched;
     }
-
-    private static bool IsExactQueryMatch(IReadOnlyDictionary<string, string> expected, IReadOnlyDictionary<string, string> actual)
-    {
-        foreach (var pair in expected)
-        {
-            if (!actual.TryGetValue(pair.Key, out var value) || value != pair.Value)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static JsonDocument? ParseRequestBody(string? body)
-    {
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            return null;
-        }
-
-        try
-        {
-            return JsonDocument.Parse(body);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    private static bool IsBodyMatch(object? expectedBody, JsonElement? actualBody)
-    {
-        if (expectedBody is null)
-        {
-            return true;
-        }
-
-        if (actualBody is null)
-        {
-            return false;
-        }
-
-        var expectedJson = StubDefinitionLoader.SerializeExample(expectedBody);
-        using var expectedDocument = JsonDocument.Parse(expectedJson);
-
-        return IsJsonMatch(expectedDocument.RootElement, actualBody.Value);
-    }
-
-    private static bool IsJsonMatch(JsonElement expected, JsonElement actual)
-    {
-        if (expected.ValueKind == JsonValueKind.Object)
-        {
-            if (actual.ValueKind != JsonValueKind.Object)
-            {
-                return false;
-            }
-
-            foreach (var property in expected.EnumerateObject())
-            {
-                if (!actual.TryGetProperty(property.Name, out var actualProperty) ||
-                    !IsJsonMatch(property.Value, actualProperty))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        if (expected.ValueKind == JsonValueKind.Array)
-        {
-            if (actual.ValueKind != JsonValueKind.Array)
-            {
-                return false;
-            }
-
-            var expectedItems = expected.EnumerateArray().ToArray();
-            var actualItems = actual.EnumerateArray().ToArray();
-
-            if (expectedItems.Length != actualItems.Length)
-            {
-                return false;
-            }
-
-            for (var index = 0; index < expectedItems.Length; index++)
-            {
-                if (!IsJsonMatch(expectedItems[index], actualItems[index]))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        if (expected.ValueKind != actual.ValueKind)
-        {
-            return false;
-        }
-
-        return expected.ValueKind switch
-        {
-            JsonValueKind.String => expected.GetString() == actual.GetString(),
-            JsonValueKind.Number => expected.GetRawText() == actual.GetRawText(),
-            JsonValueKind.True or JsonValueKind.False => expected.GetBoolean() == actual.GetBoolean(),
-            JsonValueKind.Null => true,
-            _ => expected.GetRawText() == actual.GetRawText()
-        };
-    }
-
-    private static int GetMatchSpecificity(QueryMatchDefinition match)
-    {
-        return match.Query.Count + GetBodySpecificity(match.Body);
-    }
-
-    private static int GetBodySpecificity(object? body)
-    {
-        return body switch
-        {
-            null => 0,
-            IDictionary dictionary => dictionary.Count + dictionary.Values.Cast<object?>().Sum(GetBodySpecificity),
-            IEnumerable list when body is not string => list.Cast<object?>().Sum(GetBodySpecificity),
-            _ => 1
-        };
-    }
-
     private string? BuildResponseBody(ResponseDefinition responseDefinition)
     {
         return BuildResponseBody(responseDefinition.ResponseFile, responseDefinition.Content);
