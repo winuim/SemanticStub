@@ -41,6 +41,7 @@ internal sealed class StubDefinitionNormalizer
                 .. operation.Matches.Select(match => new QueryMatchDefinition
                 {
                     Query = new Dictionary<string, string>(match.Query, StringComparer.Ordinal),
+                    Headers = new Dictionary<string, string>(match.Headers, StringComparer.OrdinalIgnoreCase),
                     Body = StubExampleSerializer.NormalizeValue(match.Body),
                     Response = new QueryMatchResponseDefinition
                     {

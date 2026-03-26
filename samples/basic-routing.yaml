@@ -64,6 +64,7 @@ paths:
                     - id: 2
                       name: Bob
                       role: guest
+
       responses:
         '200':
           description: Default user list
@@ -89,6 +90,60 @@ paths:
                         - name
                 required:
                   - users
+
+  /environment-users:
+    get:
+      operationId: listEnvironmentUsers
+      parameters:
+        - name: X-Env
+          in: header
+          required: false
+          schema:
+            type: string
+      x-match:
+        - headers:
+            X-Env: staging
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  users:
+                    - id: 3
+                      name: Staging Alice
+                      role: staging
+      responses:
+        '200':
+          description: Default environment user list
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        role:
+                          type: string
+                      required:
+                        - id
+                        - name
+                        - role
+                required:
+                  - users
+              example:
+                users:
+                  - id: 4
+                    name: Default User
+                    role: default
 
   /login:
     post:
