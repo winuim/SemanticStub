@@ -180,6 +180,50 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
+    public async Task PutProfile_ReturnsConfiguredResponse()
+    {
+        var response = await client.PutAsJsonAsync("/profile", new ProfileRequest
+        {
+            DisplayName = "Updated User"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<MutationResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("replaced", payload.Result);
+    }
+
+    [Fact]
+    public async Task PatchProfile_WithMatchingBody_ReturnsSpecificResponse()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Patch, "/profile")
+        {
+            Content = JsonContent.Create(new ProfilePatchRequest
+            {
+                Nickname = "stubby"
+            })
+        };
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<MutationResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("patched-specific", payload.Result);
+    }
+
+    [Fact]
+    public async Task DeleteProfile_ReturnsConfiguredResponse()
+    {
+        var response = await client.DeleteAsync("/profile");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<MutationResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("deleted", payload.Result);
+    }
+
+    [Fact]
     public async Task GetLogin_ReturnsMethodNotAllowed()
     {
         var response = await client.GetAsync("/login");
@@ -191,6 +235,14 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
     public async Task PostHello_ReturnsMethodNotAllowed()
     {
         var response = await client.PostAsync("/hello", content: null);
+
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetProfile_ReturnsMethodNotAllowed()
+    {
+        var response = await client.GetAsync("/profile");
 
         Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
     }
@@ -228,5 +280,20 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
         public string Result { get; init; } = string.Empty;
 
         public string? Token { get; init; }
+    }
+
+    public sealed class ProfileRequest
+    {
+        public string DisplayName { get; init; } = string.Empty;
+    }
+
+    public sealed class ProfilePatchRequest
+    {
+        public string Nickname { get; init; } = string.Empty;
+    }
+
+    public sealed class MutationResponse
+    {
+        public string Result { get; init; } = string.Empty;
     }
 }

@@ -27,6 +27,24 @@ public sealed class StubController : ControllerBase
         return HandleRequest(HttpMethods.Post, path);
     }
 
+    [HttpPut]
+    public Task<IActionResult> Put(string? path)
+    {
+        return HandleRequest(HttpMethods.Put, path);
+    }
+
+    [HttpPatch]
+    public Task<IActionResult> Patch(string? path)
+    {
+        return HandleRequest(HttpMethods.Patch, path);
+    }
+
+    [HttpDelete]
+    public Task<IActionResult> Delete(string? path)
+    {
+        return HandleRequest(HttpMethods.Delete, path);
+    }
+
     private async Task<IActionResult> HandleRequest(string method, string? path)
     {
         var requestPath = string.IsNullOrEmpty(path) ? "/" : "/" + path;
