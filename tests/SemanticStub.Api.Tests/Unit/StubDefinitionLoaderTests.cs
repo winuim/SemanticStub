@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Options;
 using SemanticStub.Api.Infrastructure.Yaml;
 using Xunit;
 
@@ -241,7 +242,10 @@ public sealed class StubDefinitionLoaderTests
                       content:
                         text/plain: {}
             """,
-            ("users.json", "[{\"id\":1,\"name\":\"Alice\"}]"));
+            sampleFiles:
+            [
+                ("users.json", "[{\"id\":1,\"name\":\"Alice\"}]")
+            ]);
 
         var loader = new StubDefinitionLoader(workspace.Environment);
 
@@ -287,7 +291,10 @@ public sealed class StubDefinitionLoaderTests
                       description: ok
                       x-response-file: users.json
             """,
-            ("users.json", "[{\"id\":1,\"name\":\"Alice\"}]"));
+            sampleFiles:
+            [
+                ("users.json", "[{\"id\":1,\"name\":\"Alice\"}]")
+            ]);
 
         var loader = new StubDefinitionLoader(workspace.Environment);
 
@@ -295,6 +302,280 @@ public sealed class StubDefinitionLoaderTests
 
         Assert.Equal("3.1.0", document.OpenApi);
         Assert.True(document.Paths.ContainsKey("/users"));
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_UsesConfiguredDefinitionsPath()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /configured:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: configured
+            """,
+            definitionsDirectoryName: "custom-stubs");
+
+        var loader = new StubDefinitionLoader(
+            workspace.Environment,
+            Options.Create(new StubSettings
+            {
+                DefinitionsPath = "custom-stubs"
+            }));
+
+        var document = loader.LoadDefaultDefinition();
+
+        Assert.True(document.Paths.ContainsKey("/configured"));
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ResolvesResponseFileRelativeToDefinitionFile()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      x-response-file: responses/users.json
+            """,
+            sampleFiles:
+            [
+                ("responses/users.json", "[{\"id\":1,\"name\":\"Alice\"}]")
+            ]);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var responseFile = document.Paths["/users"].Get!.Responses["200"].ResponseFile;
+
+        Assert.Equal(
+            Path.Combine(workspace.RootPath, "samples", "responses", "users.json"),
+            responseFile);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ResolvesResponseFileRelativeToAdditionalDefinitionFile()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /status:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            status: base
+            """,
+            additionalStubFiles:
+            [
+                ("features/orders.stub.yaml",
+                """
+                openapi: 3.1.0
+                paths:
+                  /orders:
+                    get:
+                      responses:
+                        "200":
+                          description: ok
+                          x-response-file: responses/orders.json
+                """),
+                ("features/responses/orders.json", "[{\"id\":10}]")
+            ]);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var responseFile = document.Paths["/orders"].Get!.Responses["200"].ResponseFile;
+
+        Assert.Equal(
+            Path.Combine(workspace.RootPath, "samples", "features", "responses", "orders.json"),
+            responseFile);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_LoadsAdditionalStubFiles()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            source: base
+            """,
+            additionalStubFiles:
+            [
+                ("orders.stub.yaml",
+                """
+                openapi: 3.1.0
+                paths:
+                  /orders:
+                    get:
+                      responses:
+                        "200":
+                          description: ok
+                          content:
+                            application/json:
+                              example:
+                                source: additional
+                """)
+            ]);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+
+        Assert.Equal("3.1.0", document.OpenApi);
+        Assert.True(document.Paths.ContainsKey("/users"));
+        Assert.True(document.Paths.ContainsKey("/orders"));
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_MergesDistinctMethodsAcrossStubFiles()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            method: get
+            """,
+            additionalStubFiles:
+            [
+                ("users.stub.yaml",
+                """
+                openapi: 3.1.0
+                paths:
+                  /users:
+                    post:
+                      responses:
+                        "201":
+                          description: created
+                          content:
+                            application/json:
+                              example:
+                                method: post
+                """)
+            ]);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+
+        Assert.NotNull(document.Paths["/users"].Get);
+        Assert.NotNull(document.Paths["/users"].Post);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenStubFilesDefineSamePathAndMethod()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            source: base
+            """,
+            additionalStubFiles:
+            [
+                ("users.stub.yaml",
+                """
+                openapi: 3.1.0
+                paths:
+                  /users:
+                    get:
+                      responses:
+                        "200":
+                          description: ok
+                          content:
+                            application/json:
+                              example:
+                                source: duplicate
+                """)
+            ]);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("Path '/users' GET is defined in both 'basic-routing.yaml' and 'users.stub.yaml'.", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenStubFilesUseDifferentOpenApiVersions()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            source: base
+            """,
+            additionalStubFiles:
+            [
+                ("orders.stub.yaml",
+                """
+                openapi: 3.0.3
+                paths:
+                  /orders:
+                    get:
+                      responses:
+                        "200":
+                          description: ok
+                          content:
+                            application/json:
+                              example:
+                                source: additional
+                """)
+            ]);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("must use the same 'openapi' version", exception.Message);
     }
 
     private sealed class TestWorkspace : IDisposable
@@ -312,19 +593,41 @@ public sealed class StubDefinitionLoaderTests
 
         public IWebHostEnvironment Environment { get; }
 
-        public static TestWorkspace Create(string yaml, params (string FileName, string Content)[] sampleFiles)
+        public static TestWorkspace Create(
+            string yaml,
+            (string FileName, string Content)[]? sampleFiles = null,
+            (string FileName, string Content)[]? additionalStubFiles = null,
+            string definitionsDirectoryName = "samples")
         {
             var rootPath = Path.Combine(Path.GetTempPath(), "semanticstub-tests", Guid.NewGuid().ToString("N"));
-            var samplesPath = Path.Combine(rootPath, "samples");
+            var samplesPath = Path.Combine(rootPath, definitionsDirectoryName);
             Directory.CreateDirectory(samplesPath);
-            File.WriteAllText(Path.Combine(samplesPath, "basic-routing.yaml"), yaml);
+            WriteFile(samplesPath, "basic-routing.yaml", yaml);
 
-            foreach (var (fileName, content) in sampleFiles)
+            foreach (var (fileName, content) in sampleFiles ?? [])
             {
-                File.WriteAllText(Path.Combine(samplesPath, fileName), content);
+                WriteFile(samplesPath, fileName, content);
+            }
+
+            foreach (var (fileName, content) in additionalStubFiles ?? [])
+            {
+                WriteFile(samplesPath, fileName, content);
             }
 
             return new TestWorkspace(rootPath);
+        }
+
+        private static void WriteFile(string rootPath, string relativePath, string content)
+        {
+            var fullPath = Path.Combine(rootPath, relativePath);
+            var directoryPath = Path.GetDirectoryName(fullPath);
+
+            if (!string.IsNullOrWhiteSpace(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
+
+            File.WriteAllText(fullPath, content);
         }
 
         public void Dispose()
