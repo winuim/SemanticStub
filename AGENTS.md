@@ -95,6 +95,16 @@ Supports YAML-based stub definitions with optional semantic matching using embed
 
 ---
 
+## Code Style
+
+- Add comments where intent is not obvious
+- Explain "why", not "what"
+- Avoid redundant comments
+- Document complex logic and design decisions
+- Prefer clear and readable code over clever code
+
+---
+
 ## YAML Design Rules
 
 - YAML is the source of truth
