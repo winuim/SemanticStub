@@ -452,6 +452,7 @@ public sealed class StubDefinitionLoader
                 .. operation.Matches.Select(match => new QueryMatchDefinition
                 {
                     Query = new Dictionary<string, string>(match.Query, StringComparer.Ordinal),
+                    Body = NormalizeYamlValue(match.Body),
                     Response = new QueryMatchResponseDefinition
                     {
                         StatusCode = match.Response.StatusCode,
