@@ -116,6 +116,36 @@ public sealed class MatcherServiceTests
     }
 
     [Fact]
+    public void FindBestMatch_OldOverloadRemainsCompatible()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "admin"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin"
+            },
+            body: null);
+
+        Assert.NotNull(match);
+    }
+
+    [Fact]
     public void FindBestMatch_MatchesHeadersUsingCaseInsensitiveHeaderNames()
     {
         var operation = new OperationDefinition

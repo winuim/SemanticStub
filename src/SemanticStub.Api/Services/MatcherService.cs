@@ -10,6 +10,18 @@ public sealed class MatcherService
     public QueryMatchDefinition? FindBestMatch(
         OperationDefinition operation,
         IReadOnlyDictionary<string, string> query,
+        string? body)
+    {
+        return FindBestMatch(
+            operation,
+            query,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body);
+    }
+
+    public QueryMatchDefinition? FindBestMatch(
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, string> query,
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {

@@ -94,6 +94,12 @@ paths:
   /environment-users:
     get:
       operationId: listEnvironmentUsers
+      parameters:
+        - name: X-Env
+          in: header
+          required: false
+          schema:
+            type: string
       x-match:
         - headers:
             X-Env: staging
