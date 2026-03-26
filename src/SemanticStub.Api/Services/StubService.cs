@@ -147,6 +147,21 @@ public sealed class StubService
             return pathItem.Post;
         }
 
+        if (HttpMethods.IsPut(method))
+        {
+            return pathItem.Put;
+        }
+
+        if (HttpMethods.IsPatch(method))
+        {
+            return pathItem.Patch;
+        }
+
+        if (HttpMethods.IsDelete(method))
+        {
+            return pathItem.Delete;
+        }
+
         return null;
     }
 
