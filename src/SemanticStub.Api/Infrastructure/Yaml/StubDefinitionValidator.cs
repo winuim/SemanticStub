@@ -4,7 +4,6 @@ namespace SemanticStub.Api.Infrastructure.Yaml;
 
 internal sealed class StubDefinitionValidator
 {
-    private const string JsonContentType = "application/json";
 
     public void ValidateDocument(StubDocument document, string definitionDirectory)
     {
@@ -140,15 +139,9 @@ internal sealed class StubDefinitionValidator
         {
             if (string.IsNullOrWhiteSpace(responseFile))
             {
-                errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define '{JsonContentType}' content or 'x-response-file'.");
+                errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define content or 'x-response-file'.");
             }
 
-            return;
-        }
-
-        if (!content.TryGetValue(JsonContentType, out var mediaType))
-        {
-            errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define '{JsonContentType}' content or 'x-response-file'.");
             return;
         }
 
@@ -158,9 +151,12 @@ internal sealed class StubDefinitionValidator
             return;
         }
 
-        if (mediaType.Example is null)
+        // At least one media type must provide an inline example.
+        // We report against the first entry to give a concrete target in the error message.
+        if (content.All(static entry => entry.Value.Example is null))
         {
-            errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define an example for '{JsonContentType}'.");
+            var firstKey = content.First().Key;
+            errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define an example for '{firstKey}'.");
         }
     }
 }
