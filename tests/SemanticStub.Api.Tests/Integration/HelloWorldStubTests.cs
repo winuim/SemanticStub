@@ -213,6 +213,25 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
     }
 
     [Fact]
+    public async Task PatchProfile_WithNonMatchingBody_ReturnsFallbackResponse()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Patch, "/profile")
+        {
+            Content = JsonContent.Create(new ProfilePatchRequest
+            {
+                Nickname = "other"
+            })
+        };
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<MutationResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("patched", payload.Result);
+    }
+
+    [Fact]
     public async Task DeleteProfile_ReturnsConfiguredResponse()
     {
         var response = await client.DeleteAsync("/profile");
