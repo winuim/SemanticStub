@@ -239,7 +239,7 @@ public sealed class StubDefinitionLoaderTests
         var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
 
         Assert.Contains("x-match[0] must define a positive statusCode", exception.Message);
-        Assert.Contains("x-match[0].response must define 'application/json' content or 'x-response-file'", exception.Message);
+        Assert.Contains("x-match[0].response must define content or 'x-response-file'", exception.Message);
     }
 
     [Fact]
@@ -297,34 +297,6 @@ public sealed class StubDefinitionLoaderTests
         var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
 
         Assert.Contains("uses unsupported response key 'default'", exception.Message);
-    }
-
-    [Fact]
-    public void LoadDefaultDefinition_ThrowsWhenResponseFileContentTypeIsInvalid()
-    {
-        using var workspace = TestWorkspace.Create(
-            """
-            openapi: 3.1.0
-            paths:
-              /users:
-                get:
-                  responses:
-                    "200":
-                      description: ok
-                      x-response-file: users.json
-                      content:
-                        text/plain: {}
-            """,
-            sampleFiles:
-            [
-                ("users.json", "[{\"id\":1,\"name\":\"Alice\"}]")
-            ]);
-
-        var loader = new StubDefinitionLoader(workspace.Environment);
-
-        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
-
-        Assert.Contains("must define 'application/json' content or 'x-response-file'", exception.Message);
     }
 
     [Fact]
