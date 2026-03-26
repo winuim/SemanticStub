@@ -194,3 +194,91 @@ paths:
                   - result
               example:
                 result: invalid
+
+  /profile:
+    put:
+      operationId: replaceProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                displayName:
+                  type: string
+              required:
+                - displayName
+            example:
+              displayName: Updated User
+      responses:
+        '200':
+          description: Profile replaced
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  result:
+                    type: string
+                required:
+                  - result
+              example:
+                result: replaced
+
+    patch:
+      operationId: patchProfile
+      x-match:
+        - body:
+            nickname: stubby
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  result: patched-specific
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              properties:
+                nickname:
+                  type: string
+      responses:
+        '200':
+          description: Profile patched
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  result:
+                    type: string
+                required:
+                  - result
+              example:
+                result: patched
+
+    delete:
+      operationId: deleteProfile
+      responses:
+        '200':
+          description: Profile deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  result:
+                    type: string
+                required:
+                  - result
+              example:
+                result: deleted

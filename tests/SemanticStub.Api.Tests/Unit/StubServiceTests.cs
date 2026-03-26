@@ -85,6 +85,86 @@ public sealed class StubServiceTests
     }
 
     [Fact]
+    public void TryGetResponse_UsesPutOperationWhenConfigured()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/profile"] = new()
+                {
+                    Put = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["result"] = "replaced"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var matched = service.TryGetResponse(HttpMethods.Put, "/profile", out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("{\"result\":\"replaced\"}", response.Body);
+    }
+
+    [Fact]
+    public void TryGetResponse_UsesDeleteOperationWhenConfigured()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/profile"] = new()
+                {
+                    Delete = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["result"] = "deleted"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var matched = service.TryGetResponse(HttpMethods.Delete, "/profile", out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("{\"result\":\"deleted\"}", response.Body);
+    }
+
+    [Fact]
     public void TryGetResponse_PrefersMoreSpecificQueryMatch()
     {
         var document = new StubDocument

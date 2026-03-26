@@ -239,7 +239,10 @@ public sealed class StubDefinitionLoader
         return new PathItemDefinition
         {
             Get = MergeOperation(path, "GET", existing.Get, incoming.Get, existingSource, incomingSource),
-            Post = MergeOperation(path, "POST", existing.Post, incoming.Post, existingSource, incomingSource)
+            Post = MergeOperation(path, "POST", existing.Post, incoming.Post, existingSource, incomingSource),
+            Put = MergeOperation(path, "PUT", existing.Put, incoming.Put, existingSource, incomingSource),
+            Patch = MergeOperation(path, "PATCH", existing.Patch, incoming.Patch, existingSource, incomingSource),
+            Delete = MergeOperation(path, "DELETE", existing.Delete, incoming.Delete, existingSource, incomingSource)
         };
     }
 

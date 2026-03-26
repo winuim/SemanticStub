@@ -29,7 +29,11 @@ internal sealed class StubDefinitionValidator
 
         foreach (var pathEntry in paths)
         {
-            if (pathEntry.Value.Get is null && pathEntry.Value.Post is null)
+            if (pathEntry.Value.Get is null &&
+                pathEntry.Value.Post is null &&
+                pathEntry.Value.Put is null &&
+                pathEntry.Value.Patch is null &&
+                pathEntry.Value.Delete is null)
             {
                 errors.Add($"Path '{pathEntry.Key}' must define at least one supported operation.");
                 continue;
@@ -37,6 +41,9 @@ internal sealed class StubDefinitionValidator
 
             ValidateOperation(pathEntry.Key, "get", pathEntry.Value.Get, definitionDirectory, errors);
             ValidateOperation(pathEntry.Key, "post", pathEntry.Value.Post, definitionDirectory, errors);
+            ValidateOperation(pathEntry.Key, "put", pathEntry.Value.Put, definitionDirectory, errors);
+            ValidateOperation(pathEntry.Key, "patch", pathEntry.Value.Patch, definitionDirectory, errors);
+            ValidateOperation(pathEntry.Key, "delete", pathEntry.Value.Delete, definitionDirectory, errors);
         }
 
         ThrowIfInvalid(errors);
