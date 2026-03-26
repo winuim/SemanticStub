@@ -218,7 +218,8 @@ Supports YAML-based stub definitions with optional semantic matching using embed
 2. Create a plan
 3. Implement minimal change
 4. Run validation
-5. Summarize results
+5. Self-review the diff against `code_review.md`
+6. Summarize results
 
 ---
 
