@@ -10,6 +10,7 @@ public sealed class MatcherService
     public QueryMatchDefinition? FindBestMatch(
         OperationDefinition operation,
         IReadOnlyDictionary<string, string> query,
+        IReadOnlyDictionary<string, string> headers,
         string? body)
     {
         if (operation.Matches.Count == 0)
@@ -21,12 +22,26 @@ public sealed class MatcherService
 
         return operation.Matches
             .Where(candidate => IsExactQueryMatch(candidate.Query, query))
+            .Where(candidate => IsExactHeaderMatch(candidate.Headers, headers))
             .Where(candidate => IsBodyMatch(candidate.Body, bodyDocument?.RootElement))
             .OrderByDescending(GetMatchSpecificity)
             .FirstOrDefault();
     }
 
     private static bool IsExactQueryMatch(IReadOnlyDictionary<string, string> expected, IReadOnlyDictionary<string, string> actual)
+    {
+        foreach (var pair in expected)
+        {
+            if (!actual.TryGetValue(pair.Key, out var value) || value != pair.Value)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsExactHeaderMatch(IReadOnlyDictionary<string, string> expected, IReadOnlyDictionary<string, string> actual)
     {
         foreach (var pair in expected)
         {
@@ -138,7 +153,7 @@ public sealed class MatcherService
 
     private static int GetMatchSpecificity(QueryMatchDefinition match)
     {
-        return match.Query.Count + GetBodySpecificity(match.Body);
+        return match.Query.Count + match.Headers.Count + GetBodySpecificity(match.Body);
     }
 
     private static int GetBodySpecificity(object? body)

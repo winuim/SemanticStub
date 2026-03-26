@@ -42,15 +42,44 @@ public sealed class StubService
 
     public StubMatchResult TryGetResponse(string method, string path, out StubResponse response)
     {
-        return TryGetResponse(method, path, new Dictionary<string, string>(StringComparer.Ordinal), body: null, out response);
+        return TryGetResponse(
+            method,
+            path,
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null,
+            out response);
     }
 
     public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, out StubResponse response)
     {
-        return TryGetResponse(method, path, query, body: null, out response);
+        return TryGetResponse(
+            method,
+            path,
+            query,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null,
+            out response);
     }
 
     public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, string? body, out StubResponse response)
+    {
+        return TryGetResponse(
+            method,
+            path,
+            query,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body,
+            out response);
+    }
+
+    public StubMatchResult TryGetResponse(
+        string method,
+        string path,
+        IReadOnlyDictionary<string, string> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body,
+        out StubResponse response)
     {
         response = null!;
 
@@ -66,7 +95,7 @@ public sealed class StubService
             return StubMatchResult.MethodNotAllowed;
         }
 
-        var queryMatchResult = TryBuildMatchedQueryResponse(operation, query, body, out response);
+        var queryMatchResult = TryBuildMatchedQueryResponse(operation, query, headers, body, out response);
 
         if (queryMatchResult == QueryMatchEvaluationResult.Matched)
         {
@@ -124,6 +153,7 @@ public sealed class StubService
     private QueryMatchEvaluationResult TryBuildMatchedQueryResponse(
         OperationDefinition operation,
         IReadOnlyDictionary<string, string> query,
+        IReadOnlyDictionary<string, string> headers,
         string? body,
         out StubResponse response)
     {
@@ -134,7 +164,7 @@ public sealed class StubService
             return QueryMatchEvaluationResult.NoMatch;
         }
 
-        var matchedCandidate = matcherService.FindBestMatch(operation, query, body);
+        var matchedCandidate = matcherService.FindBestMatch(operation, query, headers, body);
 
         if (matchedCandidate is null)
         {
