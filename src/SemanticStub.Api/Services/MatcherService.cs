@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Text.Json;
-using SemanticStub.Api.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
+using SemanticStub.Api.Utilities;
 
 namespace SemanticStub.Api.Services;
 
@@ -68,7 +68,7 @@ public sealed class MatcherService
             return false;
         }
 
-        var expectedJson = StubDefinitionLoader.SerializeExample(expectedBody);
+        var expectedJson = StubExampleSerializer.Serialize(expectedBody);
         using var expectedDocument = JsonDocument.Parse(expectedJson);
 
         return IsJsonMatch(expectedDocument.RootElement, actualBody.Value);

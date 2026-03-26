@@ -1,5 +1,6 @@
 using SemanticStub.Api.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
+using SemanticStub.Api.Utilities;
 
 namespace SemanticStub.Api.Services;
 
@@ -178,6 +179,6 @@ public sealed class StubService
             return null;
         }
 
-        return StubDefinitionLoader.SerializeExample(mediaType.Example);
+        return StubExampleSerializer.Serialize(mediaType.Example);
     }
 }

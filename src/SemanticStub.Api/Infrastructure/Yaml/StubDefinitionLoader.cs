@@ -1,6 +1,6 @@
-using System.Text.Json;
 using Microsoft.Extensions.Options;
 using SemanticStub.Api.Models;
+using SemanticStub.Api.Utilities;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -452,7 +452,7 @@ public sealed class StubDefinitionLoader
                 .. operation.Matches.Select(match => new QueryMatchDefinition
                 {
                     Query = new Dictionary<string, string>(match.Query, StringComparer.Ordinal),
-                    Body = NormalizeYamlValue(match.Body),
+                    Body = StubExampleSerializer.NormalizeValue(match.Body),
                     Response = new QueryMatchResponseDefinition
                     {
                         StatusCode = match.Response.StatusCode,
@@ -488,37 +488,4 @@ public sealed class StubDefinitionLoader
         return Path.GetFullPath(Path.Combine(definitionDirectory, responseFile));
     }
 
-    public static string SerializeExample(object? example)
-    {
-        var normalized = NormalizeYamlValue(example);
-
-        return JsonSerializer.Serialize(normalized);
-    }
-
-    private static object? NormalizeYamlValue(object? value)
-    {
-        if (value is null)
-        {
-            return null;
-        }
-
-        if (value is IDictionary<object, object> dictionary)
-        {
-            var normalized = new Dictionary<string, object?>(StringComparer.Ordinal);
-
-            foreach (var entry in dictionary)
-            {
-                normalized[entry.Key.ToString() ?? string.Empty] = NormalizeYamlValue(entry.Value);
-            }
-
-            return normalized;
-        }
-
-        if (value is IEnumerable<object> list && value is not string)
-        {
-            return list.Select(NormalizeYamlValue).ToList();
-        }
-
-        return value;
-    }
 }
