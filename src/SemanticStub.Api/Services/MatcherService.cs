@@ -32,6 +32,7 @@ public sealed class MatcherService
 
         using var bodyDocument = ParseRequestBody(body);
 
+        // Match conditions are conjunctive; after filtering, prefer the candidate with the most explicit constraints.
         return operation.Matches
             .Where(candidate => IsExactQueryMatch(candidate.Query, query))
             .Where(candidate => IsExactHeaderMatch(candidate.Headers, headers))
@@ -79,6 +80,7 @@ public sealed class MatcherService
         }
         catch (JsonException)
         {
+            // Invalid JSON should behave like "no structured body match" rather than failing the whole request.
             return null;
         }
     }
@@ -110,6 +112,7 @@ public sealed class MatcherService
                 return false;
             }
 
+            // Object matches are partial: every expected property must exist and match, but extra actual properties are allowed.
             foreach (var property in expected.EnumerateObject())
             {
                 if (!actual.TryGetProperty(property.Name, out var actualProperty) ||
@@ -170,6 +173,7 @@ public sealed class MatcherService
 
     private static int GetBodySpecificity(object? body)
     {
+        // Nested body shapes should outrank shallower ones so more concrete matches win.
         return body switch
         {
             null => 0,

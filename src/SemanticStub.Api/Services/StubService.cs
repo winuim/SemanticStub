@@ -139,6 +139,7 @@ public sealed class StubService
 
     private PathItemDefinition? ResolvePathItem(string requestPath)
     {
+        // Keep deterministic routing: exact paths always win before template paths.
         if (document.Paths.TryGetValue(requestPath, out var exactPathItem))
         {
             return exactPathItem;
@@ -249,6 +250,7 @@ public sealed class StubService
             return QueryMatchEvaluationResult.NoMatch;
         }
 
+        // Query/header/body conditions are combined, then the most specific surviving candidate wins.
         var matchedCandidate = matcherService.FindBestMatch(operation, query, headers, body);
 
         if (matchedCandidate is null)
