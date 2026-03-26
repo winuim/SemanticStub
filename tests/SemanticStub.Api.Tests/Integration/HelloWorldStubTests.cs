@@ -266,6 +266,36 @@ public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Pr
         Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
     }
 
+    [Fact]
+    public async Task GetOrderByTemplatePath_ReturnsPatternRouteResponse()
+    {
+        var response = await client.GetAsync("/orders/123");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<MutationResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("pattern", payload.Result);
+    }
+
+    [Fact]
+    public async Task GetSpecialOrder_PrefersExactRouteOverTemplatePath()
+    {
+        var response = await client.GetAsync("/orders/special");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<MutationResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("exact", payload.Result);
+    }
+
+    [Fact]
+    public async Task PostOrderByTemplatePath_ReturnsMethodNotAllowed()
+    {
+        var response = await client.PostAsync("/orders/123", content: null);
+
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+    }
+
     public sealed class HelloResponse
     {
         public string Message { get; init; } = string.Empty;
