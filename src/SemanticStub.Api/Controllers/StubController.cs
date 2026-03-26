@@ -31,8 +31,9 @@ public sealed class StubController : ControllerBase
     {
         var requestPath = string.IsNullOrEmpty(path) ? "/" : "/" + path;
         var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.Ordinal);
+        var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
         var requestBody = await ReadRequestBodyAsync();
-        var matchResult = stubService.TryGetResponse(method, requestPath, query, requestBody, out var response);
+        var matchResult = stubService.TryGetResponse(method, requestPath, query, headers, requestBody, out var response);
 
         if (matchResult == StubMatchResult.PathNotFound)
         {

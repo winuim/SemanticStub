@@ -2,12 +2,49 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Options;
 using SemanticStub.Api.Infrastructure.Yaml;
+using SemanticStub.Api.Models;
 using Xunit;
 
 namespace SemanticStub.Api.Tests.Unit;
 
 public sealed class StubDefinitionLoaderTests
 {
+    [Fact]
+    public void LoadDefaultDefinition_PreservesMatchedHeadersDuringNormalization()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /environment-users:
+                get:
+                  x-match:
+                    - headers:
+                        X-Env: staging
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              message: staging
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: default
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var operation = Assert.IsType<OperationDefinition>(document.Paths["/environment-users"].Get);
+        var match = Assert.Single(operation.Matches);
+
+        Assert.Equal("staging", match.Headers["X-Env"]);
+    }
+
     [Fact]
     public void LoadDefaultDefinition_ThrowsWhenOpenApiIsMissing()
     {
