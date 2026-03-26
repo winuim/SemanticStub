@@ -115,7 +115,7 @@ public sealed class StubService
         var matchedResponse = operation.Responses
             .FirstOrDefault(entry =>
                 int.TryParse(entry.Key, out _) &&
-                entry.Value.Content.ContainsKey(JsonContentType));
+                (entry.Value.Content.Count > 0 || !string.IsNullOrEmpty(entry.Value.ResponseFile)));
 
         if (string.IsNullOrEmpty(matchedResponse.Key) ||
             !int.TryParse(matchedResponse.Key, out var statusCode))
@@ -133,7 +133,7 @@ public sealed class StubService
         response = new StubResponse
         {
             StatusCode = statusCode,
-            ContentType = JsonContentType,
+            ContentType = ResolveContentType(matchedResponse.Value.Content),
             Headers = BuildResponseHeaders(matchedResponse.Value.Headers),
             Body = responseBody
         };
@@ -272,7 +272,7 @@ public sealed class StubService
         response = new StubResponse
         {
             StatusCode = matchedCandidate.Response.StatusCode,
-            ContentType = JsonContentType,
+            ContentType = ResolveContentType(matchedCandidate.Response.Content),
             Headers = BuildResponseHeaders(matchedCandidate.Response.Headers),
             Body = responseBody
         };
@@ -291,17 +291,39 @@ public sealed class StubService
             return responseFileReader(responseFile);
         }
 
-        if (!content.TryGetValue(JsonContentType, out var mediaType))
+        var selectedKey = SelectMediaTypeKey(content);
+
+        if (selectedKey is null || !content.TryGetValue(selectedKey, out var mediaType) || mediaType.Example is null)
         {
             return null;
         }
 
-        if (mediaType.Example is null)
+        // Non-JSON string examples are returned as-is; JSON types go through serialization.
+        if (!IsJsonContentType(selectedKey) && mediaType.Example is string rawExample)
         {
-            return null;
+            return rawExample;
         }
 
         return StubExampleSerializer.Serialize(mediaType.Example);
+    }
+
+    private static string ResolveContentType(IReadOnlyDictionary<string, MediaTypeDefinition> content)
+    {
+        return SelectMediaTypeKey(content) ?? JsonContentType;
+    }
+
+    // Prefer JSON content types to preserve deterministic behavior for stubs that declare
+    // multiple media types (e.g. application/json alongside text/plain for documentation).
+    // Fall back to the first declared entry only when no JSON type is present.
+    private static string? SelectMediaTypeKey(IReadOnlyDictionary<string, MediaTypeDefinition> content)
+    {
+        return content.Keys.FirstOrDefault(IsJsonContentType) ?? content.Keys.FirstOrDefault();
+    }
+
+    private static bool IsJsonContentType(string contentType)
+    {
+        return contentType.Equals(JsonContentType, StringComparison.OrdinalIgnoreCase)
+            || contentType.EndsWith("+json", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyDictionary<string, StringValues> BuildResponseHeaders(IReadOnlyDictionary<string, HeaderDefinition> headers)

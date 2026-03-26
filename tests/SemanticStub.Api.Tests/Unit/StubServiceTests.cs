@@ -636,40 +636,16 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_ReturnsResponseNotConfigured_WhenFallbackResponseHasNoJsonContent()
+    public void TryGetResponse_ReturnsTextPlainBodyWithCorrectContentType()
     {
         var document = new StubDocument
         {
             Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
             {
-                ["/users"] = new()
+                ["/hello"] = new()
                 {
                     Get = new OperationDefinition
                     {
-                        Matches =
-                        [
-                            new QueryMatchDefinition
-                            {
-                                Query = new Dictionary<string, string>(StringComparer.Ordinal)
-                                {
-                                    ["role"] = "admin"
-                                },
-                                Response = new QueryMatchResponseDefinition
-                                {
-                                    StatusCode = 200,
-                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
-                                    {
-                                        ["application/json"] = new()
-                                        {
-                                            Example = new Dictionary<object, object>
-                                            {
-                                                ["message"] = "admin"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        ],
                         Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
                         {
                             ["200"] = new()
@@ -678,7 +654,7 @@ public sealed class StubServiceTests
                                 {
                                     ["text/plain"] = new()
                                     {
-                                        Example = "default"
+                                        Example = "Hello, world!"
                                     }
                                 }
                             }
@@ -689,14 +665,95 @@ public sealed class StubServiceTests
         };
 
         var service = new StubService(document);
-        var query = new Dictionary<string, string>(StringComparer.Ordinal)
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("text/plain", response.ContentType);
+        Assert.Equal("Hello, world!", response.Body);
+    }
+
+    [Fact]
+    public void TryGetResponse_ReturnsXmlContentTypeForResponseFile()
+    {
+        var document = new StubDocument
         {
-            ["role"] = "guest"
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/data"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                ResponseFile = "data.xml",
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/xml"] = new()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         };
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out _);
+        var service = new StubService(document, _ => "<root><item>1</item></root>");
 
-        Assert.Equal(StubMatchResult.ResponseNotConfigured, matched);
+        var matched = service.TryGetResponse(HttpMethods.Get, "/data", out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("application/xml", response.ContentType);
+        Assert.Equal("<root><item>1</item></root>", response.Body);
+    }
+
+    [Fact]
+    public void TryGetResponse_ReturnsNonJsonContentTypeFromXMatch()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/report"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                                {
+                                    ["format"] = "csv"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["text/csv"] = new()
+                                        {
+                                            Example = "id,name\n1,Alice"
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+        var query = new Dictionary<string, string>(StringComparer.Ordinal) { ["format"] = "csv" };
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/report", query, out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("text/csv", response.ContentType);
+        Assert.Equal("id,name\n1,Alice", response.Body);
     }
 
     [Fact]
