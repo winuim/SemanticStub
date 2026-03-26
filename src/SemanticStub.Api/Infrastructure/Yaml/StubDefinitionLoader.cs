@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Options;
 using SemanticStub.Api.Models;
-using SemanticStub.Api.Utilities;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -11,10 +10,11 @@ public sealed class StubDefinitionLoader
     private const string DefaultStubFileName = "basic-routing.yaml";
     private static readonly string[] AdditionalStubFilePatterns = ["*.stub.yaml", "*.stub.yml"];
     private const string DefaultDefinitionsDirectoryName = "samples";
-    private const string JsonContentType = "application/json";
     private readonly IWebHostEnvironment environment;
     private readonly StubSettings settings;
     private readonly IDeserializer deserializer;
+    private readonly StubDefinitionValidator validator;
+    private readonly StubDefinitionNormalizer normalizer;
 
     public StubDefinitionLoader(IWebHostEnvironment environment)
         : this(environment, Options.Create(new StubSettings()))
@@ -29,6 +29,8 @@ public sealed class StubDefinitionLoader
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
             .IgnoreUnmatchedProperties()
             .Build();
+        validator = new StubDefinitionValidator();
+        normalizer = new StubDefinitionNormalizer();
     }
 
     public StubDocument LoadDefaultDefinition()
@@ -54,9 +56,9 @@ public sealed class StubDefinitionLoader
             throw new InvalidOperationException("Failed to deserialize stub definition.");
         }
 
-        ValidateDocument(document, definitionDirectory);
+        validator.ValidateDocument(document, definitionDirectory);
 
-        return NormalizeDocument(document, definitionDirectory);
+        return normalizer.NormalizeDocument(document, definitionDirectory);
     }
 
     public string LoadResponseFileContent(string fileName)
@@ -266,226 +268,6 @@ public sealed class StubDefinitionLoader
     private static string GetDefinitionSourceLabel(string definitionPath, string definitionsRootPath)
     {
         return Path.GetRelativePath(definitionsRootPath, definitionPath);
-    }
-
-    private void ValidateDocument(StubDocument document, string definitionDirectory)
-    {
-        var errors = new List<string>();
-        var paths = document.Paths;
-
-        if (string.IsNullOrWhiteSpace(document.OpenApi))
-        {
-            errors.Add("The 'openapi' field is required.");
-        }
-
-        if (paths is null || paths.Count == 0)
-        {
-            errors.Add("At least one path must be configured under 'paths'.");
-        }
-
-        if (paths is null)
-        {
-            if (errors.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    "Invalid stub definition:" + Environment.NewLine + string.Join(Environment.NewLine, errors.Select(error => "- " + error)));
-            }
-
-            return;
-        }
-
-        foreach (var pathEntry in paths)
-        {
-            if (pathEntry.Value.Get is null && pathEntry.Value.Post is null)
-            {
-                errors.Add($"Path '{pathEntry.Key}' must define at least one supported operation.");
-                continue;
-            }
-
-            ValidateOperation(pathEntry.Key, "get", pathEntry.Value.Get, definitionDirectory, errors);
-            ValidateOperation(pathEntry.Key, "post", pathEntry.Value.Post, definitionDirectory, errors);
-        }
-
-        if (errors.Count > 0)
-        {
-            throw new InvalidOperationException(
-                "Invalid stub definition:" + Environment.NewLine + string.Join(Environment.NewLine, errors.Select(error => "- " + error)));
-        }
-    }
-
-    private void ValidateOperation(
-        string path,
-        string method,
-        OperationDefinition? operation,
-        string definitionDirectory,
-        ICollection<string> errors)
-    {
-        if (operation is null)
-        {
-            return;
-        }
-
-        if (operation.Responses.Count == 0 && operation.Matches.Count == 0)
-        {
-            errors.Add($"Path '{path}' {method.ToUpperInvariant()} must define at least one response or x-match entry.");
-        }
-
-        foreach (var responseEntry in operation.Responses)
-        {
-            ValidateResponseDefinition(
-                path,
-                method,
-                $"responses['{responseEntry.Key}']",
-                responseEntry.Key,
-                responseEntry.Value.ResponseFile,
-                definitionDirectory,
-                responseEntry.Value.Content,
-                errors);
-        }
-
-        for (var index = 0; index < operation.Matches.Count; index++)
-        {
-            var match = operation.Matches[index];
-
-            if (match.Response.StatusCode <= 0)
-            {
-                errors.Add($"Path '{path}' {method.ToUpperInvariant()} x-match[{index}] must define a positive statusCode.");
-            }
-
-            ValidateResponseDefinition(
-                path,
-                method,
-                $"x-match[{index}].response",
-                match.Response.StatusCode.ToString(),
-                match.Response.ResponseFile,
-                definitionDirectory,
-                match.Response.Content,
-                errors);
-        }
-    }
-
-    private void ValidateResponseDefinition(
-        string path,
-        string method,
-        string location,
-        string statusCode,
-        string? responseFile,
-        string definitionDirectory,
-        IReadOnlyDictionary<string, MediaTypeDefinition> content,
-        ICollection<string> errors)
-    {
-        if (!int.TryParse(statusCode, out _))
-        {
-            errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} uses unsupported response key '{statusCode}'.");
-        }
-
-        if (!string.IsNullOrWhiteSpace(responseFile))
-        {
-            var resolvedPath = ResolveResponseFilePath(definitionDirectory, responseFile);
-
-            if (!File.Exists(resolvedPath))
-            {
-                errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} references missing response file '{responseFile}'.");
-            }
-        }
-
-        if (content.Count == 0)
-        {
-            if (string.IsNullOrWhiteSpace(responseFile))
-            {
-                errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define '{JsonContentType}' content or 'x-response-file'.");
-            }
-
-            return;
-        }
-
-        if (!content.TryGetValue(JsonContentType, out var mediaType))
-        {
-            errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define '{JsonContentType}' content or 'x-response-file'.");
-            return;
-        }
-
-        if (!string.IsNullOrWhiteSpace(responseFile))
-        {
-            return;
-        }
-
-        if (mediaType.Example is null)
-        {
-            errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define an example for '{JsonContentType}'.");
-        }
-    }
-
-    private static StubDocument NormalizeDocument(StubDocument document, string definitionDirectory)
-    {
-        return new StubDocument
-        {
-            OpenApi = document.OpenApi,
-            Paths = document.Paths.ToDictionary(
-                entry => entry.Key,
-                entry => NormalizePathItem(entry.Value, definitionDirectory),
-                StringComparer.Ordinal)
-        };
-    }
-
-    private static PathItemDefinition NormalizePathItem(PathItemDefinition pathItem, string definitionDirectory)
-    {
-        return new PathItemDefinition
-        {
-            Get = NormalizeOperation(pathItem.Get, definitionDirectory),
-            Post = NormalizeOperation(pathItem.Post, definitionDirectory)
-        };
-    }
-
-    private static OperationDefinition? NormalizeOperation(OperationDefinition? operation, string definitionDirectory)
-    {
-        if (operation is null)
-        {
-            return null;
-        }
-
-        return new OperationDefinition
-        {
-            OperationId = operation.OperationId,
-            Matches =
-            [
-                .. operation.Matches.Select(match => new QueryMatchDefinition
-                {
-                    Query = new Dictionary<string, string>(match.Query, StringComparer.Ordinal),
-                    Body = StubExampleSerializer.NormalizeValue(match.Body),
-                    Response = new QueryMatchResponseDefinition
-                    {
-                        StatusCode = match.Response.StatusCode,
-                        ResponseFile = ResolveResponseFilePath(definitionDirectory, match.Response.ResponseFile),
-                        Content = new Dictionary<string, MediaTypeDefinition>(match.Response.Content, StringComparer.Ordinal)
-                    }
-                })
-            ],
-            Responses = operation.Responses.ToDictionary(
-                entry => entry.Key,
-                entry => new ResponseDefinition
-                {
-                    Description = entry.Value.Description,
-                    ResponseFile = ResolveResponseFilePath(definitionDirectory, entry.Value.ResponseFile),
-                    Content = new Dictionary<string, MediaTypeDefinition>(entry.Value.Content, StringComparer.Ordinal)
-                },
-                StringComparer.Ordinal)
-        };
-    }
-
-    private static string? ResolveResponseFilePath(string definitionDirectory, string? responseFile)
-    {
-        if (string.IsNullOrWhiteSpace(responseFile))
-        {
-            return responseFile;
-        }
-
-        if (Path.IsPathRooted(responseFile))
-        {
-            return responseFile;
-        }
-
-        return Path.GetFullPath(Path.Combine(definitionDirectory, responseFile));
     }
 
 }
