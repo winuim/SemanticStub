@@ -5,11 +5,11 @@ using Xunit;
 
 namespace SemanticStub.Api.Tests.Integration;
 
-public sealed class HelloWorldStubTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<Program>>
 {
     private readonly HttpClient client;
 
-    public HelloWorldStubTests(WebApplicationFactory<Program> factory)
+    public BasicRoutingStubTests(WebApplicationFactory<Program> factory)
     {
         client = factory.CreateClient();
     }
