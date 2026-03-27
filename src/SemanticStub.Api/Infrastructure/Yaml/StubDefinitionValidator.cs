@@ -38,11 +38,11 @@ internal sealed class StubDefinitionValidator
                 continue;
             }
 
-            ValidateOperation(pathEntry.Key, "get", pathEntry.Value.Get, definitionDirectory, errors);
-            ValidateOperation(pathEntry.Key, "post", pathEntry.Value.Post, definitionDirectory, errors);
-            ValidateOperation(pathEntry.Key, "put", pathEntry.Value.Put, definitionDirectory, errors);
-            ValidateOperation(pathEntry.Key, "patch", pathEntry.Value.Patch, definitionDirectory, errors);
-            ValidateOperation(pathEntry.Key, "delete", pathEntry.Value.Delete, definitionDirectory, errors);
+            ValidateOperation(pathEntry.Key, "get", pathEntry.Value.Parameters, pathEntry.Value.Get, definitionDirectory, errors);
+            ValidateOperation(pathEntry.Key, "post", pathEntry.Value.Parameters, pathEntry.Value.Post, definitionDirectory, errors);
+            ValidateOperation(pathEntry.Key, "put", pathEntry.Value.Parameters, pathEntry.Value.Put, definitionDirectory, errors);
+            ValidateOperation(pathEntry.Key, "patch", pathEntry.Value.Parameters, pathEntry.Value.Patch, definitionDirectory, errors);
+            ValidateOperation(pathEntry.Key, "delete", pathEntry.Value.Parameters, pathEntry.Value.Delete, definitionDirectory, errors);
         }
 
         ThrowIfInvalid(errors);
@@ -62,6 +62,7 @@ internal sealed class StubDefinitionValidator
     private static void ValidateOperation(
         string path,
         string method,
+        IReadOnlyCollection<ParameterDefinition> pathParameters,
         OperationDefinition? operation,
         string definitionDirectory,
         ICollection<string> errors)
@@ -75,6 +76,9 @@ internal sealed class StubDefinitionValidator
         {
             errors.Add($"Path '{path}' {method.ToUpperInvariant()} must define at least one response or x-match entry.");
         }
+
+        var queryParameters = GetDeclaredQueryParameters(pathParameters, operation.Parameters);
+        var headerParameters = GetDeclaredHeaderParameters(pathParameters, operation.Parameters);
 
         foreach (var responseEntry in operation.Responses)
         {
@@ -100,6 +104,24 @@ internal sealed class StubDefinitionValidator
         {
             var match = operation.Matches[index];
 
+            foreach (var queryKey in match.Query.Keys)
+            {
+                if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
+                {
+                    errors.Add(
+                        $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].query['{queryKey}'] must reference a declared query parameter.");
+                }
+            }
+
+            foreach (var headerKey in match.Headers.Keys)
+            {
+                if (headerParameters.Count > 0 && !headerParameters.Contains(headerKey))
+                {
+                    errors.Add(
+                        $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].headers['{headerKey}'] must reference a declared header parameter.");
+                }
+            }
+
             if (match.Response.StatusCode <= 0)
             {
                 errors.Add($"Path '{path}' {method.ToUpperInvariant()} x-match[{index}] must define a positive statusCode.");
@@ -121,6 +143,49 @@ internal sealed class StubDefinitionValidator
                 definitionDirectory,
                 match.Response.Content,
                 errors);
+        }
+    }
+
+    private static HashSet<string> GetDeclaredQueryParameters(
+        IReadOnlyCollection<ParameterDefinition> pathParameters,
+        IReadOnlyCollection<ParameterDefinition> operationParameters)
+    {
+        return GetDeclaredParameters(pathParameters, operationParameters, "query", StringComparer.Ordinal);
+    }
+
+    private static HashSet<string> GetDeclaredHeaderParameters(
+        IReadOnlyCollection<ParameterDefinition> pathParameters,
+        IReadOnlyCollection<ParameterDefinition> operationParameters)
+    {
+        return GetDeclaredParameters(pathParameters, operationParameters, "header", StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static HashSet<string> GetDeclaredParameters(
+        IReadOnlyCollection<ParameterDefinition> pathParameters,
+        IReadOnlyCollection<ParameterDefinition> operationParameters,
+        string parameterLocation,
+        StringComparer comparer)
+    {
+        var declaredParameters = new HashSet<string>(comparer);
+
+        AddDeclaredParameters(pathParameters, parameterLocation, declaredParameters);
+        AddDeclaredParameters(operationParameters, parameterLocation, declaredParameters);
+
+        return declaredParameters;
+    }
+
+    private static void AddDeclaredParameters(
+        IReadOnlyCollection<ParameterDefinition> parameters,
+        string parameterLocation,
+        ISet<string> declaredParameters)
+    {
+        foreach (var parameter in parameters)
+        {
+            if (string.Equals(parameter.In, parameterLocation, StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(parameter.Name))
+            {
+                declaredParameters.Add(parameter.Name);
+            }
         }
     }
 
