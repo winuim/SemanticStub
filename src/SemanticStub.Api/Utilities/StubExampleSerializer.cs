@@ -2,8 +2,14 @@ using System.Text.Json;
 
 namespace SemanticStub.Api.Utilities;
 
+/// <summary>
+/// Normalizes YAML-deserialized example values into JSON-friendly shapes so matching and response generation can compare values consistently.
+/// </summary>
 public static class StubExampleSerializer
 {
+    /// <summary>
+    /// Serializes example data into canonical JSON so downstream matching logic is not coupled to YAML-specific runtime types.
+    /// </summary>
     public static string Serialize(object? example)
     {
         var normalized = NormalizeValue(example);
@@ -11,6 +17,9 @@ public static class StubExampleSerializer
         return JsonSerializer.Serialize(normalized);
     }
 
+    /// <summary>
+    /// Rewrites YAML-native collections into predictable CLR objects so serialization and header formatting produce stable results.
+    /// </summary>
     public static object? NormalizeValue(object? value)
     {
         if (value is null)
