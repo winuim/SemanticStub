@@ -96,13 +96,43 @@ public sealed class MatcherService
         var queryParameterTypes = BuildQueryParameterTypes(pathParameters, operation.Parameters);
 
         // Match conditions are conjunctive; after filtering, prefer the candidate with the most explicit constraints.
-        return operation.Matches
-            .Where(candidate => IsQueryMatch(candidate, query, queryParameterTypes))
-            .Where(candidate => IsExactHeaderMatch(candidate.Headers, headers))
-            .Where(candidate => IsBodyMatch(candidate.Body, bodyDocument?.RootElement))
+        return GetCandidatesMatchingRequest(
+                operation.Matches,
+                query,
+                headers,
+                queryParameterTypes,
+                bodyDocument?.RootElement)
             .OrderByDescending(GetExactQuerySpecificity)
             .ThenByDescending(GetMatchSpecificity)
             .FirstOrDefault();
+    }
+
+    private static IEnumerable<QueryMatchDefinition> GetCandidatesMatchingRequest(
+        IReadOnlyCollection<QueryMatchDefinition> candidates,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        IReadOnlyDictionary<string, string> queryParameterTypes,
+        JsonElement? requestBody)
+    {
+        foreach (var candidate in candidates)
+        {
+            if (IsCandidateMatch(candidate, query, headers, queryParameterTypes, requestBody))
+            {
+                yield return candidate;
+            }
+        }
+    }
+
+    private static bool IsCandidateMatch(
+        QueryMatchDefinition candidate,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        IReadOnlyDictionary<string, string> queryParameterTypes,
+        JsonElement? requestBody)
+    {
+        return IsQueryMatch(candidate, query, queryParameterTypes) &&
+               IsExactHeaderMatch(candidate.Headers, headers) &&
+               IsBodyMatch(candidate.Body, requestBody);
     }
 
     private static Dictionary<string, string> BuildQueryParameterTypes(
