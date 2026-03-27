@@ -183,6 +183,30 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public async Task GetRegexUsersWithMatchingRole_ReturnsRegexSpecificResponse()
+    {
+        var response = await client.GetAsync("/regex-users?role=admin-42");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Single(payload.Users);
+        Assert.Equal("Regex Alice", payload.Users[0].Name);
+        Assert.Equal("regex-admin", payload.Users[0].Role);
+    }
+
+    [Fact]
+    public async Task GetRegexUsersWithNonMatchingRole_ReturnsFallbackResponse()
+    {
+        var response = await client.GetAsync("/regex-users?role=guest");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Empty(payload.Users);
+    }
+
+    [Fact]
     public async Task GetUsersWithEnvironmentHeader_ReturnsHeaderSpecificUsers()
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "/environment-users");
