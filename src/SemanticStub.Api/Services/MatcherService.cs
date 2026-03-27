@@ -97,10 +97,11 @@ public sealed class MatcherService
 
         // Match conditions are conjunctive; after filtering, prefer the candidate with the most explicit constraints.
         return operation.Matches
-            .Where(candidate => IsExactQueryMatch(candidate.Query, query, queryParameterTypes))
+            .Where(candidate => IsQueryMatch(candidate, query, queryParameterTypes))
             .Where(candidate => IsExactHeaderMatch(candidate.Headers, headers))
             .Where(candidate => IsBodyMatch(candidate.Body, bodyDocument?.RootElement))
-            .OrderByDescending(GetMatchSpecificity)
+            .OrderByDescending(GetExactQuerySpecificity)
+            .ThenByDescending(GetMatchSpecificity)
             .FirstOrDefault();
     }
 
@@ -150,6 +151,32 @@ public sealed class MatcherService
         return true;
     }
 
+    private static bool IsQueryMatch(
+        QueryMatchDefinition match,
+        IReadOnlyDictionary<string, StringValues> actual,
+        IReadOnlyDictionary<string, string> queryParameterTypes)
+    {
+        return IsExactQueryMatch(match.Query, actual, queryParameterTypes) &&
+               IsPartialQueryMatch(match.PartialQuery, actual, queryParameterTypes);
+    }
+
+    private static bool IsPartialQueryMatch(
+        IReadOnlyDictionary<string, object?> expected,
+        IReadOnlyDictionary<string, StringValues> actual,
+        IReadOnlyDictionary<string, string> queryParameterTypes)
+    {
+        foreach (var pair in expected)
+        {
+            if (!actual.TryGetValue(pair.Key, out var value) ||
+                !IsTypedPartialQueryValueMatch(pair.Value, value, queryParameterTypes.GetValueOrDefault(pair.Key)))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static bool IsTypedQueryValueMatch(object? expected, StringValues actual, string? parameterType)
     {
         if (expected is IEnumerable expectedSequence && expected is not string)
@@ -160,6 +187,18 @@ public sealed class MatcherService
         return actual.Count == 1 &&
                actual[0] is not null &&
                IsTypedSingleQueryValueMatch(expected, actual[0]!, parameterType);
+    }
+
+    private static bool IsTypedPartialQueryValueMatch(object? expected, StringValues actual, string? parameterType)
+    {
+        if (expected is IEnumerable expectedSequence && expected is not string)
+        {
+            return IsTypedPartialQuerySequenceMatch(expectedSequence, actual, parameterType);
+        }
+
+        return actual.Any(actualValue =>
+            actualValue is not null &&
+            IsTypedSinglePartialQueryValueMatch(expected, actualValue!, parameterType));
     }
 
     private static bool IsTypedQuerySequenceMatch(IEnumerable expectedSequence, StringValues actual, string? parameterType)
@@ -176,6 +215,43 @@ public sealed class MatcherService
         {
             if (actualValues[index] is null ||
                 !IsTypedSingleQueryValueMatch(expectedValues[index], actualValues[index]!, parameterType))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsTypedPartialQuerySequenceMatch(IEnumerable expectedSequence, StringValues actual, string? parameterType)
+    {
+        var expectedValues = expectedSequence.Cast<object?>().ToArray();
+        var actualValues = actual.ToArray();
+
+        if (expectedValues.Length == 0)
+        {
+            return true;
+        }
+
+        var actualIndex = 0;
+
+        foreach (var expectedValue in expectedValues)
+        {
+            var matched = false;
+
+            while (actualIndex < actualValues.Length)
+            {
+                var actualValue = actualValues[actualIndex++];
+
+                if (actualValue is not null &&
+                    IsTypedSinglePartialQueryValueMatch(expectedValue, actualValue!, parameterType))
+                {
+                    matched = true;
+                    break;
+                }
+            }
+
+            if (!matched)
             {
                 return false;
             }
@@ -208,6 +284,25 @@ public sealed class MatcherService
         }
 
         return string.Equals(ConvertQueryValueToString(expected), actual, StringComparison.Ordinal);
+    }
+
+    private static bool IsTypedSinglePartialQueryValueMatch(object? expected, string actual, string? parameterType)
+    {
+        if (string.Equals(parameterType, "integer", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(parameterType, "number", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(parameterType, "boolean", StringComparison.OrdinalIgnoreCase))
+        {
+            return IsTypedSingleQueryValueMatch(expected, actual, parameterType);
+        }
+
+        var expectedText = ConvertQueryValueToString(expected);
+
+        if (expectedText.Length == 0)
+        {
+            return string.Equals(expectedText, actual, StringComparison.Ordinal);
+        }
+
+        return actual.Contains(expectedText, StringComparison.Ordinal);
     }
 
     private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)
@@ -414,7 +509,12 @@ public sealed class MatcherService
 
     private static int GetMatchSpecificity(QueryMatchDefinition match)
     {
-        return match.Query.Count + match.Headers.Count + GetBodySpecificity(match.Body);
+        return match.Query.Count + match.PartialQuery.Count + match.Headers.Count + GetBodySpecificity(match.Body);
+    }
+
+    private static int GetExactQuerySpecificity(QueryMatchDefinition match)
+    {
+        return match.Query.Count;
     }
 
     private static int GetBodySpecificity(object? body)

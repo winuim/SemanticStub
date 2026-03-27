@@ -113,6 +113,15 @@ internal sealed class StubDefinitionValidator
                 }
             }
 
+            foreach (var queryKey in match.PartialQuery.Keys)
+            {
+                if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
+                {
+                    errors.Add(
+                        $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-partial['{queryKey}'] must reference a declared query parameter.");
+                }
+            }
+
             foreach (var headerKey in match.Headers.Keys)
             {
                 if (headerParameters.Count > 0 && !headerParameters.Contains(headerKey))

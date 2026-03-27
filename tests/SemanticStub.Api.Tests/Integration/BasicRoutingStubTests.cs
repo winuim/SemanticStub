@@ -135,6 +135,19 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public async Task GetUsersWithPartialRoleQuery_ReturnsPartialMatchResponse()
+    {
+        var response = await client.GetAsync("/users?role=super-admin");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
+        Assert.NotNull(payload);
+        Assert.Single(payload.Users);
+        Assert.Equal("Partial Alice", payload.Users[0].Name);
+        Assert.Equal("partial-admin", payload.Users[0].Role);
+    }
+
+    [Fact]
     public async Task GetSearchWithOrderedRepeatedTagQuery_ReturnsSpecificResponse()
     {
         var response = await client.GetAsync("/search?tag=alpha&tag=beta");
