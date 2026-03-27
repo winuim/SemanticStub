@@ -5,8 +5,14 @@ using SemanticStub.Api.Utilities;
 
 namespace SemanticStub.Api.Services;
 
+/// <summary>
+/// Chooses the most specific conditional match so YAML-defined query, header, and body refinements remain deterministic.
+/// </summary>
 public sealed class MatcherService
 {
+    /// <summary>
+    /// Preserves the existing query-and-body matching entry point while delegating to the full matcher implementation.
+    /// </summary>
     public QueryMatchDefinition? FindBestMatch(
         OperationDefinition operation,
         IReadOnlyDictionary<string, string> query,
@@ -19,6 +25,10 @@ public sealed class MatcherService
             body);
     }
 
+    /// <summary>
+    /// Filters candidates by every configured condition and prefers the most constrained definition so explicit matches win over broad fallbacks.
+    /// </summary>
+    /// <returns>The best matching conditional definition, or <see langword="null"/> when none satisfy the request.</returns>
     public QueryMatchDefinition? FindBestMatch(
         OperationDefinition operation,
         IReadOnlyDictionary<string, string> query,
