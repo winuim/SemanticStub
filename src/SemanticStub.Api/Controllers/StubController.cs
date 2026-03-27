@@ -101,6 +101,12 @@ public sealed class StubController : ControllerBase
             Response.Headers[header.Key] = header.Value;
         }
 
+        if (!string.IsNullOrEmpty(response.FilePath))
+        {
+            Response.StatusCode = response.StatusCode;
+            return File(System.IO.File.OpenRead(response.FilePath), response.ContentType);
+        }
+
         return new ContentResult
         {
             StatusCode = response.StatusCode,

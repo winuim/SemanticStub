@@ -386,3 +386,16 @@ paths:
                   - result
               example:
                 result: exact
+
+  /download:
+    get:
+      operationId: downloadFile
+      responses:
+        '200':
+          description: Binary file download
+          x-response-file: files/sample.bin
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary

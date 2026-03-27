@@ -373,7 +373,20 @@ public sealed class StubService
     private bool TryBuildStubResponse(int statusCode, ResponseDefinition responseDefinition, out StubResponse response)
     {
         response = null!;
-        var responseBody = BuildResponseBody(responseDefinition);
+
+        if (!string.IsNullOrEmpty(responseDefinition.ResponseFile))
+        {
+            response = CreateStubResponse(
+                statusCode,
+                responseDefinition.DelayMilliseconds,
+                responseDefinition.Content,
+                responseDefinition.Headers,
+                responseDefinition.ResponseFile);
+
+            return true;
+        }
+
+        var responseBody = BuildResponseBody(responseDefinition.Content);
 
         if (responseBody is null)
         {
@@ -385,7 +398,8 @@ public sealed class StubService
             responseDefinition.DelayMilliseconds,
             responseDefinition.Content,
             responseDefinition.Headers,
-            responseBody);
+            responseBody,
+            filePath: null);
 
         return true;
     }
@@ -394,9 +408,26 @@ public sealed class StubService
     {
         response = null!;
 
-        var responseBody = BuildResponseBody(responseDefinition.ResponseFile, responseDefinition.Content);
+        if (responseDefinition.StatusCode <= 0)
+        {
+            return false;
+        }
 
-        if (responseBody is null || responseDefinition.StatusCode <= 0)
+        if (!string.IsNullOrEmpty(responseDefinition.ResponseFile))
+        {
+            response = CreateStubResponse(
+                responseDefinition.StatusCode,
+                responseDefinition.DelayMilliseconds,
+                responseDefinition.Content,
+                responseDefinition.Headers,
+                responseDefinition.ResponseFile);
+
+            return true;
+        }
+
+        var responseBody = BuildResponseBody(responseDefinition.Content);
+
+        if (responseBody is null)
         {
             return false;
         }
@@ -406,7 +437,8 @@ public sealed class StubService
             responseDefinition.DelayMilliseconds,
             responseDefinition.Content,
             responseDefinition.Headers,
-            responseBody);
+            responseBody,
+            filePath: null);
 
         return true;
     }
@@ -416,7 +448,8 @@ public sealed class StubService
         int? delayMilliseconds,
         IReadOnlyDictionary<string, MediaTypeDefinition> content,
         IReadOnlyDictionary<string, HeaderDefinition> headers,
-        string responseBody)
+        string responseBody,
+        string? filePath)
     {
         return new StubResponse
         {
@@ -424,21 +457,40 @@ public sealed class StubService
             DelayMilliseconds = delayMilliseconds,
             ContentType = ResolveContentType(content),
             Headers = BuildResponseHeaders(headers),
-            Body = responseBody
+            Body = responseBody,
+            FilePath = filePath
         };
     }
-    private string? BuildResponseBody(ResponseDefinition responseDefinition)
-    {
-        return BuildResponseBody(responseDefinition.ResponseFile, responseDefinition.Content);
-    }
 
-    private string? BuildResponseBody(string? responseFile, IReadOnlyDictionary<string, MediaTypeDefinition> content)
+    private StubResponse CreateStubResponse(
+        int statusCode,
+        int? delayMilliseconds,
+        IReadOnlyDictionary<string, MediaTypeDefinition> content,
+        IReadOnlyDictionary<string, HeaderDefinition> headers,
+        string responseFile)
     {
-        if (!string.IsNullOrEmpty(responseFile))
+        if (Path.IsPathRooted(responseFile))
         {
-            return responseFileReader(responseFile);
+            return CreateStubResponse(
+                statusCode,
+                delayMilliseconds,
+                content,
+                headers,
+                string.Empty,
+                responseFile);
         }
 
+        return CreateStubResponse(
+            statusCode,
+            delayMilliseconds,
+            content,
+            headers,
+            responseFileReader(responseFile),
+            filePath: null);
+    }
+
+    private string? BuildResponseBody(IReadOnlyDictionary<string, MediaTypeDefinition> content)
+    {
         var selectedKey = SelectMediaTypeKey(content);
 
         if (selectedKey is null || !content.TryGetValue(selectedKey, out var mediaType) || mediaType.Example is null)
