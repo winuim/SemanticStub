@@ -764,6 +764,45 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenRegexPatternValueIsAnEmptyMap()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  parameters:
+                    - name: role
+                      in: query
+                      schema:
+                        type: string
+                  x-match:
+                    - x-query-regex:
+                        role: {}
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              users: []
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            users: []
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].x-query-regex['role'] must be a string pattern", exception.Message);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_AllowsMatchedHeaderDefinedOnOperationParameters()
     {
         using var workspace = TestWorkspace.Create(

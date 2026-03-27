@@ -290,13 +290,21 @@ internal sealed class StubDefinitionValidator
     {
         if (value is IEnumerable sequence and not string)
         {
-            var patternIndex = 0;
-
-            foreach (var item in sequence)
+            var enumerator = sequence.GetEnumerator();
+            if (!enumerator.MoveNext())
             {
-                ValidateRegexPattern(path, method, index, queryKey, item, $"[{patternIndex}]", errors);
+                errors.Add(
+                    $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex['{queryKey}'] must be a string pattern.");
+                return;
+            }
+
+            var patternIndex = 0;
+            do
+            {
+                ValidateRegexPattern(path, method, index, queryKey, enumerator.Current, $"[{patternIndex}]", errors);
                 patternIndex++;
             }
+            while (enumerator.MoveNext());
 
             return;
         }
