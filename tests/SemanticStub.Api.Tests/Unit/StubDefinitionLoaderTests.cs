@@ -400,6 +400,49 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_PreservesQueryParameterSchemaTypeAndTypedMatchValue()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  parameters:
+                    - name: page
+                      in: query
+                      schema:
+                        type: integer
+                  x-match:
+                    - query:
+                        page: 1
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              users: []
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            users: []
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var operation = Assert.IsType<OperationDefinition>(document.Paths["/users"].Get);
+        var parameter = Assert.Single(operation.Parameters);
+        var match = Assert.Single(operation.Matches);
+
+        Assert.Equal("integer", parameter.Schema?.Type);
+        Assert.Equal("1", Assert.IsType<string>(match.Query["page"]));
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_AllowsMatchedQueryDefinedOnPathParameters()
     {
         using var workspace = TestWorkspace.Create(
