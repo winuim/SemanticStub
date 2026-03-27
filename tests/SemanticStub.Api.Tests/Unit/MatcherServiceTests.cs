@@ -627,4 +627,66 @@ public sealed class MatcherServiceTests
 
         Assert.NotNull(match);
     }
+
+    [Fact]
+    public void FindBestMatch_DoesNotTreatNullPartialQueryValueAsWildcard()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = null
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.Null(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_MatchesNullPartialQueryValueOnlyAgainstEmptyString()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = null
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["role"] = string.Empty
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.NotNull(match);
+    }
 }

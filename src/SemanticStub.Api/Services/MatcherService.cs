@@ -295,7 +295,14 @@ public sealed class MatcherService
             return IsTypedSingleQueryValueMatch(expected, actual, parameterType);
         }
 
-        return actual.Contains(ConvertQueryValueToString(expected), StringComparison.Ordinal);
+        var expectedText = ConvertQueryValueToString(expected);
+
+        if (expectedText.Length == 0)
+        {
+            return string.Equals(expectedText, actual, StringComparison.Ordinal);
+        }
+
+        return actual.Contains(expectedText, StringComparison.Ordinal);
     }
 
     private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)
