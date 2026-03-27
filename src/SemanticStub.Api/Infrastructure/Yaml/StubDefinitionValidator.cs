@@ -1,4 +1,6 @@
 using SemanticStub.Api.Models;
+using System.Collections;
+using System.Text.RegularExpressions;
 
 namespace SemanticStub.Api.Infrastructure.Yaml;
 
@@ -120,6 +122,23 @@ internal sealed class StubDefinitionValidator
                     errors.Add(
                         $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-partial['{queryKey}'] must reference a declared query parameter.");
                 }
+            }
+
+            foreach (var queryKey in match.RegexQuery.Keys)
+            {
+                if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
+                {
+                    errors.Add(
+                        $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex['{queryKey}'] must reference a declared query parameter.");
+                }
+
+                ValidateRegexQueryDefinition(
+                    path,
+                    method,
+                    index,
+                    queryKey,
+                    match.RegexQuery[queryKey],
+                    errors);
             }
 
             foreach (var headerKey in match.Headers.Keys)
@@ -258,6 +277,65 @@ internal sealed class StubDefinitionValidator
         if (delayMilliseconds is < 0)
         {
             errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define a non-negative x-delay.");
+        }
+    }
+
+    private static void ValidateRegexQueryDefinition(
+        string path,
+        string method,
+        int index,
+        string queryKey,
+        object? value,
+        ICollection<string> errors)
+    {
+        if (value is IEnumerable sequence and not string)
+        {
+            var enumerator = sequence.GetEnumerator();
+            if (!enumerator.MoveNext())
+            {
+                errors.Add(
+                    $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex['{queryKey}'] must be a string pattern.");
+                return;
+            }
+
+            var patternIndex = 0;
+            do
+            {
+                ValidateRegexPattern(path, method, index, queryKey, enumerator.Current, $"[{patternIndex}]", errors);
+                patternIndex++;
+            }
+            while (enumerator.MoveNext());
+
+            return;
+        }
+
+        ValidateRegexPattern(path, method, index, queryKey, value, string.Empty, errors);
+    }
+
+    private static void ValidateRegexPattern(
+        string path,
+        string method,
+        int index,
+        string queryKey,
+        object? value,
+        string suffix,
+        ICollection<string> errors)
+    {
+        if (value is not string pattern)
+        {
+            errors.Add(
+                $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex['{queryKey}']{suffix} must be a string pattern.");
+            return;
+        }
+
+        try
+        {
+            _ = new Regex(pattern, RegexOptions.CultureInvariant);
+        }
+        catch (ArgumentException)
+        {
+            errors.Add(
+                $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex['{queryKey}']{suffix} must be a valid regex pattern.");
         }
     }
 }
