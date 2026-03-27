@@ -361,6 +361,240 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_AllowsMatchedQueryDefinedOnOperationParameters()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  parameters:
+                    - name: role
+                      in: query
+                      schema:
+                        type: string
+                  x-match:
+                    - query:
+                        role: admin
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              users: []
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            users: []
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+
+        Assert.Single(document.Paths["/users"].Get!.Matches);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_AllowsMatchedQueryDefinedOnPathParameters()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                parameters:
+                  - name: role
+                    in: query
+                    schema:
+                      type: string
+                get:
+                  x-match:
+                    - query:
+                        role: admin
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              users: []
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            users: []
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+
+        Assert.Single(document.Paths["/users"].Get!.Matches);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenMatchedQueryIsNotDeclared()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  parameters:
+                    - name: status
+                      in: query
+                      schema:
+                        type: string
+                  x-match:
+                    - query:
+                        role: admin
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              users: []
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            users: []
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].query['role'] must reference a declared query parameter", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_AllowsMatchedHeaderDefinedOnOperationParameters()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  parameters:
+                    - name: X-Env
+                      in: header
+                      schema:
+                        type: string
+                  x-match:
+                    - headers:
+                        x-env: staging
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              users: []
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            users: []
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+
+        Assert.Single(document.Paths["/users"].Get!.Matches);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_AllowsMatchedHeaderDefinedOnPathParameters()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                parameters:
+                  - name: X-Env
+                    in: header
+                    schema:
+                      type: string
+                get:
+                  x-match:
+                    - headers:
+                        X-Env: staging
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              users: []
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            users: []
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+
+        Assert.Single(document.Paths["/users"].Get!.Matches);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenMatchedHeaderIsNotDeclared()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  parameters:
+                    - name: X-Trace-Id
+                      in: header
+                      schema:
+                        type: string
+                  x-match:
+                    - headers:
+                        X-Env: staging
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              users: []
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            users: []
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].headers['X-Env'] must reference a declared header parameter", exception.Message);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_LoadsValidDefinition()
     {
         using var workspace = TestWorkspace.Create(

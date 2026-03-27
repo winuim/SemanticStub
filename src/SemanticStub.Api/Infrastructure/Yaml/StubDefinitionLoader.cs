@@ -245,8 +245,15 @@ public sealed class StubDefinitionLoader
         string existingSource,
         string incomingSource)
     {
+        if (existing.Parameters.Count > 0 && incoming.Parameters.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Path '{path}' parameters are defined in both '{existingSource}' and '{incomingSource}'.");
+        }
+
         return new PathItemDefinition
         {
+            Parameters = existing.Parameters.Count > 0 ? existing.Parameters : incoming.Parameters,
             Get = MergeOperation(path, "GET", existing.Get, incoming.Get, existingSource, incomingSource),
             Post = MergeOperation(path, "POST", existing.Post, incoming.Post, existingSource, incomingSource),
             Put = MergeOperation(path, "PUT", existing.Put, incoming.Put, existingSource, incomingSource),
