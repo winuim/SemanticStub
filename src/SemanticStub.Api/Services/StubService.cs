@@ -123,7 +123,7 @@ public sealed class StubService
             return StubMatchResult.MethodNotAllowed;
         }
 
-        var queryMatchResult = TryBuildMatchedQueryResponse(operation, query, headers, body, out response);
+        var queryMatchResult = TryBuildMatchedQueryResponse(pathItem, operation, query, headers, body, out response);
 
         if (queryMatchResult == QueryMatchEvaluationResult.Matched)
         {
@@ -265,6 +265,7 @@ public sealed class StubService
     }
 
     private QueryMatchEvaluationResult TryBuildMatchedQueryResponse(
+        PathItemDefinition pathItem,
         OperationDefinition operation,
         IReadOnlyDictionary<string, string> query,
         IReadOnlyDictionary<string, string> headers,
@@ -279,7 +280,7 @@ public sealed class StubService
         }
 
         // Query/header/body conditions are combined, then the most specific surviving candidate wins.
-        var matchedCandidate = matcherService.FindBestMatch(operation, query, headers, body);
+        var matchedCandidate = matcherService.FindBestMatch(pathItem.Parameters, operation, query, headers, body);
 
         if (matchedCandidate is null)
         {
