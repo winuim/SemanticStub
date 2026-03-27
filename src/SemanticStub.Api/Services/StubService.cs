@@ -382,7 +382,7 @@ public sealed class StubService
 
         response = CreateStubResponse(
             statusCode,
-            responseDefinition.DelayMilliseconds ?? 0,
+            responseDefinition.DelayMilliseconds,
             responseDefinition.Content,
             responseDefinition.Headers,
             responseBody);
@@ -403,7 +403,7 @@ public sealed class StubService
 
         response = CreateStubResponse(
             responseDefinition.StatusCode,
-            responseDefinition.DelayMilliseconds ?? 0,
+            responseDefinition.DelayMilliseconds,
             responseDefinition.Content,
             responseDefinition.Headers,
             responseBody);
@@ -413,7 +413,7 @@ public sealed class StubService
 
     private static StubResponse CreateStubResponse(
         int statusCode,
-        int delayMilliseconds,
+        int? delayMilliseconds,
         IReadOnlyDictionary<string, MediaTypeDefinition> content,
         IReadOnlyDictionary<string, HeaderDefinition> headers,
         string responseBody)

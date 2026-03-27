@@ -144,6 +144,98 @@ public sealed class StubServiceTests
     }
 
     [Fact]
+    public void TryGetResponse_LeavesDelayNullWhenYamlResponseDelayIsNotConfigured()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/hello"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["message"] = "Hello"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Null(response.DelayMilliseconds);
+    }
+
+    [Fact]
+    public void TryGetResponse_LeavesDelayNullWhenMatchedResponseDelayIsNotConfigured()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                                {
+                                    ["role"] = "admin"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new()
+                                        {
+                                            Example = new Dictionary<object, object>
+                                            {
+                                                ["message"] = "admin"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+        var query = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["role"] = "admin"
+        };
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Null(response.DelayMilliseconds);
+    }
+
+    [Fact]
     public void TryGetResponse_MatchesMultiValueQueryParameter()
     {
         var document = new StubDocument
