@@ -78,6 +78,13 @@ internal sealed class StubDefinitionValidator
 
         foreach (var responseEntry in operation.Responses)
         {
+            ValidateDelayDefinition(
+                path,
+                method,
+                $"responses['{responseEntry.Key}']",
+                responseEntry.Value.DelayMilliseconds,
+                errors);
+
             ValidateResponseDefinition(
                 path,
                 method,
@@ -97,6 +104,13 @@ internal sealed class StubDefinitionValidator
             {
                 errors.Add($"Path '{path}' {method.ToUpperInvariant()} x-match[{index}] must define a positive statusCode.");
             }
+
+            ValidateDelayDefinition(
+                path,
+                method,
+                $"x-match[{index}].response",
+                match.Response.DelayMilliseconds,
+                errors);
 
             ValidateResponseDefinition(
                 path,
@@ -157,6 +171,19 @@ internal sealed class StubDefinitionValidator
         {
             var firstKey = content.First().Key;
             errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define an example for '{firstKey}'.");
+        }
+    }
+
+    private static void ValidateDelayDefinition(
+        string path,
+        string method,
+        string location,
+        int? delayMilliseconds,
+        ICollection<string> errors)
+    {
+        if (delayMilliseconds is < 0)
+        {
+            errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location} must define a non-negative x-delay.");
         }
     }
 }

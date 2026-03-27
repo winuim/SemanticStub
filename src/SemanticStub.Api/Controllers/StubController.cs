@@ -68,6 +68,11 @@ public sealed class StubController : ControllerBase
             return NotFound();
         }
 
+        if (response.DelayMilliseconds is > 0)
+        {
+            await Task.Delay(response.DelayMilliseconds.Value, HttpContext.RequestAborted);
+        }
+
         foreach (var header in response.Headers)
         {
             if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
