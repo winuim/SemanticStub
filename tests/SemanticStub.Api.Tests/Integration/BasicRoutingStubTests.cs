@@ -25,7 +25,7 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal("hello", response.Headers.GetValues("X-Stub-Source").Single());
-        Assert.True(stopwatch.Elapsed >= TimeSpan.FromMilliseconds(150));
+        Assert.True(stopwatch.Elapsed >= TimeSpan.FromMilliseconds(200));
 
         var payload = await response.Content.ReadFromJsonAsync<HelloResponse>();
         Assert.NotNull(payload);
