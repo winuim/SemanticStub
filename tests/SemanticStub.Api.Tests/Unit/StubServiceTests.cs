@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
 using Xunit;
@@ -140,6 +141,74 @@ public sealed class StubServiceTests
 
         Assert.Equal(StubMatchResult.Matched, matched);
         Assert.Equal(125, response.DelayMilliseconds);
+    }
+
+    [Fact]
+    public void TryGetResponse_MatchesMultiValueQueryParameter()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/search"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                                {
+                                    ["tag"] = new List<object?> { "alpha", "beta" }
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new()
+                                        {
+                                            Example = new Dictionary<object, object>
+                                            {
+                                                ["result"] = "ordered"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["result"] = "fallback"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+        var query = new Dictionary<string, StringValues>(StringComparer.Ordinal)
+        {
+            ["tag"] = new StringValues(["alpha", "beta"])
+        };
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/search", query, out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.Equal("{\"result\":\"ordered\"}", response.Body);
     }
 
     [Fact]
@@ -1186,7 +1255,7 @@ public sealed class StubServiceTests
         var matched = service.TryGetResponse(
             HttpMethods.Get,
             "/users",
-            new Dictionary<string, string>(StringComparer.Ordinal),
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["x-env"] = "staging"

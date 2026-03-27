@@ -135,6 +135,28 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public async Task GetSearchWithOrderedRepeatedTagQuery_ReturnsSpecificResponse()
+    {
+        var response = await client.GetAsync("/search?tag=alpha&tag=beta");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<SearchResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("ordered-tags", payload.Result);
+    }
+
+    [Fact]
+    public async Task GetSearchWithDifferentRepeatedTagQueryOrder_UsesFallbackResponse()
+    {
+        var response = await client.GetAsync("/search?tag=beta&tag=alpha");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<SearchResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("default-search", payload.Result);
+    }
+
+    [Fact]
     public async Task GetUsersWithEnvironmentHeader_ReturnsHeaderSpecificUsers()
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "/environment-users");
@@ -348,6 +370,11 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
     }
 
     public sealed class MutationResponse
+    {
+        public string Result { get; init; } = string.Empty;
+    }
+
+    public sealed class SearchResponse
     {
         public string Result { get; init; } = string.Empty;
     }

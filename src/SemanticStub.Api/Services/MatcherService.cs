@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Globalization;
 using System.Text.Json;
+using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Utilities;
 
@@ -21,6 +22,20 @@ public sealed class MatcherService
     {
         return FindBestMatch(
             operation,
+            ConvertQueryValues(query),
+            body);
+    }
+
+    /// <summary>
+    /// Preserves the existing query-and-body matching entry point while delegating to the full matcher implementation.
+    /// </summary>
+    public QueryMatchDefinition? FindBestMatch(
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, StringValues> query,
+        string? body)
+    {
+        return FindBestMatch(
+            operation,
             query,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body);
@@ -33,6 +48,23 @@ public sealed class MatcherService
     public QueryMatchDefinition? FindBestMatch(
         OperationDefinition operation,
         IReadOnlyDictionary<string, string> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
+    {
+        return FindBestMatch(
+            operation,
+            ConvertQueryValues(query),
+            headers,
+            body);
+    }
+
+    /// <summary>
+    /// Filters candidates by every configured condition and prefers the most constrained definition so explicit matches win over broad fallbacks.
+    /// </summary>
+    /// <returns>The best matching conditional definition, or <see langword="null"/> when none satisfy the request.</returns>
+    public QueryMatchDefinition? FindBestMatch(
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
@@ -51,7 +83,7 @@ public sealed class MatcherService
     public QueryMatchDefinition? FindBestMatch(
         IReadOnlyCollection<ParameterDefinition> pathParameters,
         OperationDefinition operation,
-        IReadOnlyDictionary<string, string> query,
+        IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
@@ -103,7 +135,7 @@ public sealed class MatcherService
 
     private static bool IsExactQueryMatch(
         IReadOnlyDictionary<string, object?> expected,
-        IReadOnlyDictionary<string, string> actual,
+        IReadOnlyDictionary<string, StringValues> actual,
         IReadOnlyDictionary<string, string> queryParameterTypes)
     {
         foreach (var pair in expected)
@@ -118,7 +150,41 @@ public sealed class MatcherService
         return true;
     }
 
-    private static bool IsTypedQueryValueMatch(object? expected, string actual, string? parameterType)
+    private static bool IsTypedQueryValueMatch(object? expected, StringValues actual, string? parameterType)
+    {
+        if (expected is IEnumerable expectedSequence && expected is not string)
+        {
+            return IsTypedQuerySequenceMatch(expectedSequence, actual, parameterType);
+        }
+
+        return actual.Count == 1 &&
+               actual[0] is not null &&
+               IsTypedSingleQueryValueMatch(expected, actual[0]!, parameterType);
+    }
+
+    private static bool IsTypedQuerySequenceMatch(IEnumerable expectedSequence, StringValues actual, string? parameterType)
+    {
+        var expectedValues = expectedSequence.Cast<object?>().ToArray();
+        var actualValues = actual.ToArray();
+
+        if (expectedValues.Length != actualValues.Length)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < expectedValues.Length; index++)
+        {
+            if (actualValues[index] is null ||
+                !IsTypedSingleQueryValueMatch(expectedValues[index], actualValues[index]!, parameterType))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsTypedSingleQueryValueMatch(object? expected, string actual, string? parameterType)
     {
         if (string.Equals(parameterType, "integer", StringComparison.OrdinalIgnoreCase))
         {
@@ -142,6 +208,14 @@ public sealed class MatcherService
         }
 
         return string.Equals(ConvertQueryValueToString(expected), actual, StringComparison.Ordinal);
+    }
+
+    private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)
+    {
+        return query.ToDictionary(
+            entry => entry.Key,
+            entry => new StringValues(entry.Value),
+            StringComparer.Ordinal);
     }
 
     private static bool TryConvertInteger(object? value, out decimal integer)
