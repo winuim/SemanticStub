@@ -796,7 +796,9 @@ public sealed class MatcherServiceTests
             body: null);
 
         Assert.NotNull(match);
-        Assert.Same(specificHeaderMatch, match);
+        Assert.Equal("admin", match.PartialQuery["role"]);
+        Assert.Equal("alpha", match.Headers["x-tenant"]);
+        Assert.Empty(match.RegexQuery);
     }
 
     [Fact]
