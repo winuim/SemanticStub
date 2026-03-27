@@ -104,8 +104,8 @@ public sealed class MatcherService
                 queryParameterTypes,
                 bodyDocument?.RootElement)
             .OrderByDescending(GetExactQuerySpecificity)
-            .ThenByDescending(GetRegexQuerySpecificity)
             .ThenByDescending(GetMatchSpecificity)
+            .ThenByDescending(GetRegexQuerySpecificity)
             .FirstOrDefault();
     }
 

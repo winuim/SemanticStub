@@ -754,6 +754,52 @@ public sealed class MatcherServiceTests
     }
 
     [Fact]
+    public void FindBestMatch_PreservesOverallSpecificityBeforeRegexTieBreaks()
+    {
+        var specificHeaderMatch = new QueryMatchDefinition
+        {
+            PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin"
+            },
+            Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["x-tenant"] = "alpha"
+            }
+        };
+
+        var broaderRegexMatch = new QueryMatchDefinition
+        {
+            RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["role"] = "^admin-[0-9]+$"
+            }
+        };
+
+        var operation = new OperationDefinition
+        {
+            Matches = [broaderRegexMatch, specificHeaderMatch]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin-42"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["x-tenant"] = "alpha"
+            },
+            body: null);
+
+        Assert.NotNull(match);
+        Assert.Same(specificHeaderMatch, match);
+    }
+
+    [Fact]
     public void FindBestMatch_PrefersRegexQueryOverPartialQuery()
     {
         var operation = new OperationDefinition
