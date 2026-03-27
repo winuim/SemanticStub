@@ -324,6 +324,11 @@ Examples:
   - changes
   - validation
   - impact
+- When addressing review feedback:
+  - Reply in the relevant review thread with a brief summary of the fix
+  - Include the validation result when it helps the reviewer confirm the change
+  - Prefer resolving the review thread after the fix is pushed and verified
+  - Do not rely only on a top-level PR comment when a thread-specific reply is more appropriate
 
 ---
 
