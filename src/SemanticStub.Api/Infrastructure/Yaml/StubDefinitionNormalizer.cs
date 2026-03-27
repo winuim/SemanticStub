@@ -21,6 +21,11 @@ internal sealed class StubDefinitionNormalizer
     {
         return new PathItemDefinition
         {
+            Parameters = [.. pathItem.Parameters.Select(parameter => new ParameterDefinition
+            {
+                Name = parameter.Name,
+                In = parameter.In
+            })],
             Get = NormalizeOperation(pathItem.Get, definitionDirectory),
             Post = NormalizeOperation(pathItem.Post, definitionDirectory),
             Put = NormalizeOperation(pathItem.Put, definitionDirectory),
@@ -39,6 +44,11 @@ internal sealed class StubDefinitionNormalizer
         return new OperationDefinition
         {
             OperationId = operation.OperationId,
+            Parameters = [.. operation.Parameters.Select(parameter => new ParameterDefinition
+            {
+                Name = parameter.Name,
+                In = parameter.In
+            })],
             Matches =
             [
                 .. operation.Matches.Select(match => new QueryMatchDefinition
