@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
+using System.Diagnostics;
 using Xunit;
 
 namespace SemanticStub.Api.Tests.Unit;
@@ -751,6 +752,43 @@ public sealed class MatcherServiceTests
             body: null);
 
         Assert.Null(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_ReturnsNullWhenRegexQueryEvaluationTimesOut()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "^(a+)+$"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+        var query = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["role"] = new string('a', 4096) + "!"
+        };
+
+        var stopwatch = Stopwatch.StartNew();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            query,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        stopwatch.Stop();
+
+        Assert.Null(match);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2));
     }
 
     [Fact]

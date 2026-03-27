@@ -13,6 +13,8 @@ namespace SemanticStub.Api.Services;
 /// </summary>
 public sealed class MatcherService
 {
+    private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(100);
+
     /// <summary>
     /// Preserves the existing query-and-body matching entry point while delegating to the full matcher implementation.
     /// </summary>
@@ -292,9 +294,13 @@ public sealed class MatcherService
 
         try
         {
-            return Regex.IsMatch(actual, pattern, RegexOptions.CultureInvariant);
+            return Regex.IsMatch(actual, pattern, RegexOptions.CultureInvariant, RegexMatchTimeout);
         }
         catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (RegexMatchTimeoutException)
         {
             return false;
         }
