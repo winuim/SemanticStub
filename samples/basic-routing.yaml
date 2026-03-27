@@ -30,6 +30,17 @@ paths:
 
   /users:
     get:
+      parameters:
+        - name: role
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: view
+          in: query
+          required: false
+          schema:
+            type: string
       operationId: listUsers
       x-match:
         - query:
@@ -99,6 +110,34 @@ paths:
                         - name
                 required:
                   - users
+
+  /search:
+    get:
+      operationId: searchUsers
+      parameters:
+        - name: tag
+          in: query
+          required: false
+          schema:
+            type: string
+      x-match:
+        - query:
+            tag:
+              - alpha
+              - beta
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  result: ordered-tags
+      responses:
+        '200':
+          description: Default search response
+          content:
+            application/json:
+              example:
+                result: default-search
 
   /environment-users:
     get:

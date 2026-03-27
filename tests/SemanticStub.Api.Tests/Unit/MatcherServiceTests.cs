@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
 using Xunit;
@@ -380,14 +381,107 @@ public sealed class MatcherServiceTests
                 }
             ],
             operation,
-            new Dictionary<string, string>(StringComparer.Ordinal)
+            new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>(StringComparer.Ordinal)
             {
-                ["page"] = "1"
+                ["page"] = new("1")
             },
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body: null);
 
         Assert.NotNull(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_MatchesMultiValueQueryInOrder()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["tag"] = new List<object?> { "alpha", "beta" }
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, StringValues>(StringComparer.Ordinal)
+            {
+                ["tag"] = new StringValues(["alpha", "beta"])
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.NotNull(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_ReturnsNullWhenMultiValueQueryOrderDiffers()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["tag"] = new List<object?> { "alpha", "beta" }
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, StringValues>(StringComparer.Ordinal)
+            {
+                ["tag"] = new StringValues(["beta", "alpha"])
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.Null(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_ReturnsNullWhenSingleValueMatchReceivesMultipleActualValues()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["tag"] = "alpha"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, StringValues>(StringComparer.Ordinal)
+            {
+                ["tag"] = new StringValues(["alpha", "beta"])
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.Null(match);
     }
 
     [Fact]
