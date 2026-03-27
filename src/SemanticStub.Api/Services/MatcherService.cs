@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Models;
@@ -103,6 +104,7 @@ public sealed class MatcherService
                 queryParameterTypes,
                 bodyDocument?.RootElement)
             .OrderByDescending(GetExactQuerySpecificity)
+            .ThenByDescending(GetRegexQuerySpecificity)
             .ThenByDescending(GetMatchSpecificity)
             .FirstOrDefault();
     }
@@ -187,7 +189,23 @@ public sealed class MatcherService
         IReadOnlyDictionary<string, string> queryParameterTypes)
     {
         return IsExactQueryMatch(match.Query, actual, queryParameterTypes) &&
+               IsRegexQueryMatch(match.RegexQuery, actual) &&
                IsPartialQueryMatch(match.PartialQuery, actual, queryParameterTypes);
+    }
+
+    private static bool IsRegexQueryMatch(
+        IReadOnlyDictionary<string, object?> expected,
+        IReadOnlyDictionary<string, StringValues> actual)
+    {
+        foreach (var pair in expected)
+        {
+            if (!actual.TryGetValue(pair.Key, out var value) || !IsRegexQueryValueMatch(pair.Value, value))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool IsPartialQueryMatch(
@@ -229,6 +247,57 @@ public sealed class MatcherService
         return actual.Any(actualValue =>
             actualValue is not null &&
             IsTypedSinglePartialQueryValueMatch(expected, actualValue!, parameterType));
+    }
+
+    private static bool IsRegexQueryValueMatch(object? expected, StringValues actual)
+    {
+        if (expected is IEnumerable expectedSequence && expected is not string)
+        {
+            return IsRegexQuerySequenceMatch(expectedSequence, actual);
+        }
+
+        return actual.Count == 1 &&
+               actual[0] is not null &&
+               IsSingleRegexQueryValueMatch(expected, actual[0]!);
+    }
+
+    private static bool IsRegexQuerySequenceMatch(IEnumerable expectedSequence, StringValues actual)
+    {
+        var expectedValues = expectedSequence.Cast<object?>().ToArray();
+        var actualValues = actual.ToArray();
+
+        if (expectedValues.Length != actualValues.Length)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < expectedValues.Length; index++)
+        {
+            if (actualValues[index] is null ||
+                !IsSingleRegexQueryValueMatch(expectedValues[index], actualValues[index]!))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsSingleRegexQueryValueMatch(object? expected, string actual)
+    {
+        if (expected is not string pattern)
+        {
+            return false;
+        }
+
+        try
+        {
+            return Regex.IsMatch(actual, pattern, RegexOptions.CultureInvariant);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     private static bool IsTypedQuerySequenceMatch(IEnumerable expectedSequence, StringValues actual, string? parameterType)
@@ -539,12 +608,17 @@ public sealed class MatcherService
 
     private static int GetMatchSpecificity(QueryMatchDefinition match)
     {
-        return match.Query.Count + match.PartialQuery.Count + match.Headers.Count + GetBodySpecificity(match.Body);
+        return match.Query.Count + match.RegexQuery.Count + match.PartialQuery.Count + match.Headers.Count + GetBodySpecificity(match.Body);
     }
 
     private static int GetExactQuerySpecificity(QueryMatchDefinition match)
     {
         return match.Query.Count;
+    }
+
+    private static int GetRegexQuerySpecificity(QueryMatchDefinition match)
+    {
+        return match.RegexQuery.Count;
     }
 
     private static int GetBodySpecificity(object? body)

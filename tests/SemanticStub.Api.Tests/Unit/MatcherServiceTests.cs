@@ -689,4 +689,107 @@ public sealed class MatcherServiceTests
 
         Assert.NotNull(match);
     }
+
+    [Fact]
+    public void FindBestMatch_MatchesRegexSingleQueryValue()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "^admin-[0-9]+$"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin-42"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.NotNull(match);
+        Assert.Equal("^admin-[0-9]+$", match.RegexQuery["role"]);
+    }
+
+    [Fact]
+    public void FindBestMatch_ReturnsNullWhenRegexQueryDoesNotMatch()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "^admin-[0-9]+$"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["role"] = "guest"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.Null(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_PrefersRegexQueryOverPartialQuery()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "admin"
+                    }
+                },
+                new QueryMatchDefinition
+                {
+                    RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "^admin-[0-9]+$"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin-42"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.NotNull(match);
+        Assert.Equal("^admin-[0-9]+$", match.RegexQuery["role"]);
+        Assert.Empty(match.PartialQuery);
+    }
 }

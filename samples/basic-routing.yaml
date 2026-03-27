@@ -151,6 +151,35 @@ paths:
               example:
                 result: default-search
 
+  /regex-users:
+    get:
+      operationId: listRegexUsers
+      parameters:
+        - name: role
+          in: query
+          required: false
+          schema:
+            type: string
+      x-match:
+        - x-query-regex:
+            role: ^admin-[0-9]+$
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  users:
+                    - id: 6
+                      name: Regex Alice
+                      role: regex-admin
+      responses:
+        '200':
+          description: Default regex user list
+          content:
+            application/json:
+              example:
+                users: []
+
   /environment-users:
     get:
       operationId: listEnvironmentUsers
