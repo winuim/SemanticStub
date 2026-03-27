@@ -97,11 +97,36 @@ Supports YAML-based stub definitions with optional semantic matching using embed
 
 ## Code Style
 
+### General
+- Prefer clear and readable code over clever code
+- Keep code simple and maintainable
+
+### Documentation
 - Add comments where intent is not obvious
 - Explain "why", not "what"
 - Avoid redundant comments
 - Document complex logic and design decisions
-- Prefer clear and readable code over clever code
+
+### XML Documentation
+- Add XML documentation comments for:
+  - All public classes
+  - All public methods
+
+- Focus on:
+  - Purpose and responsibility
+  - Important behavior and constraints
+  - Side effects (e.g. external API calls, state changes)
+
+- Do NOT add comments for trivial code or DTOs
+
+### Parameters and Returns
+- Only document parameters when:
+  - Format, unit, or constraints are important
+  - Behavior is not obvious from the method signature
+
+- Only document return values when:
+  - Nullability or special cases exist
+  - Behavior is not obvious
 
 ---
 
@@ -367,3 +392,105 @@ Ask before:
 - Highlight ambiguity before large changes
 - Call out breaking changes clearly
 - Prefer safe implementation choices
+
+## Coding Guidelines for AI Agent (.NET / C#)
+
+### General Principles
+- Write clean, readable, and maintainable code
+- Prefer simplicity over cleverness
+- Follow existing project structure and conventions
+- Avoid unnecessary abstractions
+
+---
+
+## Documentation Rules
+
+### XML Comments
+- Add XML documentation comments for:
+  - All public classes
+  - All public methods
+
+### What to Write
+- Focus on WHY, not just WHAT
+- Describe:
+  - Purpose and responsibility of the class
+  - Important behavior or business logic
+  - Constraints or assumptions
+  - Side effects (e.g. external API calls, state changes)
+
+### Parameter and Return Comments
+- Do NOT add comments for obvious parameters or return values
+- Only document when:
+  - Format or unit is important (e.g. yyyyMMdd, seconds)
+  - Constraints exist (e.g. must be authenticated)
+  - Nullability or special return behavior exists
+  - Behavior is not clear from method signature
+
+### Avoid
+- Redundant comments that restate the code
+- Commenting trivial DTOs or simple CRUD methods
+
+---
+
+## Code Style
+
+### Naming
+- Use clear and descriptive names
+- Avoid abbreviations unless commonly understood
+
+### Methods
+- Keep methods small and focused
+- Prefer single responsibility
+
+### Classes
+- Each class should have a clear responsibility
+- Avoid god classes
+
+---
+
+## Dependency Injection
+- Use constructor injection
+- Avoid service locator pattern
+- Do not resolve dependencies manually unless explicitly required
+
+---
+
+## Error Handling
+- Use exceptions for exceptional cases
+- Do not swallow exceptions silently
+- Add meaningful context to exceptions
+
+---
+
+## Logging
+- Log important operations and failures
+- Do not log sensitive information
+- Avoid excessive logging
+
+---
+
+## HTTP / External Calls
+- Use IHttpClientFactory
+- Do not create HttpClient manually
+- Handle timeouts and retries where appropriate
+
+---
+
+## Testing
+- Write unit tests for business logic
+- Mock external dependencies
+- Do not test framework behavior
+
+---
+
+## When Generating Code
+- Do not modify unrelated files
+- Only change what is necessary
+- If multiple approaches exist, choose the simplest one
+
+---
+
+## Code Review Expectations
+- Prioritize correctness, readability, and maintainability
+- Flag unclear logic or missing documentation
+- Suggest improvements when confidence is high
