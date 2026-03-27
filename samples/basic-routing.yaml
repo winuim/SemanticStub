@@ -85,6 +85,18 @@ paths:
                       name: Bob
                       role: guest
 
+        - x-query-partial:
+            role: admin
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  users:
+                    - id: 5
+                      name: Partial Alice
+                      role: partial-admin
+
       responses:
         '200':
           description: Default user list

@@ -487,6 +487,47 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_PreservesPartialQueryMatch()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  parameters:
+                    - name: role
+                      in: query
+                      schema:
+                        type: string
+                  x-match:
+                    - x-query-partial:
+                        role: admin
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              users: []
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            users: []
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var operation = Assert.IsType<OperationDefinition>(document.Paths["/users"].Get);
+        var match = Assert.Single(operation.Matches);
+
+        Assert.Equal("admin", Assert.IsType<string>(match.PartialQuery["role"]));
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_AllowsMatchedQueryDefinedOnPathParameters()
     {
         using var workspace = TestWorkspace.Create(
@@ -562,6 +603,45 @@ public sealed class StubDefinitionLoaderTests
         var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
 
         Assert.Contains("x-match[0].query['role'] must reference a declared query parameter", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenPartialMatchedQueryIsNotDeclared()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  parameters:
+                    - name: status
+                      in: query
+                      schema:
+                        type: string
+                  x-match:
+                    - x-query-partial:
+                        role: admin
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              users: []
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            users: []
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].x-query-partial['role'] must reference a declared query parameter", exception.Message);
     }
 
     [Fact]
