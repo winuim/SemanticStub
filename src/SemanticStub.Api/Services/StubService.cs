@@ -141,60 +141,21 @@ public sealed class StubService
     {
         response = null!;
 
-        var pathItem = ResolvePathItem(path);
-
-        if (pathItem is null)
+        if (!TryResolveOperation(method, path, out var pathItem, out var operation, out var failedMatchResult))
         {
-            return StubMatchResult.PathNotFound;
+            return failedMatchResult;
         }
 
-        var operation = GetOperation(method, pathItem);
+        var conditionalResult = TryBuildMatchedConditionalResponse(pathItem, operation, query, headers, body, out response);
 
-        if (operation is null)
+        if (conditionalResult.HasValue)
         {
-            return StubMatchResult.MethodNotAllowed;
+            return conditionalResult.Value;
         }
 
-        var queryMatchResult = TryBuildMatchedQueryResponse(pathItem, operation, query, headers, body, out response);
-
-        if (queryMatchResult == QueryMatchEvaluationResult.Matched)
-        {
-            return StubMatchResult.Matched;
-        }
-
-        if (queryMatchResult == QueryMatchEvaluationResult.MatchedButInvalidResponse)
-        {
-            return StubMatchResult.ResponseNotConfigured;
-        }
-
-        var matchedResponse = operation.Responses
-            .FirstOrDefault(entry =>
-                int.TryParse(entry.Key, out _) &&
-                (entry.Value.Content.Count > 0 || !string.IsNullOrEmpty(entry.Value.ResponseFile)));
-
-        if (string.IsNullOrEmpty(matchedResponse.Key) ||
-            !int.TryParse(matchedResponse.Key, out var statusCode))
-        {
-            return StubMatchResult.ResponseNotConfigured;
-        }
-
-        var responseBody = BuildResponseBody(matchedResponse.Value);
-
-        if (responseBody is null)
-        {
-            return StubMatchResult.ResponseNotConfigured;
-        }
-
-        response = new StubResponse
-        {
-            StatusCode = statusCode,
-            DelayMilliseconds = matchedResponse.Value.DelayMilliseconds,
-            ContentType = ResolveContentType(matchedResponse.Value.Content),
-            Headers = BuildResponseHeaders(matchedResponse.Value.Headers),
-            Body = responseBody
-        };
-
-        return StubMatchResult.Matched;
+        return TryBuildDefaultOperationResponse(operation, out response)
+            ? StubMatchResult.Matched
+            : StubMatchResult.ResponseNotConfigured;
     }
 
     private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)
@@ -327,23 +288,144 @@ public sealed class StubService
             return QueryMatchEvaluationResult.NoMatch;
         }
 
-        var responseBody = BuildResponseBody(matchedCandidate.Response.ResponseFile, matchedCandidate.Response.Content);
-
-        if (responseBody is null || matchedCandidate.Response.StatusCode <= 0)
+        if (!TryBuildStubResponse(matchedCandidate.Response, out response))
         {
             return QueryMatchEvaluationResult.MatchedButInvalidResponse;
         }
 
-        response = new StubResponse
+        return QueryMatchEvaluationResult.Matched;
+    }
+
+    private bool TryResolveOperation(
+        string method,
+        string path,
+        out PathItemDefinition pathItem,
+        out OperationDefinition operation,
+        out StubMatchResult failedMatchResult)
+    {
+        pathItem = null!;
+        operation = null!;
+        failedMatchResult = StubMatchResult.Matched;
+
+        var resolvedPathItem = ResolvePathItem(path);
+
+        if (resolvedPathItem is null)
         {
-            StatusCode = matchedCandidate.Response.StatusCode,
-            DelayMilliseconds = matchedCandidate.Response.DelayMilliseconds,
-            ContentType = ResolveContentType(matchedCandidate.Response.Content),
-            Headers = BuildResponseHeaders(matchedCandidate.Response.Headers),
+            failedMatchResult = StubMatchResult.PathNotFound;
+            return false;
+        }
+
+        var resolvedOperation = GetOperation(method, resolvedPathItem);
+
+        if (resolvedOperation is null)
+        {
+            failedMatchResult = StubMatchResult.MethodNotAllowed;
+            return false;
+        }
+
+        pathItem = resolvedPathItem;
+        operation = resolvedOperation;
+        return true;
+    }
+
+    private StubMatchResult? TryBuildMatchedConditionalResponse(
+        PathItemDefinition pathItem,
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body,
+        out StubResponse response)
+    {
+        response = null!;
+
+        var queryMatchResult = TryBuildMatchedQueryResponse(pathItem, operation, query, headers, body, out response);
+
+        if (queryMatchResult == QueryMatchEvaluationResult.Matched)
+        {
+            return StubMatchResult.Matched;
+        }
+
+        if (queryMatchResult == QueryMatchEvaluationResult.MatchedButInvalidResponse)
+        {
+            return StubMatchResult.ResponseNotConfigured;
+        }
+
+        return null;
+    }
+
+    private bool TryBuildDefaultOperationResponse(OperationDefinition operation, out StubResponse response)
+    {
+        response = null!;
+
+        var matchedResponse = operation.Responses
+            .FirstOrDefault(entry =>
+                int.TryParse(entry.Key, out _) &&
+                (entry.Value.Content.Count > 0 || !string.IsNullOrEmpty(entry.Value.ResponseFile)));
+
+        if (string.IsNullOrEmpty(matchedResponse.Key) || !int.TryParse(matchedResponse.Key, out var statusCode))
+        {
+            return false;
+        }
+
+        return TryBuildStubResponse(statusCode, matchedResponse.Value, out response);
+    }
+
+    private bool TryBuildStubResponse(int statusCode, ResponseDefinition responseDefinition, out StubResponse response)
+    {
+        response = null!;
+        var responseBody = BuildResponseBody(responseDefinition);
+
+        if (responseBody is null)
+        {
+            return false;
+        }
+
+        response = CreateStubResponse(
+            statusCode,
+            responseDefinition.DelayMilliseconds ?? 0,
+            responseDefinition.Content,
+            responseDefinition.Headers,
+            responseBody);
+
+        return true;
+    }
+
+    private bool TryBuildStubResponse(QueryMatchResponseDefinition responseDefinition, out StubResponse response)
+    {
+        response = null!;
+
+        var responseBody = BuildResponseBody(responseDefinition.ResponseFile, responseDefinition.Content);
+
+        if (responseBody is null || responseDefinition.StatusCode <= 0)
+        {
+            return false;
+        }
+
+        response = CreateStubResponse(
+            responseDefinition.StatusCode,
+            responseDefinition.DelayMilliseconds ?? 0,
+            responseDefinition.Content,
+            responseDefinition.Headers,
+            responseBody);
+
+        return true;
+    }
+
+    private static StubResponse CreateStubResponse(
+        int statusCode,
+        int delayMilliseconds,
+        IReadOnlyDictionary<string, MediaTypeDefinition> content,
+        IReadOnlyDictionary<string, HeaderDefinition> headers,
+        string responseBody)
+    {
+        return new StubResponse
+        {
+            StatusCode = statusCode,
+            DelayMilliseconds = delayMilliseconds,
+            ContentType = ResolveContentType(content),
+            Headers = BuildResponseHeaders(headers),
             Body = responseBody
         };
-
-        return QueryMatchEvaluationResult.Matched;
     }
     private string? BuildResponseBody(ResponseDefinition responseDefinition)
     {
