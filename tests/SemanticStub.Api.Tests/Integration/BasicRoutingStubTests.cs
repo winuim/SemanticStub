@@ -56,6 +56,19 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public async Task GetDownload_ReturnsBinaryResponseFileWithoutStringConversion()
+    {
+        var response = await client.GetAsync("/download");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/octet-stream", response.Content.Headers.ContentType?.MediaType);
+
+        var payload = await response.Content.ReadAsByteArrayAsync();
+
+        Assert.Equal(new byte[] { 0x00, 0x01, 0x7F, 0xFF, 0x10 }, payload);
+    }
+
+    [Fact]
     public async Task GetUsersWithAdminRole_ReturnsAdminUsers()
     {
         var response = await client.GetAsync("/users?role=admin");
