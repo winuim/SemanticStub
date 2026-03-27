@@ -340,6 +340,53 @@ public sealed class StubServiceTests
     }
 
     [Fact]
+    public void TryGetResponse_UsesFilePathForAbsoluteResponseFile()
+    {
+        var filePath = Path.Combine(Path.GetTempPath(), $"semanticstub-{Guid.NewGuid():N}.bin");
+        File.WriteAllBytes(filePath, [0x00, 0x01, 0x7F, 0xFF]);
+
+        try
+        {
+            var document = new StubDocument
+            {
+                Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+                {
+                    ["/download"] = new()
+                    {
+                        Get = new OperationDefinition
+                        {
+                            Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                            {
+                                ["200"] = new()
+                                {
+                                    ResponseFile = filePath,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/octet-stream"] = new()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            var service = new StubService(document, _ => throw new InvalidOperationException("Response file reader should not be used for absolute paths."));
+
+            var matched = service.TryGetResponse(HttpMethods.Get, "/download", out var response);
+
+            Assert.Equal(StubMatchResult.Matched, matched);
+            Assert.Equal(filePath, response.FilePath);
+            Assert.Equal(string.Empty, response.Body);
+            Assert.Equal("application/octet-stream", response.ContentType);
+        }
+        finally
+        {
+            File.Delete(filePath);
+        }
+    }
+
+    [Fact]
     public void TryGetResponse_ReturnsConfiguredResponseHeaders()
     {
         var document = new StubDocument

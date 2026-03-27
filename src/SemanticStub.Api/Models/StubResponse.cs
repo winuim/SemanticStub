@@ -13,4 +13,6 @@ public sealed class StubResponse
     public IReadOnlyDictionary<string, StringValues> Headers { get; init; } = new Dictionary<string, StringValues>(StringComparer.OrdinalIgnoreCase);
 
     public string Body { get; init; } = string.Empty;
+
+    public string? FilePath { get; init; }
 }
