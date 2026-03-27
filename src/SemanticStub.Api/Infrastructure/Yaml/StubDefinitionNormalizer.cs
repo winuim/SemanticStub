@@ -24,7 +24,13 @@ internal sealed class StubDefinitionNormalizer
             Parameters = [.. pathItem.Parameters.Select(parameter => new ParameterDefinition
             {
                 Name = parameter.Name,
-                In = parameter.In
+                In = parameter.In,
+                Schema = parameter.Schema is null
+                    ? null
+                    : new ParameterSchemaDefinition
+                    {
+                        Type = parameter.Schema.Type
+                    }
             })],
             Get = NormalizeOperation(pathItem.Get, definitionDirectory),
             Post = NormalizeOperation(pathItem.Post, definitionDirectory),
@@ -47,13 +53,22 @@ internal sealed class StubDefinitionNormalizer
             Parameters = [.. operation.Parameters.Select(parameter => new ParameterDefinition
             {
                 Name = parameter.Name,
-                In = parameter.In
+                In = parameter.In,
+                Schema = parameter.Schema is null
+                    ? null
+                    : new ParameterSchemaDefinition
+                    {
+                        Type = parameter.Schema.Type
+                    }
             })],
             Matches =
             [
                 .. operation.Matches.Select(match => new QueryMatchDefinition
                 {
-                    Query = new Dictionary<string, string>(match.Query, StringComparer.Ordinal),
+                    Query = match.Query.ToDictionary(
+                        entry => entry.Key,
+                        entry => StubExampleSerializer.NormalizeValue(entry.Value),
+                        StringComparer.Ordinal),
                     Headers = new Dictionary<string, string>(match.Headers, StringComparer.OrdinalIgnoreCase),
                     Body = StubExampleSerializer.NormalizeValue(match.Body),
                     Response = new QueryMatchResponseDefinition

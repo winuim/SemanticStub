@@ -15,7 +15,7 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
                         ["role"] = "admin"
                     },
@@ -26,7 +26,7 @@ public sealed class MatcherServiceTests
                 },
                 new QueryMatchDefinition
                 {
-                    Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
                         ["role"] = "admin",
                         ["view"] = "summary"
@@ -124,7 +124,7 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
                         ["role"] = "admin"
                     }
@@ -171,6 +171,220 @@ public sealed class MatcherServiceTests
             {
                 ["x-env"] = "staging"
             },
+            body: null);
+
+        Assert.NotNull(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_MatchesIntegerQueryUsingDeclaredSchemaType()
+    {
+        var operation = new OperationDefinition
+        {
+            Parameters =
+            [
+                new ParameterDefinition
+                {
+                    Name = "page",
+                    In = "query",
+                    Schema = new ParameterSchemaDefinition
+                    {
+                        Type = "integer"
+                    }
+                }
+            ],
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["page"] = 1
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["page"] = "1"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.NotNull(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_MatchesNumberQueryUsingDeclaredSchemaType()
+    {
+        var operation = new OperationDefinition
+        {
+            Parameters =
+            [
+                new ParameterDefinition
+                {
+                    Name = "ratio",
+                    In = "query",
+                    Schema = new ParameterSchemaDefinition
+                    {
+                        Type = "number"
+                    }
+                }
+            ],
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["ratio"] = 1.5m
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["ratio"] = "1.5"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.NotNull(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_MatchesBooleanQueryUsingDeclaredSchemaType()
+    {
+        var operation = new OperationDefinition
+        {
+            Parameters =
+            [
+                new ParameterDefinition
+                {
+                    Name = "enabled",
+                    In = "query",
+                    Schema = new ParameterSchemaDefinition
+                    {
+                        Type = "boolean"
+                    }
+                }
+            ],
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["enabled"] = true
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["enabled"] = "true"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.NotNull(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_ReturnsNullWhenTypedQueryValueDoesNotMatch()
+    {
+        var operation = new OperationDefinition
+        {
+            Parameters =
+            [
+                new ParameterDefinition
+                {
+                    Name = "page",
+                    In = "query",
+                    Schema = new ParameterSchemaDefinition
+                    {
+                        Type = "integer"
+                    }
+                }
+            ],
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["page"] = 1
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["page"] = "1.5"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.Null(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_UsesPathLevelQueryParameterType()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["page"] = 1
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            [
+                new ParameterDefinition
+                {
+                    Name = "page",
+                    In = "query",
+                    Schema = new ParameterSchemaDefinition
+                    {
+                        Type = "integer"
+                    }
+                }
+            ],
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["page"] = "1"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body: null);
 
         Assert.NotNull(match);
