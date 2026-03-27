@@ -7,6 +7,9 @@ using System.Globalization;
 
 namespace SemanticStub.Api.Services;
 
+/// <summary>
+/// Converts matched stub definitions into concrete HTTP responses so controllers can delegate routing, matching, and payload assembly to one place.
+/// </summary>
 public sealed class StubService
 {
     private const string JsonContentType = "application/json";
@@ -43,6 +46,11 @@ public sealed class StubService
         this.matcherService = matcherService;
     }
 
+    /// <summary>
+    /// Resolves a response for callers that only need method and path matching.
+    /// </summary>
+    /// <param name="response">Receives the assembled response when a matching stub is found.</param>
+    /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
     public StubMatchResult TryGetResponse(string method, string path, out StubResponse response)
     {
         return TryGetResponse(
@@ -54,6 +62,11 @@ public sealed class StubService
             out response);
     }
 
+    /// <summary>
+    /// Resolves a response while considering query-based match conditions so more specific stubs can override broad defaults.
+    /// </summary>
+    /// <param name="response">Receives the assembled response when a matching stub is found.</param>
+    /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
     public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, out StubResponse response)
     {
         return TryGetResponse(
@@ -65,6 +78,11 @@ public sealed class StubService
             out response);
     }
 
+    /// <summary>
+    /// Resolves a response while considering query and body match conditions so structured request payloads can select a narrower stub.
+    /// </summary>
+    /// <param name="response">Receives the assembled response when a matching stub is found.</param>
+    /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
     public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, string? body, out StubResponse response)
     {
         return TryGetResponse(
@@ -76,6 +94,11 @@ public sealed class StubService
             out response);
     }
 
+    /// <summary>
+    /// Resolves the most specific stub response by evaluating path, method, query, headers, and body through the same matching pipeline.
+    /// </summary>
+    /// <param name="response">Receives the assembled response when a matching stub is found.</param>
+    /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
     public StubMatchResult TryGetResponse(
         string method,
         string path,

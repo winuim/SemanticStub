@@ -5,6 +5,9 @@ using YamlDotNet.Serialization.NamingConventions;
 
 namespace SemanticStub.Api.Infrastructure.Yaml;
 
+/// <summary>
+/// Loads OpenAPI-based stub definitions from disk so the runtime can execute mock behavior directly from YAML without duplicating route metadata in code.
+/// </summary>
 public sealed class StubDefinitionLoader
 {
     private const string DefaultStubFileName = "basic-routing.yaml";
@@ -33,6 +36,9 @@ public sealed class StubDefinitionLoader
         normalizer = new StubDefinitionNormalizer();
     }
 
+    /// <summary>
+    /// Discovers the default stub files, validates them, and merges them into one document so matching can run against a single deterministic view.
+    /// </summary>
     public StubDocument LoadDefaultDefinition()
     {
         var definitionsRootPath = ResolveDefinitionsDirectory();
@@ -61,6 +67,9 @@ public sealed class StubDefinitionLoader
         return normalizer.NormalizeDocument(document, definitionDirectory);
     }
 
+    /// <summary>
+    /// Resolves file-based response payloads relative to the definitions root so YAML response-file references behave consistently across environments.
+    /// </summary>
     public string LoadResponseFileContent(string fileName)
     {
         if (Path.IsPathRooted(fileName))

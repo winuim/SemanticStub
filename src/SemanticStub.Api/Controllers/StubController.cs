@@ -4,6 +4,9 @@ using SemanticStub.Api.Services;
 
 namespace SemanticStub.Api.Controllers;
 
+/// <summary>
+/// Routes every incoming request through the stub engine so mocked behavior stays defined in YAML rather than duplicated across controllers.
+/// </summary>
 [ApiController]
 [Route("{*path}")]
 public sealed class StubController : ControllerBase
@@ -15,30 +18,45 @@ public sealed class StubController : ControllerBase
         this.stubService = stubService;
     }
 
+    /// <summary>
+    /// Handles GET requests through the shared stub resolution path so verb-specific endpoints do not drift from YAML definitions.
+    /// </summary>
     [HttpGet]
     public Task<IActionResult> Get(string? path)
     {
         return HandleRequest(HttpMethods.Get, path);
     }
 
+    /// <summary>
+    /// Handles POST requests through the shared stub resolution path so verb-specific endpoints do not drift from YAML definitions.
+    /// </summary>
     [HttpPost]
     public Task<IActionResult> Post(string? path)
     {
         return HandleRequest(HttpMethods.Post, path);
     }
 
+    /// <summary>
+    /// Handles PUT requests through the shared stub resolution path so verb-specific endpoints do not drift from YAML definitions.
+    /// </summary>
     [HttpPut]
     public Task<IActionResult> Put(string? path)
     {
         return HandleRequest(HttpMethods.Put, path);
     }
 
+    /// <summary>
+    /// Handles PATCH requests through the shared stub resolution path so verb-specific endpoints do not drift from YAML definitions.
+    /// </summary>
     [HttpPatch]
     public Task<IActionResult> Patch(string? path)
     {
         return HandleRequest(HttpMethods.Patch, path);
     }
 
+    /// <summary>
+    /// Handles DELETE requests through the shared stub resolution path so verb-specific endpoints do not drift from YAML definitions.
+    /// </summary>
     [HttpDelete]
     public Task<IActionResult> Delete(string? path)
     {
