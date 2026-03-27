@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
+using System.Diagnostics;
 using Xunit;
 
 namespace SemanticStub.Api.Tests.Unit;
@@ -688,5 +689,193 @@ public sealed class MatcherServiceTests
             body: null);
 
         Assert.NotNull(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_MatchesRegexSingleQueryValue()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "^admin-[0-9]+$"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin-42"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.NotNull(match);
+        Assert.Equal("^admin-[0-9]+$", match.RegexQuery["role"]);
+    }
+
+    [Fact]
+    public void FindBestMatch_ReturnsNullWhenRegexQueryDoesNotMatch()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "^admin-[0-9]+$"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["role"] = "guest"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.Null(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_ReturnsNullWhenRegexQueryEvaluationTimesOut()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "^(a+)+$"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+        var query = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["role"] = new string('a', 4096) + "!"
+        };
+
+        var stopwatch = Stopwatch.StartNew();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            query,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        stopwatch.Stop();
+
+        Assert.Null(match);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public void FindBestMatch_PreservesOverallSpecificityBeforeRegexTieBreaks()
+    {
+        var specificHeaderMatch = new QueryMatchDefinition
+        {
+            PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin"
+            },
+            Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["x-tenant"] = "alpha"
+            }
+        };
+
+        var broaderRegexMatch = new QueryMatchDefinition
+        {
+            RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["role"] = "^admin-[0-9]+$"
+            }
+        };
+
+        var operation = new OperationDefinition
+        {
+            Matches = [broaderRegexMatch, specificHeaderMatch]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin-42"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["x-tenant"] = "alpha"
+            },
+            body: null);
+
+        Assert.NotNull(match);
+        Assert.Equal("admin", match.PartialQuery["role"]);
+        Assert.Equal("alpha", match.Headers["x-tenant"]);
+        Assert.Empty(match.RegexQuery);
+    }
+
+    [Fact]
+    public void FindBestMatch_PrefersRegexQueryOverPartialQuery()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "admin"
+                    }
+                },
+                new QueryMatchDefinition
+                {
+                    RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "^admin-[0-9]+$"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin-42"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        Assert.NotNull(match);
+        Assert.Equal("^admin-[0-9]+$", match.RegexQuery["role"]);
+        Assert.Empty(match.PartialQuery);
     }
 }
