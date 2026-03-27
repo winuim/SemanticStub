@@ -245,21 +245,61 @@ public sealed class StubDefinitionLoader
         string existingSource,
         string incomingSource)
     {
-        if (existing.Parameters.Count > 0 && incoming.Parameters.Count > 0)
-        {
-            throw new InvalidOperationException(
-                $"Path '{path}' parameters are defined in both '{existingSource}' and '{incomingSource}'.");
-        }
-
         return new PathItemDefinition
         {
-            Parameters = existing.Parameters.Count > 0 ? existing.Parameters : incoming.Parameters,
+            Parameters = MergeParameters(existing.Parameters, incoming.Parameters),
             Get = MergeOperation(path, "GET", existing.Get, incoming.Get, existingSource, incomingSource),
             Post = MergeOperation(path, "POST", existing.Post, incoming.Post, existingSource, incomingSource),
             Put = MergeOperation(path, "PUT", existing.Put, incoming.Put, existingSource, incomingSource),
             Patch = MergeOperation(path, "PATCH", existing.Patch, incoming.Patch, existingSource, incomingSource),
             Delete = MergeOperation(path, "DELETE", existing.Delete, incoming.Delete, existingSource, incomingSource)
         };
+    }
+
+    private static List<ParameterDefinition> MergeParameters(
+        IReadOnlyCollection<ParameterDefinition> existing,
+        IReadOnlyCollection<ParameterDefinition> incoming)
+    {
+        if (existing.Count == 0)
+        {
+            return [.. incoming];
+        }
+
+        if (incoming.Count == 0)
+        {
+            return [.. existing];
+        }
+
+        var merged = new List<ParameterDefinition>(existing.Count + incoming.Count);
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var parameter in existing)
+        {
+            if (keys.Add(GetParameterMergeKey(parameter)))
+            {
+                merged.Add(parameter);
+            }
+        }
+
+        foreach (var parameter in incoming)
+        {
+            if (keys.Add(GetParameterMergeKey(parameter)))
+            {
+                merged.Add(parameter);
+            }
+        }
+
+        return merged;
+    }
+
+    private static string GetParameterMergeKey(ParameterDefinition parameter)
+    {
+        var location = parameter.In.Trim();
+        var name = location.Equals("header", StringComparison.OrdinalIgnoreCase)
+            ? parameter.Name.Trim().ToUpperInvariant()
+            : parameter.Name.Trim();
+
+        return location.ToUpperInvariant() + ":" + name;
     }
 
     private static OperationDefinition? MergeOperation(

@@ -812,6 +812,112 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_MergesIdenticalPathParametersAcrossStubFiles()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                parameters:
+                  - name: role
+                    in: query
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            method: get
+            """,
+            additionalStubFiles:
+            [
+                ("users.stub.yaml",
+                """
+                openapi: 3.1.0
+                paths:
+                  /users:
+                    parameters:
+                      - name: role
+                        in: query
+                    post:
+                      responses:
+                        "201":
+                          description: created
+                          content:
+                            application/json:
+                              example:
+                                method: post
+                """)
+            ]);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var parameters = document.Paths["/users"].Parameters;
+
+        var parameter = Assert.Single(parameters);
+        Assert.Equal("role", parameter.Name);
+        Assert.Equal("query", parameter.In);
+        Assert.NotNull(document.Paths["/users"].Get);
+        Assert.NotNull(document.Paths["/users"].Post);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_MergesDistinctPathParametersAcrossStubFiles()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                parameters:
+                  - name: role
+                    in: query
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            method: get
+            """,
+            additionalStubFiles:
+            [
+                ("users.stub.yaml",
+                """
+                openapi: 3.1.0
+                paths:
+                  /users:
+                    parameters:
+                      - name: X-Env
+                        in: header
+                    post:
+                      responses:
+                        "201":
+                          description: created
+                          content:
+                            application/json:
+                              example:
+                                method: post
+                """)
+            ]);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var parameters = document.Paths["/users"].Parameters;
+
+        Assert.Equal(2, parameters.Count);
+        Assert.Contains(parameters, parameter => parameter.Name == "role" && parameter.In == "query");
+        Assert.Contains(parameters, parameter => parameter.Name == "X-Env" && parameter.In == "header");
+        Assert.NotNull(document.Paths["/users"].Get);
+        Assert.NotNull(document.Paths["/users"].Post);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_ThrowsWhenStubFilesDefineSamePathAndMethod()
     {
         using var workspace = TestWorkspace.Create(
