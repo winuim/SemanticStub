@@ -69,6 +69,10 @@ internal sealed class StubDefinitionNormalizer
                         entry => entry.Key,
                         entry => StubExampleSerializer.NormalizeValue(entry.Value),
                         StringComparer.Ordinal),
+                    PartialQuery = match.PartialQuery.ToDictionary(
+                        entry => entry.Key,
+                        entry => StubExampleSerializer.NormalizeValue(entry.Value),
+                        StringComparer.Ordinal),
                     Headers = new Dictionary<string, string>(match.Headers, StringComparer.OrdinalIgnoreCase),
                     Body = StubExampleSerializer.NormalizeValue(match.Body),
                     Response = new QueryMatchResponseDefinition

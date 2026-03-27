@@ -20,6 +20,10 @@ Accept: application/json
 GET {{host}}/users?role=guest
 Accept: application/json
 
+### Users stub filtered by partial query match
+GET {{host}}/users?role=super-admin
+Accept: application/json
+
 ### Search stub filtered by ordered repeated query values
 GET {{host}}/search?tag=alpha&tag=beta
 Accept: application/json
