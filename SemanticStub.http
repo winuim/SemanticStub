@@ -12,11 +12,28 @@ Accept: application/json
 GET {{host}}/users?role=admin
 Accept: application/json
 
+### Users stub prefers the more specific query match
+GET {{host}}/users?role=admin&view=summary
+Accept: application/json
+
 ### Users stub filtered by another exact query match
 GET {{host}}/users?role=guest
 Accept: application/json
 
-### Login stub
+### Search stub filtered by ordered repeated query values
+GET {{host}}/search?tag=alpha&tag=beta
+Accept: application/json
+
+### Search stub falls back when repeated query value order differs
+GET {{host}}/search?tag=beta&tag=alpha
+Accept: application/json
+
+### Environment users stub filtered by request header
+GET {{host}}/environment-users
+X-Env: staging
+Accept: application/json
+
+### Login stub with matching body
 POST {{host}}/login
 Content-Type: application/json
 Accept: application/json
@@ -25,6 +42,55 @@ Accept: application/json
   "username": "demo",
   "password": "secret"
 }
+
+### Login stub falls back when body does not match
+POST {{host}}/login
+Content-Type: application/json
+Accept: application/json
+
+{
+  "username": "other",
+  "password": "wrong"
+}
+
+### Replace profile
+PUT {{host}}/profile
+Content-Type: application/json
+Accept: application/json
+
+{
+  "displayName": "Updated User"
+}
+
+### Patch profile with matching body
+PATCH {{host}}/profile
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nickname": "stubby"
+}
+
+### Patch profile fallback response
+PATCH {{host}}/profile
+Content-Type: application/json
+Accept: application/json
+
+{
+  "nickname": "other"
+}
+
+### Delete profile
+DELETE {{host}}/profile
+Accept: application/json
+
+### Template path order route
+GET {{host}}/orders/123
+Accept: application/json
+
+### Exact path order route
+GET {{host}}/orders/special
+Accept: application/json
 
 ### Unknown route returns 404
 GET {{host}}/missing

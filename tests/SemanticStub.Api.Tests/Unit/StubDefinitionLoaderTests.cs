@@ -443,6 +443,50 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_PreservesMultiValueQueryMatch()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /search:
+                get:
+                  parameters:
+                    - name: tag
+                      in: query
+                      schema:
+                        type: string
+                  x-match:
+                    - query:
+                        tag:
+                          - alpha
+                          - beta
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              result: ordered
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            result: fallback
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var operation = Assert.IsType<OperationDefinition>(document.Paths["/search"].Get);
+        var match = Assert.Single(operation.Matches);
+        var values = Assert.IsAssignableFrom<IEnumerable<object?>>(match.Query["tag"]);
+
+        Assert.Equal(["alpha", "beta"], values.Cast<string>().ToArray());
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_AllowsMatchedQueryDefinedOnPathParameters()
     {
         using var workspace = TestWorkspace.Create(
