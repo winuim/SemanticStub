@@ -56,7 +56,7 @@ public sealed class StubService
         return TryGetResponse(
             method,
             path,
-            new Dictionary<string, string>(StringComparer.Ordinal),
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body: null,
             out response);
@@ -68,6 +68,22 @@ public sealed class StubService
     /// <param name="response">Receives the assembled response when a matching stub is found.</param>
     /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
     public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, out StubResponse response)
+    {
+        return TryGetResponse(
+            method,
+            path,
+            ConvertQueryValues(query),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null,
+            out response);
+    }
+
+    /// <summary>
+    /// Resolves a response while considering query-based match conditions so more specific stubs can override broad defaults.
+    /// </summary>
+    /// <param name="response">Receives the assembled response when a matching stub is found.</param>
+    /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
+    public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, StringValues> query, out StubResponse response)
     {
         return TryGetResponse(
             method,
@@ -88,6 +104,22 @@ public sealed class StubService
         return TryGetResponse(
             method,
             path,
+            ConvertQueryValues(query),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body,
+            out response);
+    }
+
+    /// <summary>
+    /// Resolves a response while considering query and body match conditions so structured request payloads can select a narrower stub.
+    /// </summary>
+    /// <param name="response">Receives the assembled response when a matching stub is found.</param>
+    /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
+    public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, StringValues> query, string? body, out StubResponse response)
+    {
+        return TryGetResponse(
+            method,
+            path,
             query,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body,
@@ -102,7 +134,7 @@ public sealed class StubService
     public StubMatchResult TryGetResponse(
         string method,
         string path,
-        IReadOnlyDictionary<string, string> query,
+        IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
         string? body,
         out StubResponse response)
@@ -163,6 +195,14 @@ public sealed class StubService
         };
 
         return StubMatchResult.Matched;
+    }
+
+    private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)
+    {
+        return query.ToDictionary(
+            entry => entry.Key,
+            entry => new StringValues(entry.Value),
+            StringComparer.Ordinal);
     }
 
     private PathItemDefinition? ResolvePathItem(string requestPath)
@@ -267,7 +307,7 @@ public sealed class StubService
     private QueryMatchEvaluationResult TryBuildMatchedQueryResponse(
         PathItemDefinition pathItem,
         OperationDefinition operation,
-        IReadOnlyDictionary<string, string> query,
+        IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
         string? body,
         out StubResponse response)
