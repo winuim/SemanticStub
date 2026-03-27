@@ -104,7 +104,7 @@ public sealed class StubServiceTests
                         [
                             new QueryMatchDefinition
                             {
-                                Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                                 {
                                     ["role"] = "admin"
                                 },
@@ -395,7 +395,7 @@ public sealed class StubServiceTests
                         [
                             new QueryMatchDefinition
                             {
-                                Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                                 {
                                     ["role"] = "admin"
                                 },
@@ -534,7 +534,7 @@ public sealed class StubServiceTests
                         [
                             new QueryMatchDefinition
                             {
-                                Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                                 {
                                     ["role"] = "admin"
                                 },
@@ -555,7 +555,7 @@ public sealed class StubServiceTests
                             },
                             new QueryMatchDefinition
                             {
-                                Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                                 {
                                     ["role"] = "admin",
                                     ["view"] = "summary"
@@ -609,7 +609,7 @@ public sealed class StubServiceTests
                         [
                             new QueryMatchDefinition
                             {
-                                Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                                 {
                                     ["role"] = "admin"
                                 },
@@ -677,7 +677,7 @@ public sealed class StubServiceTests
                         [
                             new QueryMatchDefinition
                             {
-                                Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                                 {
                                     ["role"] = "admin"
                                 },
@@ -818,7 +818,7 @@ public sealed class StubServiceTests
                         [
                             new QueryMatchDefinition
                             {
-                                Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                                 {
                                     ["format"] = "csv"
                                 },
@@ -865,7 +865,7 @@ public sealed class StubServiceTests
                         [
                             new QueryMatchDefinition
                             {
-                                Query = new Dictionary<string, string>(StringComparer.Ordinal)
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                                 {
                                     ["role"] = "admin"
                                 },
