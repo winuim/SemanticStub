@@ -133,6 +133,7 @@ public sealed class StubService
         response = new StubResponse
         {
             StatusCode = statusCode,
+            DelayMilliseconds = matchedResponse.Value.DelayMilliseconds,
             ContentType = ResolveContentType(matchedResponse.Value.Content),
             Headers = BuildResponseHeaders(matchedResponse.Value.Headers),
             Body = responseBody
@@ -272,6 +273,7 @@ public sealed class StubService
         response = new StubResponse
         {
             StatusCode = matchedCandidate.Response.StatusCode,
+            DelayMilliseconds = matchedCandidate.Response.DelayMilliseconds,
             ContentType = ResolveContentType(matchedCandidate.Response.Content),
             Headers = BuildResponseHeaders(matchedCandidate.Response.Headers),
             Body = responseBody

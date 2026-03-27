@@ -49,6 +49,7 @@ internal sealed class StubDefinitionNormalizer
                     Response = new QueryMatchResponseDefinition
                     {
                         StatusCode = match.Response.StatusCode,
+                        DelayMilliseconds = match.Response.DelayMilliseconds,
                         ResponseFile = StubDefinitionPathResolver.ResolveResponseFilePath(definitionDirectory, match.Response.ResponseFile),
                         Headers = new Dictionary<string, HeaderDefinition>(match.Response.Headers, StringComparer.OrdinalIgnoreCase),
                         Content = new Dictionary<string, MediaTypeDefinition>(match.Response.Content, StringComparer.Ordinal)
@@ -60,6 +61,7 @@ internal sealed class StubDefinitionNormalizer
                 entry => new ResponseDefinition
                 {
                     Description = entry.Value.Description,
+                    DelayMilliseconds = entry.Value.DelayMilliseconds,
                     ResponseFile = StubDefinitionPathResolver.ResolveResponseFilePath(definitionDirectory, entry.Value.ResponseFile),
                     Headers = new Dictionary<string, HeaderDefinition>(entry.Value.Headers, StringComparer.OrdinalIgnoreCase),
                     Content = new Dictionary<string, MediaTypeDefinition>(entry.Value.Content, StringComparer.Ordinal)
