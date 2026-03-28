@@ -214,6 +214,40 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_ThrowsForOutOfRangeMatchedResponseStatusCode()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  x-match:
+                    - query:
+                        role: admin
+                      response:
+                        statusCode: 700
+                        content:
+                          application/json:
+                            example:
+                              message: broken
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: default
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].response.statusCode must be between 100 and 599", exception.Message);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_ThrowsForMalformedMatchedResponseWithoutResponse()
     {
         using var workspace = TestWorkspace.Create(
@@ -297,6 +331,31 @@ public sealed class StubDefinitionLoaderTests
         var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
 
         Assert.Contains("uses unsupported response key 'default'", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsForOutOfRangeResponseStatusKey()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  responses:
+                    "700":
+                      description: out-of-range
+                      content:
+                        application/json:
+                          example:
+                            message: broken
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("responses['700'] must use an HTTP status code between 100 and 599", exception.Message);
     }
 
     [Fact]
