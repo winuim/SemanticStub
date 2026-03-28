@@ -7,6 +7,7 @@ builder.Services.AddControllers();
 builder.Services.Configure<StubSettings>(builder.Configuration.GetSection("StubSettings"));
 builder.Services.AddSingleton<IStubDefinitionLoader, StubDefinitionLoader>();
 builder.Services.AddSingleton<MatcherService>();
+builder.Services.AddSingleton<ScenarioService>();
 builder.Services.AddSingleton<IStubService, StubService>();
 
 var app = builder.Build();

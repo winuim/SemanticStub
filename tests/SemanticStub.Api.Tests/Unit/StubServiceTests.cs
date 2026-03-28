@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
+using SemanticStub.Api.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
 using Xunit;
@@ -47,6 +48,47 @@ public sealed class StubServiceTests
         };
 
         IStubService service = new StubService(document);
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
+
+        Assert.Equal(200, matchedResponse.StatusCode);
+    }
+
+    [Fact]
+    public void InterfaceContract_PreservesLoaderAndMatcherConstructorCompatibility()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/hello"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["message"] = "Hello"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var loader = new TestStubDefinitionLoader(document);
+        var service = new StubService(loader, new MatcherService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -1591,5 +1633,174 @@ public sealed class StubServiceTests
         var matched = service.TryGetResponse(HttpMethods.Post, "/orders/123", out _);
 
         Assert.Equal(StubMatchResult.MethodNotAllowed, matched);
+    }
+
+    private sealed class TestStubDefinitionLoader(StubDocument document) : IStubDefinitionLoader
+    {
+        public StubDocument LoadDefaultDefinition()
+        {
+            return document;
+        }
+
+        public string LoadResponseFileContent(string fileName)
+        {
+            throw new InvalidOperationException("Response-file loading is not used in this test.");
+        }
+    }
+
+    [Fact]
+    public void TryGetResponse_AdvancesScenarioStateAcrossRequests()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/checkout"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["409"] = new()
+                            {
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "checkout-flow",
+                                    State = "initial",
+                                    Next = "confirmed"
+                                },
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["result"] = "pending"
+                                        }
+                                    }
+                                }
+                            },
+                            ["200"] = new()
+                            {
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "checkout-flow",
+                                    State = "confirmed"
+                                },
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["result"] = "complete"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var firstMatch = service.TryGetResponse(HttpMethods.Post, "/checkout", out var firstResponse);
+        var firstMatchedResponse = AssertMatchedResponse(firstMatch, firstResponse);
+        var secondMatch = service.TryGetResponse(HttpMethods.Post, "/checkout", out var secondResponse);
+        var secondMatchedResponse = AssertMatchedResponse(secondMatch, secondResponse);
+
+        Assert.Equal(409, firstMatchedResponse.StatusCode);
+        Assert.Equal("{\"result\":\"pending\"}", firstMatchedResponse.Body);
+        Assert.Equal(200, secondMatchedResponse.StatusCode);
+        Assert.Equal("{\"result\":\"complete\"}", secondMatchedResponse.Body);
+    }
+
+    [Fact]
+    public void TryGetResponse_FiltersMatchedConditionalResponsesByScenarioState()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/checkout"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                                {
+                                    ["step"] = "1"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 409,
+                                    Scenario = new ScenarioDefinition
+                                    {
+                                        Name = "checkout-flow",
+                                        State = "initial",
+                                        Next = "confirmed"
+                                    },
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new()
+                                        {
+                                            Example = new Dictionary<object, object>
+                                            {
+                                                ["result"] = "pending"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            new QueryMatchDefinition
+                            {
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                                {
+                                    ["step"] = "1"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Scenario = new ScenarioDefinition
+                                    {
+                                        Name = "checkout-flow",
+                                        State = "confirmed"
+                                    },
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new()
+                                        {
+                                            Example = new Dictionary<object, object>
+                                            {
+                                                ["result"] = "complete"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document);
+        var query = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["step"] = "1"
+        };
+
+        var firstMatch = service.TryGetResponse(HttpMethods.Post, "/checkout", query, out var firstResponse);
+        var firstMatchedResponse = AssertMatchedResponse(firstMatch, firstResponse);
+        var secondMatch = service.TryGetResponse(HttpMethods.Post, "/checkout", query, out var secondResponse);
+        var secondMatchedResponse = AssertMatchedResponse(secondMatch, secondResponse);
+
+        Assert.Equal(409, firstMatchedResponse.StatusCode);
+        Assert.Equal(200, secondMatchedResponse.StatusCode);
     }
 }

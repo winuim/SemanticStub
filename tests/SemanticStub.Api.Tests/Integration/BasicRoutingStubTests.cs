@@ -258,6 +258,24 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public async Task PostCheckout_AdvancesScenarioStateAcrossRequests()
+    {
+        var firstResponse = await client.PostAsync("/checkout", content: null);
+        var secondResponse = await client.PostAsync("/checkout", content: null);
+
+        Assert.Equal(HttpStatusCode.Conflict, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+
+        var firstPayload = await firstResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        var secondPayload = await secondResponse.Content.ReadFromJsonAsync<LoginResponse>();
+
+        Assert.NotNull(firstPayload);
+        Assert.NotNull(secondPayload);
+        Assert.Equal("pending", firstPayload.Result);
+        Assert.Equal("complete", secondPayload.Result);
+    }
+
+    [Fact]
     public async Task PutProfile_ReturnsConfiguredResponse()
     {
         var response = await client.PutAsJsonAsync("/profile", new ProfileRequest

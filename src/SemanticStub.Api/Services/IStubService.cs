@@ -110,7 +110,7 @@ public interface IStubService
     /// or <see cref="StubMatchResult.ResponseNotConfigured"/> when a route matches but no usable response can be built.
     /// </returns>
     /// <remarks>
-    /// This contract does not mutate scenario state.
+    /// Selecting a response may advance in-memory scenario state when the matched YAML response defines <c>x-scenario.next</c>.
     /// Relative file-backed responses may require reading payload content from the configured loader, while absolute file-backed responses can be returned as streamable file paths without loader resolution.
     /// </remarks>
     StubMatchResult TryGetResponse(

@@ -6,6 +6,9 @@ public sealed class ResponseDefinition
 {
     public string Description { get; init; } = string.Empty;
 
+    [YamlMember(Alias = "x-scenario", ApplyNamingConventions = false)]
+    public ScenarioDefinition? Scenario { get; init; }
+
     [YamlMember(Alias = "x-delay", ApplyNamingConventions = false)]
     public int? DelayMilliseconds { get; init; }
 

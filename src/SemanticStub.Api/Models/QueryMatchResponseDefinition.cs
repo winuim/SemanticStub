@@ -6,6 +6,9 @@ public sealed class QueryMatchResponseDefinition
 {
     public int StatusCode { get; init; }
 
+    [YamlMember(Alias = "x-scenario", ApplyNamingConventions = false)]
+    public ScenarioDefinition? Scenario { get; init; }
+
     [YamlMember(Alias = "x-delay", ApplyNamingConventions = false)]
     public int? DelayMilliseconds { get; init; }
 

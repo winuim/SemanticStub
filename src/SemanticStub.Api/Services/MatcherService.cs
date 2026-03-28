@@ -129,7 +129,8 @@ public sealed class MatcherService
         OperationDefinition operation,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
-        string? body)
+        string? body,
+        Func<QueryMatchDefinition, bool>? candidateFilter = null)
     {
         if (operation.Matches.Count == 0)
         {
@@ -145,7 +146,8 @@ public sealed class MatcherService
                 query,
                 headers,
                 queryParameterTypes,
-                bodyDocument?.RootElement)
+                bodyDocument?.RootElement,
+                candidateFilter)
             .OrderByDescending(GetExactQuerySpecificity)
             .ThenByDescending(GetMatchSpecificity)
             .ThenByDescending(GetRegexQuerySpecificity)
@@ -157,10 +159,16 @@ public sealed class MatcherService
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
         IReadOnlyDictionary<string, string> queryParameterTypes,
-        JsonElement? requestBody)
+        JsonElement? requestBody,
+        Func<QueryMatchDefinition, bool>? candidateFilter)
     {
         foreach (var candidate in candidates)
         {
+            if (candidateFilter is not null && !candidateFilter(candidate))
+            {
+                continue;
+            }
+
             if (IsCandidateMatch(candidate, query, headers, queryParameterTypes, requestBody))
             {
                 yield return candidate;
