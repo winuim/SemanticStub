@@ -107,6 +107,13 @@ internal sealed class StubDefinitionValidator
                 definitionDirectory,
                 responseEntry.Value.Content,
                 errors);
+
+            ValidateScenarioDefinition(
+                path,
+                method,
+                $"responses['{responseEntry.Key}'].x-scenario",
+                responseEntry.Value.Scenario,
+                errors);
         }
 
         for (var index = 0; index < operation.Matches.Count; index++)
@@ -183,6 +190,41 @@ internal sealed class StubDefinitionValidator
                 definitionDirectory,
                 match.Response.Content,
                 errors);
+
+            ValidateScenarioDefinition(
+                path,
+                method,
+                $"x-match[{index}].response.x-scenario",
+                match.Response.Scenario,
+                errors);
+        }
+    }
+
+    private static void ValidateScenarioDefinition(
+        string path,
+        string method,
+        string location,
+        ScenarioDefinition? scenario,
+        ICollection<string> errors)
+    {
+        if (scenario is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(scenario.Name))
+        {
+            errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location}.name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(scenario.State))
+        {
+            errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location}.state is required.");
+        }
+
+        if (scenario.Next is not null && string.IsNullOrWhiteSpace(scenario.Next))
+        {
+            errors.Add($"Path '{path}' {method.ToUpperInvariant()} {location}.next must not be empty.");
         }
     }
 

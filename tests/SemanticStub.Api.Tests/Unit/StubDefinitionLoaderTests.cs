@@ -420,6 +420,66 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_LoadsScenarioDefinitionFromResponseExtension()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /checkout:
+                post:
+                  responses:
+                    "409":
+                      description: pending
+                      x-scenario:
+                        name: checkout-flow
+                        state: initial
+                        next: confirmed
+                      content:
+                        application/json:
+                          example:
+                            result: pending
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var response = document.Paths["/checkout"].Post!.Responses["409"];
+
+        var scenario = Assert.IsType<ScenarioDefinition>(response.Scenario);
+        Assert.Equal("checkout-flow", scenario.Name);
+        Assert.Equal("initial", scenario.State);
+        Assert.Equal("confirmed", scenario.Next);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenScenarioNameIsMissing()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /checkout:
+                post:
+                  responses:
+                    "409":
+                      description: pending
+                      x-scenario:
+                        state: initial
+                      content:
+                        application/json:
+                          example:
+                            result: pending
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("responses['409'].x-scenario.name is required", exception.Message);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_AllowsMatchedQueryDefinedOnOperationParameters()
     {
         using var workspace = TestWorkspace.Create(

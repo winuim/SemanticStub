@@ -372,6 +372,30 @@ paths:
               example:
                 result: deleted
 
+  /checkout:
+    post:
+      operationId: checkout
+      responses:
+        '409':
+          description: Cart needs confirmation
+          x-scenario:
+            name: checkout-flow
+            state: initial
+            next: confirmed
+          content:
+            application/json:
+              example:
+                result: pending
+        '200':
+          description: Checkout confirmed
+          x-scenario:
+            name: checkout-flow
+            state: confirmed
+          content:
+            application/json:
+              example:
+                result: complete
+
   /orders/{orderId}:
     get:
       operationId: getOrderById
