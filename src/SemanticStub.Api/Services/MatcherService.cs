@@ -2,6 +2,7 @@ using System.Collections;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Utilities;
@@ -9,15 +10,33 @@ using SemanticStub.Api.Utilities;
 namespace SemanticStub.Api.Services;
 
 /// <summary>
-/// Chooses the most specific conditional match so YAML-defined query, header, and body refinements remain deterministic.
+/// Evaluates <c>x-match</c> candidates and returns the most specific successful match without mutating request or stub state.
 /// </summary>
 public sealed class MatcherService
 {
     private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(100);
+    private readonly ILogger<MatcherService>? logger;
 
     /// <summary>
-    /// Preserves the existing query-and-body matching entry point while delegating to the full matcher implementation.
+    /// Creates a matcher with no logging. Invalid regex patterns will silently produce non-matches.
     /// </summary>
+    public MatcherService() { }
+
+    /// <summary>
+    /// Creates a matcher that logs warnings for invalid regex patterns in stub definitions.
+    /// </summary>
+    public MatcherService(ILogger<MatcherService> logger)
+    {
+        this.logger = logger;
+    }
+
+    /// <summary>
+    /// Evaluates conditional matches using operation-level query definitions and no request headers.
+    /// </summary>
+    /// <param name="operation">The operation whose <c>x-match</c> candidates should be evaluated.</param>
+    /// <param name="query">Single-value query parameters keyed by parameter name.</param>
+    /// <param name="body">The request body used for JSON body matching. <see langword="null"/> means no structured body is available.</param>
+    /// <returns>The best matching candidate, or <see langword="null"/> when no candidate matches.</returns>
     public QueryMatchDefinition? FindBestMatch(
         OperationDefinition operation,
         IReadOnlyDictionary<string, string> query,
@@ -30,8 +49,12 @@ public sealed class MatcherService
     }
 
     /// <summary>
-    /// Preserves the existing query-and-body matching entry point while delegating to the full matcher implementation.
+    /// Evaluates conditional matches using operation-level query definitions and no request headers.
     /// </summary>
+    /// <param name="operation">The operation whose <c>x-match</c> candidates should be evaluated.</param>
+    /// <param name="query">Query parameters keyed by parameter name, including repeated values in request order.</param>
+    /// <param name="body">The request body used for JSON body matching. <see langword="null"/> means no structured body is available.</param>
+    /// <returns>The best matching candidate, or <see langword="null"/> when no candidate matches.</returns>
     public QueryMatchDefinition? FindBestMatch(
         OperationDefinition operation,
         IReadOnlyDictionary<string, StringValues> query,
@@ -45,8 +68,12 @@ public sealed class MatcherService
     }
 
     /// <summary>
-    /// Filters candidates by every configured condition and prefers the most constrained definition so explicit matches win over broad fallbacks.
+    /// Evaluates conditional matches using the operation's query parameter definitions and the supplied request headers.
     /// </summary>
+    /// <param name="operation">The operation whose <c>x-match</c> candidates should be evaluated.</param>
+    /// <param name="query">Single-value query parameters keyed by parameter name.</param>
+    /// <param name="headers">Request headers keyed by header name. Supply a case-insensitive dictionary for HTTP semantics.</param>
+    /// <param name="body">The request body used for JSON body matching. Invalid JSON is treated as "no structured body" instead of causing an exception.</param>
     /// <returns>The best matching conditional definition, or <see langword="null"/> when none satisfy the request.</returns>
     public QueryMatchDefinition? FindBestMatch(
         OperationDefinition operation,
@@ -62,8 +89,12 @@ public sealed class MatcherService
     }
 
     /// <summary>
-    /// Filters candidates by every configured condition and prefers the most constrained definition so explicit matches win over broad fallbacks.
+    /// Evaluates conditional matches using the operation's query parameter definitions and the supplied request headers.
     /// </summary>
+    /// <param name="operation">The operation whose <c>x-match</c> candidates should be evaluated.</param>
+    /// <param name="query">Query parameters keyed by parameter name, including repeated values in request order.</param>
+    /// <param name="headers">Request headers keyed by header name. Supply a case-insensitive dictionary for HTTP semantics.</param>
+    /// <param name="body">The request body used for JSON body matching. Invalid JSON is treated as "no structured body" instead of causing an exception.</param>
     /// <returns>The best matching conditional definition, or <see langword="null"/> when none satisfy the request.</returns>
     public QueryMatchDefinition? FindBestMatch(
         OperationDefinition operation,
@@ -80,9 +111,19 @@ public sealed class MatcherService
     }
 
     /// <summary>
-    /// Filters candidates by every configured condition and prefers the most constrained definition so explicit matches win over broad fallbacks.
+    /// Filters candidates by every configured condition and returns the most specific surviving match.
     /// </summary>
+    /// <param name="pathParameters">Path-level parameters whose query-schema definitions may contribute typed comparison metadata.</param>
+    /// <param name="operation">The operation whose <c>x-match</c> candidates should be evaluated.</param>
+    /// <param name="query">Query parameters keyed by parameter name, including repeated values in request order.</param>
+    /// <param name="headers">Request headers keyed by header name. Supply a case-insensitive dictionary for HTTP semantics.</param>
+    /// <param name="body">The request body used for JSON body matching. Invalid JSON, invalid regex patterns, and regex timeouts are treated as non-matches instead of exceptions.</param>
     /// <returns>The best matching conditional definition, or <see langword="null"/> when none satisfy the request.</returns>
+    /// <remarks>
+    /// When multiple candidates match, exact-query specificity wins first, then overall query/header/body specificity,
+    /// then regex-query specificity as the final tie-breaker.
+    /// This is the most complete matcher entry point and is the contract used by <see cref="StubService"/>.
+    /// </remarks>
     public QueryMatchDefinition? FindBestMatch(
         IReadOnlyCollection<ParameterDefinition> pathParameters,
         OperationDefinition operation,
@@ -111,7 +152,7 @@ public sealed class MatcherService
             .FirstOrDefault();
     }
 
-    private static IEnumerable<QueryMatchDefinition> GetCandidatesMatchingRequest(
+    private IEnumerable<QueryMatchDefinition> GetCandidatesMatchingRequest(
         IReadOnlyCollection<QueryMatchDefinition> candidates,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
@@ -127,7 +168,7 @@ public sealed class MatcherService
         }
     }
 
-    private static bool IsCandidateMatch(
+    private bool IsCandidateMatch(
         QueryMatchDefinition candidate,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
@@ -185,7 +226,7 @@ public sealed class MatcherService
         return true;
     }
 
-    private static bool IsQueryMatch(
+    private bool IsQueryMatch(
         QueryMatchDefinition match,
         IReadOnlyDictionary<string, StringValues> actual,
         IReadOnlyDictionary<string, string> queryParameterTypes)
@@ -195,7 +236,7 @@ public sealed class MatcherService
                IsPartialQueryMatch(match.PartialQuery, actual, queryParameterTypes);
     }
 
-    private static bool IsRegexQueryMatch(
+    private bool IsRegexQueryMatch(
         IReadOnlyDictionary<string, object?> expected,
         IReadOnlyDictionary<string, StringValues> actual)
     {
@@ -251,7 +292,7 @@ public sealed class MatcherService
             IsTypedSinglePartialQueryValueMatch(expected, actualValue!, parameterType));
     }
 
-    private static bool IsRegexQueryValueMatch(object? expected, StringValues actual)
+    private bool IsRegexQueryValueMatch(object? expected, StringValues actual)
     {
         if (expected is IEnumerable expectedSequence && expected is not string)
         {
@@ -263,7 +304,7 @@ public sealed class MatcherService
                IsSingleRegexQueryValueMatch(expected, actual[0]!);
     }
 
-    private static bool IsRegexQuerySequenceMatch(IEnumerable expectedSequence, StringValues actual)
+    private bool IsRegexQuerySequenceMatch(IEnumerable expectedSequence, StringValues actual)
     {
         var expectedValues = expectedSequence.Cast<object?>().ToArray();
         var actualValues = actual.ToArray();
@@ -285,7 +326,7 @@ public sealed class MatcherService
         return true;
     }
 
-    private static bool IsSingleRegexQueryValueMatch(object? expected, string actual)
+    private bool IsSingleRegexQueryValueMatch(object? expected, string actual)
     {
         if (expected is not string pattern)
         {
@@ -296,12 +337,14 @@ public sealed class MatcherService
         {
             return Regex.IsMatch(actual, pattern, RegexOptions.CultureInvariant, RegexMatchTimeout);
         }
-        catch (ArgumentException)
+        catch (ArgumentException ex)
         {
+            logger?.LogWarning(ex, "Invalid x-regex-query pattern '{Pattern}' in stub definition — treating as non-match.", pattern);
             return false;
         }
         catch (RegexMatchTimeoutException)
         {
+            logger?.LogWarning("x-regex-query pattern '{Pattern}' timed out after {TimeoutMs}ms — treating as non-match.", pattern, RegexMatchTimeout.TotalMilliseconds);
             return false;
         }
     }
@@ -531,7 +574,7 @@ public sealed class MatcherService
         }
     }
 
-    private static bool IsBodyMatch(object? expectedBody, JsonElement? actualBody)
+    private bool IsBodyMatch(object? expectedBody, JsonElement? actualBody)
     {
         if (expectedBody is null)
         {
@@ -543,10 +586,23 @@ public sealed class MatcherService
             return false;
         }
 
-        var expectedJson = StubExampleSerializer.Serialize(expectedBody);
-        using var expectedDocument = JsonDocument.Parse(expectedJson);
+        try
+        {
+            var expectedJson = StubExampleSerializer.Serialize(expectedBody);
+            using var expectedDocument = JsonDocument.Parse(expectedJson);
 
-        return IsJsonMatch(expectedDocument.RootElement, actualBody.Value);
+            return IsJsonMatch(expectedDocument.RootElement, actualBody.Value);
+        }
+        catch (JsonException ex)
+        {
+            logger?.LogWarning(ex, "Invalid body match definition in stub YAML — treating as non-match.");
+            return false;
+        }
+        catch (NotSupportedException ex)
+        {
+            logger?.LogWarning(ex, "Unsupported body match definition in stub YAML — treating as non-match.");
+            return false;
+        }
     }
 
     private static bool IsJsonMatch(JsonElement expected, JsonElement actual)

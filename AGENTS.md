@@ -14,6 +14,10 @@
 - Group related changes into logical commits
 - Do not create overly large commits
 - Prefer small, reviewable commits
+- Prefer reading interfaces, tests, and docs before reading concrete implementations
+- Do not open implementation files unless interface, tests, or docs are insufficient
+- Keep context usage small by limiting investigation to the minimum affected area
+- When starting work, identify the smallest set of files needed and avoid broad repository scans
 
 ---
 
@@ -239,20 +243,23 @@ Supports YAML-based stub definitions with optional semantic matching using embed
 
 ## Workflow
 
-1. Read relevant code
-2. Create a plan
-3. Implement minimal change
-4. Run validation
-5. Summarize results
+1. Identify the smallest relevant set of files
+2. Read interfaces, tests, and docs first
+3. Read concrete implementations only when necessary
+4. Create a plan
+5. Implement minimal change
+6. Run validation
+7. Summarize results
 
 ---
 
 ## Planning Expectations
 
-Before coding:
-- Identify affected files
+- Identify the smallest affected file set first
+- Prefer interface, test, and documentation review before implementation review
 - Identify risks and edge cases
 - Clarify assumptions
+- Avoid broad repository exploration unless clearly required
 - Do not start coding blindly
 
 ---
@@ -385,6 +392,7 @@ Ask before:
 - breaking YAML compatibility
 - changing routing behavior
 - adding new abstractions
+- introducing an interface only for style or speculative future use
 - introducing external services
 - changing API contracts
 - changing infrastructure
@@ -399,11 +407,21 @@ Ask before:
 
 ## Coding Guidelines for AI Agent (.NET / C#)
 
+### Context Efficiency
+- Prefer the smallest possible reading scope for each task
+- Read public contracts before concrete implementations
+- Treat interfaces, XML documentation, tests, and architecture notes as primary sources of behavior
+- Only inspect implementation details when behavior cannot be determined from the contract or tests
+- Avoid repository-wide searches when the affected area is already known
+
 ### General Principles
 - Write clean, readable, and maintainable code
 - Prefer simplicity over cleverness
 - Follow existing project structure and conventions
 - Avoid unnecessary abstractions
+- Prefer explicit contracts over implicit behavior
+- Introduce interfaces when they reduce coupling, improve testability, or clarify boundaries
+- Do not introduce interfaces that only mirror a single implementation without a clear architectural or testing benefit
 
 ---
 
@@ -413,6 +431,7 @@ Ask before:
 - Add XML documentation comments for:
   - All public classes
   - All public methods
+  - Public interface members when behavior or constraints are important to consumers
 
 ### What to Write
 - Focus on WHY, not just WHAT
@@ -421,8 +440,10 @@ Ask before:
   - Important behavior or business logic
   - Constraints or assumptions
   - Side effects (e.g. external API calls, state changes)
+  - Nullability and special return behavior when not obvious
+  - Whether callers can rely on the method contract without reading the implementation
 
-### Parameter and Return Comments
+### Parameters and Return Comments
 - Do NOT add comments for obvious parameters or return values
 - Only document when:
   - Format or unit is important (e.g. yyyyMMdd, seconds)
@@ -456,6 +477,14 @@ Ask before:
 - Use constructor injection
 - Avoid service locator pattern
 - Do not resolve dependencies manually unless explicitly required
+
+### Interface and Contract Design
+- Prefer interface-first design at service boundaries that are reused, tested in isolation, or likely to vary by infrastructure
+- Keep interfaces small and focused on a single responsibility
+- Do not create fat interfaces with unrelated operations
+- Public service contracts should make important behavior clear through naming, XML documentation, and tests
+- Document notable constraints, side effects, nullability, and exceptional behavior when they are not obvious from the signature
+- If a concrete class is sufficient and no boundary benefit exists, prefer the simpler concrete dependency
 
 ---
 

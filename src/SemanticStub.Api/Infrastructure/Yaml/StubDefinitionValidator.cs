@@ -84,6 +84,13 @@ internal sealed class StubDefinitionValidator
 
         foreach (var responseEntry in operation.Responses)
         {
+            if (int.TryParse(responseEntry.Key, out var responseStatusCode) &&
+                !IsSupportedHttpStatusCode(responseStatusCode))
+            {
+                errors.Add(
+                    $"Path '{path}' {method.ToUpperInvariant()} responses['{responseEntry.Key}'] must use an HTTP status code between 100 and 599.");
+            }
+
             ValidateDelayDefinition(
                 path,
                 method,
@@ -154,6 +161,11 @@ internal sealed class StubDefinitionValidator
             {
                 errors.Add($"Path '{path}' {method.ToUpperInvariant()} x-match[{index}] must define a positive statusCode.");
             }
+            else if (!IsSupportedHttpStatusCode(match.Response.StatusCode))
+            {
+                errors.Add(
+                    $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].response.statusCode must be between 100 and 599.");
+            }
 
             ValidateDelayDefinition(
                 path,
@@ -172,6 +184,11 @@ internal sealed class StubDefinitionValidator
                 match.Response.Content,
                 errors);
         }
+    }
+
+    private static bool IsSupportedHttpStatusCode(int statusCode)
+    {
+        return statusCode is >= 100 and <= 599;
     }
 
     private static HashSet<string> GetDeclaredQueryParameters(

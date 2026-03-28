@@ -9,6 +9,47 @@ namespace SemanticStub.Api.Tests.Unit;
 public sealed class StubServiceTests
 {
     [Fact]
+    public void InterfaceContract_ExposesConvenienceOverloadForMethodAndPathOnly()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/hello"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["message"] = "Hello"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        IStubService service = new StubService(document);
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+
+        Assert.Equal(StubMatchResult.Matched, matched);
+        Assert.NotNull(response);
+        Assert.Equal(200, response.StatusCode);
+    }
+
+    [Fact]
     public void TryGetResponse_UsesStatusCodeDefinedInYamlResponses()
     {
         var document = new StubDocument
