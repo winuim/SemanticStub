@@ -35,6 +35,19 @@ public sealed class StubService : IStubService
     /// </summary>
     /// <param name="loader">Provides the validated stub document and any relative file-backed response payloads.</param>
     /// <param name="matcherService">The matcher used to evaluate <c>x-match</c> candidates when a route and method have been resolved.</param>
+    /// <exception cref="DirectoryNotFoundException">Propagated when the loader cannot locate the configured definitions directory.</exception>
+    /// <exception cref="FileNotFoundException">Propagated when the loader cannot find required stub files or response files.</exception>
+    /// <exception cref="InvalidOperationException">Propagated when the loader cannot build a valid stub document.</exception>
+    public StubService(IStubDefinitionLoader loader, MatcherService matcherService)
+        : this(loader, matcherService, new ScenarioService())
+    {
+    }
+
+    /// <summary>
+    /// Creates a service that loads its stub document immediately from the configured loader and uses the supplied matcher implementation for conditional matches.
+    /// </summary>
+    /// <param name="loader">Provides the validated stub document and any relative file-backed response payloads.</param>
+    /// <param name="matcherService">The matcher used to evaluate <c>x-match</c> candidates when a route and method have been resolved.</param>
     /// <param name="scenarioService">Stores in-memory scenario transitions for responses that opt into <c>x-scenario</c>.</param>
     /// <exception cref="DirectoryNotFoundException">Propagated when the loader cannot locate the configured definitions directory.</exception>
     /// <exception cref="FileNotFoundException">Propagated when the loader cannot find required stub files or response files.</exception>
@@ -202,16 +215,41 @@ public sealed class StubService : IStubService
             return failedMatchResult;
         }
 
-        var conditionalResult = TryBuildMatchedConditionalResponse(pathItem, operation, query, headers, body, out response);
+        if (OperationUsesScenario(operation))
+        {
+            var evaluation = scenarioService.ExecuteLocked(() => TryGetResponseCore(pathItem, operation, query, headers, body));
+            response = evaluation.Response;
+            return evaluation.MatchResult;
+        }
+
+        var result = TryGetResponseCore(pathItem, operation, query, headers, body);
+        response = result.Response;
+        return result.MatchResult;
+    }
+
+    private static bool OperationUsesScenario(OperationDefinition operation)
+    {
+        return operation.Matches.Any(match => match.Response.Scenario is not null) ||
+               operation.Responses.Values.Any(response => response.Scenario is not null);
+    }
+
+    private (StubMatchResult MatchResult, StubResponse? Response) TryGetResponseCore(
+        PathItemDefinition pathItem,
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
+    {
+        var conditionalResult = TryBuildMatchedConditionalResponse(pathItem, operation, query, headers, body, out var response);
 
         if (conditionalResult.HasValue)
         {
-            return conditionalResult.Value;
+            return (conditionalResult.Value, response);
         }
 
         return TryBuildDefaultOperationResponse(operation, out response)
-            ? StubMatchResult.Matched
-            : StubMatchResult.ResponseNotConfigured;
+            ? (StubMatchResult.Matched, response)
+            : (StubMatchResult.ResponseNotConfigured, null);
     }
 
     private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)

@@ -10,6 +10,7 @@ public sealed class ScenarioService
 {
     private const string InitialState = "initial";
     private readonly ConcurrentDictionary<string, string> currentStates = new(StringComparer.Ordinal);
+    private readonly object syncRoot = new();
 
     /// <summary>
     /// Returns whether the supplied scenario definition is eligible for the current in-memory state.
@@ -39,5 +40,17 @@ public sealed class ScenarioService
         }
 
         currentStates[scenario.Name] = scenario.Next;
+    }
+
+    /// <summary>
+    /// Executes scenario-sensitive selection and transition logic under one lock so state checks and advances stay atomic across concurrent requests.
+    /// </summary>
+    /// <param name="action">The scenario-aware operation to run atomically.</param>
+    public T ExecuteLocked<T>(Func<T> action)
+    {
+        lock (syncRoot)
+        {
+            return action();
+        }
     }
 }
