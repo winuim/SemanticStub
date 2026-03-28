@@ -14,7 +14,7 @@ public sealed class StubService : IStubService
 {
     private const string JsonContentType = "application/json";
     private static readonly string[] SupportedMethodOrder = [HttpMethods.Get, HttpMethods.Post, HttpMethods.Put, HttpMethods.Patch, HttpMethods.Delete];
-    private readonly StubDocument document;
+    private readonly Func<StubDocument> documentAccessor;
     private readonly Func<string, string> responseFileReader;
     private readonly MatcherService matcherService;
     private readonly ScenarioService scenarioService;
@@ -55,8 +55,23 @@ public sealed class StubService : IStubService
     /// <exception cref="InvalidOperationException">Propagated when the loader cannot build a valid stub document.</exception>
     public StubService(IStubDefinitionLoader loader, MatcherService matcherService, ScenarioService scenarioService)
     {
-        document = loader.LoadDefaultDefinition();
+        var document = loader.LoadDefaultDefinition();
+        documentAccessor = () => document;
         responseFileReader = loader.LoadResponseFileContent;
+        this.matcherService = matcherService;
+        this.scenarioService = scenarioService;
+    }
+
+    /// <summary>
+    /// Creates a service that always evaluates requests against the latest successfully loaded stub document.
+    /// </summary>
+    /// <param name="state">Provides the current validated stub document snapshot and file-backed response payloads.</param>
+    /// <param name="matcherService">The matcher used to evaluate <c>x-match</c> candidates when a route and method have been resolved.</param>
+    /// <param name="scenarioService">Stores in-memory scenario transitions for responses that opt into <c>x-scenario</c>.</param>
+    internal StubService(StubDefinitionState state, MatcherService matcherService, ScenarioService scenarioService)
+    {
+        documentAccessor = state.GetCurrentDocument;
+        responseFileReader = state.LoadResponseFileContent;
         this.matcherService = matcherService;
         this.scenarioService = scenarioService;
     }
@@ -83,7 +98,7 @@ public sealed class StubService : IStubService
 
     internal StubService(StubDocument document, Func<string, string> responseFileReader, MatcherService matcherService, ScenarioService scenarioService)
     {
-        this.document = document;
+        documentAccessor = () => document;
         this.responseFileReader = responseFileReader;
         this.matcherService = matcherService;
         this.scenarioService = scenarioService;
@@ -114,7 +129,7 @@ public sealed class StubService : IStubService
     /// <returns>The configured methods for the resolved path, or an empty list when no path matches.</returns>
     public IReadOnlyList<string> GetAllowedMethods(string path)
     {
-        var pathItem = ResolvePathItem(path);
+        var pathItem = ResolvePathItem(documentAccessor(), path);
 
         if (pathItem is null)
         {
@@ -229,8 +244,9 @@ public sealed class StubService : IStubService
         out StubResponse? response)
     {
         response = null;
+        var document = documentAccessor();
 
-        if (!TryResolveOperation(method, path, out var pathItem, out var operation, out var failedMatchResult))
+        if (!TryResolveOperation(document, method, path, out var pathItem, out var operation, out var failedMatchResult))
         {
             return failedMatchResult;
         }
@@ -280,7 +296,7 @@ public sealed class StubService : IStubService
             StringComparer.Ordinal);
     }
 
-    private PathItemDefinition? ResolvePathItem(string requestPath)
+    private static PathItemDefinition? ResolvePathItem(StubDocument document, string requestPath)
     {
         // Keep deterministic routing: exact paths always win before template paths.
         if (document.Paths.TryGetValue(requestPath, out var exactPathItem))
@@ -419,6 +435,7 @@ public sealed class StubService : IStubService
     }
 
     private bool TryResolveOperation(
+        StubDocument document,
         string method,
         string path,
         out PathItemDefinition pathItem,
@@ -429,7 +446,7 @@ public sealed class StubService : IStubService
         operation = null!;
         failedMatchResult = StubMatchResult.Matched;
 
-        var resolvedPathItem = ResolvePathItem(path);
+        var resolvedPathItem = ResolvePathItem(document, path);
 
         if (resolvedPathItem is null)
         {

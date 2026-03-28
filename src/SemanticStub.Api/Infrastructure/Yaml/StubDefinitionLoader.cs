@@ -63,6 +63,11 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
         return MergeDefinitions(documents);
     }
 
+    internal string GetDefinitionsDirectoryPath()
+    {
+        return ResolveDefinitionsDirectory();
+    }
+
     private StubDocument LoadDefinition(string path)
     {
         var yaml = File.ReadAllText(path);
