@@ -11,9 +11,9 @@ namespace SemanticStub.Api.Controllers;
 [Route("{*path}")]
 public sealed class StubController : ControllerBase
 {
-    private readonly StubService stubService;
+    private readonly IStubService stubService;
 
-    public StubController(StubService stubService)
+    public StubController(IStubService stubService)
     {
         this.stubService = stubService;
     }
@@ -68,6 +68,7 @@ public sealed class StubController : ControllerBase
         var requestPath = string.IsNullOrEmpty(path) ? "/" : "/" + path;
         var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
         var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
+        Request.EnableBuffering();
         var requestBody = await ReadRequestBodyAsync();
         var matchResult = stubService.TryGetResponse(method, requestPath, query, headers, requestBody, out var response);
 
@@ -81,9 +82,14 @@ public sealed class StubController : ControllerBase
             return StatusCode(StatusCodes.Status405MethodNotAllowed);
         }
 
-        if (matchResult != StubMatchResult.Matched)
+        if (matchResult == StubMatchResult.ResponseNotConfigured)
         {
-            return NotFound();
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
+
+        if (response is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError);
         }
 
         if (response.DelayMilliseconds is > 0)
@@ -104,7 +110,7 @@ public sealed class StubController : ControllerBase
         if (!string.IsNullOrEmpty(response.FilePath))
         {
             Response.StatusCode = response.StatusCode;
-            return File(System.IO.File.OpenRead(response.FilePath), response.ContentType);
+            return PhysicalFile(response.FilePath, response.ContentType);
         }
 
         return new ContentResult
@@ -117,9 +123,25 @@ public sealed class StubController : ControllerBase
 
     private async Task<string?> ReadRequestBodyAsync()
     {
-        using var reader = new StreamReader(Request.Body);
-        var body = await reader.ReadToEndAsync();
+        try
+        {
+            using var reader = new StreamReader(Request.Body, leaveOpen: true);
+            var body = await reader.ReadToEndAsync();
 
-        return string.IsNullOrWhiteSpace(body) ? null : body;
+            if (Request.Body.CanSeek)
+            {
+                Request.Body.Position = 0;
+            }
+
+            return string.IsNullOrWhiteSpace(body) ? null : body;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (OperationCanceledException) when (Request.HttpContext.RequestAborted.IsCancellationRequested)
+        {
+            return null;
+        }
     }
 }

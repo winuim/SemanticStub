@@ -978,6 +978,48 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenConfiguredAbsoluteDefinitionsPathDoesNotExist()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /configured:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: configured
+            """);
+
+        var missingPath = Path.Combine(workspace.RootPath, "missing-stubs");
+        var loader = new StubDefinitionLoader(
+            workspace.Environment,
+            Options.Create(new StubSettings
+            {
+                DefinitionsPath = missingPath
+            }));
+
+        var exception = Assert.Throws<DirectoryNotFoundException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains(missingPath, exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenNoStubFilesAreFound()
+    {
+        using var workspace = TestWorkspace.CreateEmpty();
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<FileNotFoundException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Equal("samples/basic-routing.yaml", exception.FileName);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_ResolvesResponseFileRelativeToDefinitionFile()
     {
         using var workspace = TestWorkspace.Create(
@@ -1326,6 +1368,109 @@ public sealed class StubDefinitionLoaderTests
         Assert.Contains("must use the same 'openapi' version", exception.Message);
     }
 
+    [Fact]
+    public void InterfaceContract_LoadsNormalizedDocumentAndResponseFileContent()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      x-response-file: payloads/users.json
+                      headers:
+                        X-Stub-Source:
+                          example: loader
+                      content:
+                        application/json:
+                          schema:
+                            type: object
+            """,
+            sampleFiles:
+            [
+                ("payloads/users.json", "{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}")
+            ]);
+
+        IStubDefinitionLoader loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var operation = Assert.IsType<OperationDefinition>(document.Paths["/users"].Get);
+        var response = operation.Responses["200"];
+        var body = loader.LoadResponseFileContent("payloads/users.json");
+
+        Assert.Equal(
+            Path.Combine(workspace.RootPath, "samples", "payloads", "users.json"),
+            response.ResponseFile);
+        Assert.Equal("loader", response.Headers["X-Stub-Source"].Example);
+        Assert.Equal("{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}", body);
+    }
+
+    [Fact]
+    public void LoadResponseFileContent_ThrowsWhenRelativePathEscapesDefinitionsDirectory()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: ok
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadResponseFileContent("../../etc/passwd"));
+
+        Assert.Contains("outside the definitions directory", exception.Message);
+    }
+
+    [Fact]
+    public void LoadResponseFileContent_ThrowsWhenAbsolutePathEscapesDefinitionsDirectory()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: ok
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+        var outsidePath = Path.Combine(Path.GetTempPath(), $"semanticstub-outside-{Guid.NewGuid():N}.json");
+
+        try
+        {
+            File.WriteAllText(outsidePath, "{}");
+
+            var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadResponseFileContent(outsidePath));
+
+            Assert.Contains("outside the definitions directory", exception.Message);
+        }
+        finally
+        {
+            if (File.Exists(outsidePath))
+            {
+                File.Delete(outsidePath);
+            }
+        }
+    }
+
     private sealed class TestWorkspace : IDisposable
     {
         private TestWorkspace(string rootPath)
@@ -1361,6 +1506,15 @@ public sealed class StubDefinitionLoaderTests
             {
                 WriteFile(samplesPath, fileName, content);
             }
+
+            return new TestWorkspace(rootPath);
+        }
+
+        public static TestWorkspace CreateEmpty(string definitionsDirectoryName = "samples")
+        {
+            var rootPath = Path.Combine(Path.GetTempPath(), "semanticstub-tests", Guid.NewGuid().ToString("N"));
+            var samplesPath = Path.Combine(rootPath, definitionsDirectoryName);
+            Directory.CreateDirectory(samplesPath);
 
             return new TestWorkspace(rootPath);
         }

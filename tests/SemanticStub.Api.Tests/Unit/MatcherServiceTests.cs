@@ -118,6 +118,34 @@ public sealed class MatcherServiceTests
     }
 
     [Fact]
+    public void FindBestMatch_ReturnsNullWhenBodyDefinitionContainsUnsupportedValue()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Body = new Dictionary<object, object>
+                    {
+                        ["value"] = new IntPtr(42)
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "{\"value\":42}");
+
+        Assert.Null(match);
+    }
+
+    [Fact]
     public void FindBestMatch_OldOverloadRemainsCompatible()
     {
         var operation = new OperationDefinition
@@ -145,6 +173,78 @@ public sealed class MatcherServiceTests
             body: null);
 
         Assert.NotNull(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_UsesPathParametersOperationQueryHeadersAndBody()
+    {
+        var pathParameters = new[]
+        {
+            new ParameterDefinition
+            {
+                Name = "tenantId",
+                In = "path",
+                Schema = new ParameterSchemaDefinition
+                {
+                    Type = "string"
+                }
+            }
+        };
+
+        var operation = new OperationDefinition
+        {
+            Parameters =
+            [
+                new ParameterDefinition
+                {
+                    Name = "page",
+                    In = "query",
+                    Schema = new ParameterSchemaDefinition
+                    {
+                        Type = "integer"
+                    }
+                }
+            ],
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["page"] = 2
+                    },
+                    Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["X-Env"] = "staging"
+                    },
+                    Body = new Dictionary<object, object>
+                    {
+                        ["username"] = "demo"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var match = matcher.FindBestMatch(
+            pathParameters,
+            operation,
+            new Dictionary<string, StringValues>(StringComparer.Ordinal)
+            {
+                ["page"] = "2"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["x-env"] = "staging"
+            },
+            "{\"username\":\"demo\",\"rememberMe\":true}");
+
+        Assert.NotNull(match);
+        Assert.Equal(2, match.Query["page"]);
+        Assert.Equal("staging", match.Headers["X-Env"]);
+        var body = Assert.IsAssignableFrom<IDictionary<object, object>>(match.Body);
+        Assert.Equal("demo", body["username"]);
     }
 
     [Fact]

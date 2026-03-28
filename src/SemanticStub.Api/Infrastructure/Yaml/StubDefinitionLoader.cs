@@ -6,9 +6,9 @@ using YamlDotNet.Serialization.NamingConventions;
 namespace SemanticStub.Api.Infrastructure.Yaml;
 
 /// <summary>
-/// Loads OpenAPI-based stub definitions from disk so the runtime can execute mock behavior directly from YAML without duplicating route metadata in code.
+/// Loads OpenAPI-based stub definitions from disk, validates repository-specific constraints, and normalizes file-backed references before the runtime uses the document.
 /// </summary>
-public sealed class StubDefinitionLoader
+public sealed class StubDefinitionLoader : IStubDefinitionLoader
 {
     private const string DefaultStubFileName = "basic-routing.yaml";
     private static readonly string[] AdditionalStubFilePatterns = ["*.stub.yaml", "*.stub.yml"];
@@ -19,11 +19,20 @@ public sealed class StubDefinitionLoader
     private readonly StubDefinitionValidator validator;
     private readonly StubDefinitionNormalizer normalizer;
 
+    /// <summary>
+    /// Creates a loader that discovers definitions relative to <see cref="IWebHostEnvironment.ContentRootPath"/> and uses the default <c>samples</c> search behavior when no explicit settings are supplied.
+    /// </summary>
+    /// <param name="environment">Supplies the content root used to locate the default definitions directory.</param>
     public StubDefinitionLoader(IWebHostEnvironment environment)
         : this(environment, Options.Create(new StubSettings()))
     {
     }
 
+    /// <summary>
+    /// Creates a loader that discovers definitions relative to <see cref="IWebHostEnvironment.ContentRootPath"/> and honors <see cref="StubSettings.DefinitionsPath"/> when configured.
+    /// </summary>
+    /// <param name="environment">Supplies the content root used as the starting point for relative definitions-path resolution.</param>
+    /// <param name="settings">Supplies the optional definitions directory override. When unset, the nearest ancestor directory containing <c>samples</c> is used.</param>
     public StubDefinitionLoader(IWebHostEnvironment environment, IOptions<StubSettings> settings)
     {
         this.environment = environment;
@@ -37,8 +46,12 @@ public sealed class StubDefinitionLoader
     }
 
     /// <summary>
-    /// Discovers the default stub files, validates them, and merges them into one document so matching can run against a single deterministic view.
+    /// Discovers the active stub files, validates every document, normalizes repository-specific extensions, and merges compatible files into one deterministic view.
     /// </summary>
+    /// <returns>A validated and normalized <see cref="StubDocument"/> suitable for request matching.</returns>
+    /// <exception cref="DirectoryNotFoundException">Thrown when the configured definitions directory cannot be located.</exception>
+    /// <exception cref="FileNotFoundException">Thrown when no supported stub files can be found.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when a stub file is malformed, violates validation rules, or cannot be merged with the other discovered files.</exception>
     public StubDocument LoadDefaultDefinition()
     {
         var definitionsRootPath = ResolveDefinitionsDirectory();
@@ -68,16 +81,23 @@ public sealed class StubDefinitionLoader
     }
 
     /// <summary>
-    /// Resolves file-based response payloads relative to the definitions root so YAML response-file references behave consistently across environments.
+    /// Loads the bytes for a file-backed response payload as text using the same definitions root used for YAML discovery.
     /// </summary>
+    /// <param name="fileName">An absolute path or a path relative to the active definitions directory.</param>
+    /// <returns>The file contents without additional parsing or transformation.</returns>
+    /// <exception cref="DirectoryNotFoundException">Thrown when the configured definitions directory cannot be located before resolving a relative path.</exception>
+    /// <exception cref="FileNotFoundException">Thrown when the requested file cannot be resolved.</exception>
     public string LoadResponseFileContent(string fileName)
     {
+        var definitionsPath = ResolveDefinitionsDirectory();
+
         if (Path.IsPathRooted(fileName))
         {
+            EnsurePathWithinDefinitionsDirectory(Path.GetFullPath(definitionsPath), Path.GetFullPath(fileName), fileName);
             return File.ReadAllText(fileName);
         }
 
-        var path = ResolveSamplePath(fileName);
+        var path = ResolveSamplePath(fileName, definitionsPath);
 
         return File.ReadAllText(path);
     }
@@ -118,10 +138,13 @@ public sealed class StubDefinitionLoader
             Path.Combine(GetDefinitionsPathLabel(), DefaultStubFileName));
     }
 
-    private string ResolveSamplePath(string fileName)
+    private string ResolveSamplePath(string fileName, string? resolvedDefinitionsPath = null)
     {
-        var samplesPath = ResolveDefinitionsDirectory();
-        var candidate = Path.Combine(samplesPath, fileName);
+        var samplesPath = resolvedDefinitionsPath ?? ResolveDefinitionsDirectory();
+        var root = Path.GetFullPath(samplesPath);
+        var candidate = Path.GetFullPath(Path.Combine(samplesPath, fileName));
+
+        EnsurePathWithinDefinitionsDirectory(root, candidate, fileName);
 
         if (File.Exists(candidate))
         {
@@ -131,6 +154,16 @@ public sealed class StubDefinitionLoader
         throw new FileNotFoundException(
             $"Could not locate {Path.Combine(GetDefinitionsPathLabel(), fileName)} from the current content root.",
             Path.Combine(GetDefinitionsPathLabel(), fileName));
+    }
+
+    private static void EnsurePathWithinDefinitionsDirectory(string root, string candidate, string originalPath)
+    {
+        if (!candidate.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) &&
+            !candidate.Equals(root, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Response file path '{originalPath}' resolves outside the definitions directory.");
+        }
     }
 
     private string ResolveDefinitionsDirectory()

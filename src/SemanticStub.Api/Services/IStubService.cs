@@ -1,0 +1,123 @@
+using Microsoft.Extensions.Primitives;
+using SemanticStub.Api.Models;
+
+namespace SemanticStub.Api.Services;
+
+/// <summary>
+/// Resolves incoming HTTP requests against the loaded stub document and returns either a concrete response contract or a reason no response can be produced.
+/// </summary>
+public interface IStubService
+{
+    /// <summary>
+    /// Resolves a response for callers that only need method and path matching.
+    /// </summary>
+    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
+    /// <returns>The same result contract as the full overload, with query, header, and body matching treated as unspecified.</returns>
+    StubMatchResult TryGetResponse(string method, string path, out StubResponse? response)
+    {
+        return TryGetResponse(
+            method,
+            path,
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null,
+            out response);
+    }
+
+    /// <summary>
+    /// Resolves a response while considering query-based match conditions so more specific stubs can override broad defaults.
+    /// </summary>
+    /// <param name="query">Single-value query parameters keyed by parameter name. Missing or empty dictionaries mean no query conditions are available to match.</param>
+    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
+    /// <returns>The same result contract as the full overload, with headers omitted and the body treated as unspecified.</returns>
+    StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, out StubResponse? response)
+    {
+        return TryGetResponse(
+            method,
+            path,
+            query.ToDictionary(entry => entry.Key, entry => new StringValues(entry.Value), StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null,
+            out response);
+    }
+
+    /// <summary>
+    /// Resolves a response while considering query-based match conditions so more specific stubs can override broad defaults.
+    /// </summary>
+    /// <param name="query">Query parameters keyed by parameter name, including repeated values in request order.</param>
+    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
+    /// <returns>The same result contract as the full overload, with headers omitted and the body treated as unspecified.</returns>
+    StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, StringValues> query, out StubResponse? response)
+    {
+        return TryGetResponse(
+            method,
+            path,
+            query,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null,
+            out response);
+    }
+
+    /// <summary>
+    /// Resolves a response while considering query and body match conditions so structured request payloads can select a narrower stub.
+    /// </summary>
+    /// <param name="query">Single-value query parameters keyed by parameter name.</param>
+    /// <param name="body">The request body used for JSON body matching. <see langword="null"/> means no body conditions can match.</param>
+    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
+    /// <returns>The same result contract as the full overload, with headers omitted.</returns>
+    StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, string? body, out StubResponse? response)
+    {
+        return TryGetResponse(
+            method,
+            path,
+            query.ToDictionary(entry => entry.Key, entry => new StringValues(entry.Value), StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body,
+            out response);
+    }
+
+    /// <summary>
+    /// Resolves a response while considering query and body match conditions so structured request payloads can select a narrower stub.
+    /// </summary>
+    /// <param name="query">Query parameters keyed by parameter name, including repeated values in request order.</param>
+    /// <param name="body">The request body used for JSON body matching. <see langword="null"/> means no body conditions can match.</param>
+    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
+    /// <returns>The same result contract as the full overload, with headers omitted.</returns>
+    StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, StringValues> query, string? body, out StubResponse? response)
+    {
+        return TryGetResponse(
+            method,
+            path,
+            query,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body,
+            out response);
+    }
+
+    /// <summary>
+    /// Resolves the most specific stub response by evaluating path, method, query, headers, and body through the shared matching pipeline.
+    /// </summary>
+    /// <param name="method">The HTTP method to evaluate. Values are interpreted with ASP.NET Core's standard verb helpers.</param>
+    /// <param name="path">The request path to match. Callers are expected to pass the absolute request path such as <c>/users</c>.</param>
+    /// <param name="query">The query-string values to evaluate. Pass an empty dictionary when the request has no query parameters.</param>
+    /// <param name="headers">The request headers to evaluate. Pass an empty dictionary when header matching is not needed; callers should use case-insensitive keys for HTTP semantics.</param>
+    /// <param name="body">The request body used for JSON body matching. <see langword="null"/> means "no body supplied".</param>
+    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>; otherwise <see langword="null"/>.</param>
+    /// <returns>
+    /// <see cref="StubMatchResult.Matched"/> when a stub response was assembled,
+    /// <see cref="StubMatchResult.PathNotFound"/> when no path matches,
+    /// <see cref="StubMatchResult.MethodNotAllowed"/> when the path exists but not for the supplied method,
+    /// or <see cref="StubMatchResult.ResponseNotConfigured"/> when a route matches but no usable response can be built.
+    /// </returns>
+    /// <remarks>
+    /// This contract does not mutate scenario state.
+    /// Relative file-backed responses may require reading payload content from the configured loader, while absolute file-backed responses can be returned as streamable file paths without loader resolution.
+    /// </remarks>
+    StubMatchResult TryGetResponse(
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body,
+        out StubResponse? response);
+}
