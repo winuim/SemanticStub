@@ -17,6 +17,7 @@ These extensions are used on response objects:
 | --- | --- | --- |
 | `x-delay` | `responses.<status>` or `x-match[].response` | Delays the response by the specified milliseconds. |
 | `x-response-file` | `responses.<status>` or `x-match[].response` | Loads the response body from a file relative to the YAML file. |
+| `x-scenario` | `responses.<status>` or `x-match[].response` | Restricts a response to a named scenario state and can advance that state with `next`. |
 
 Example:
 
@@ -131,8 +132,8 @@ This keeps routing deterministic for the current feature set.
 ### Current limitations
 
 - Regex query matching is not supported yet.
-- Scenario and semantic matching appear only in sample files today; they are
-  not part of the current runtime behavior.
+- Semantic matching appears only in sample files today; it is not part of the
+  current runtime behavior.
 - `body` matching is intended for structured JSON request payloads rather than
   arbitrary binary request bodies.
 
@@ -142,7 +143,6 @@ The repository also includes examples that use the following extension names:
 
 | Extension | Sample | Intent |
 | --- | --- | --- |
-| `x-scenario` | `samples/scenario-basic.yaml` | Describes scenario/state-based response behavior. |
 | `x-semantic-match` | `samples/semantic-search.yaml` | Describes semantic matching behavior for request content. |
 
 These samples document the intended OpenAPI-compatible extension style for

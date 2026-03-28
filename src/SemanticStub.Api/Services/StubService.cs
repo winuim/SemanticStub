@@ -16,6 +16,7 @@ public sealed class StubService : IStubService
     private readonly StubDocument document;
     private readonly Func<string, string> responseFileReader;
     private readonly MatcherService matcherService;
+    private readonly ScenarioService scenarioService;
 
     /// <summary>
     /// Creates a service that loads its stub document immediately from the configured loader and uses the default matcher implementation.
@@ -25,7 +26,7 @@ public sealed class StubService : IStubService
     /// <exception cref="FileNotFoundException">Propagated when the loader cannot find required stub files or response files.</exception>
     /// <exception cref="InvalidOperationException">Propagated when the loader cannot build a valid stub document.</exception>
     public StubService(IStubDefinitionLoader loader)
-        : this(loader, new MatcherService())
+        : this(loader, new MatcherService(), new ScenarioService())
     {
     }
 
@@ -38,10 +39,25 @@ public sealed class StubService : IStubService
     /// <exception cref="FileNotFoundException">Propagated when the loader cannot find required stub files or response files.</exception>
     /// <exception cref="InvalidOperationException">Propagated when the loader cannot build a valid stub document.</exception>
     public StubService(IStubDefinitionLoader loader, MatcherService matcherService)
+        : this(loader, matcherService, new ScenarioService())
+    {
+    }
+
+    /// <summary>
+    /// Creates a service that loads its stub document immediately from the configured loader and uses the supplied matcher implementation for conditional matches.
+    /// </summary>
+    /// <param name="loader">Provides the validated stub document and any relative file-backed response payloads.</param>
+    /// <param name="matcherService">The matcher used to evaluate <c>x-match</c> candidates when a route and method have been resolved.</param>
+    /// <param name="scenarioService">Stores in-memory scenario transitions for responses that opt into <c>x-scenario</c>.</param>
+    /// <exception cref="DirectoryNotFoundException">Propagated when the loader cannot locate the configured definitions directory.</exception>
+    /// <exception cref="FileNotFoundException">Propagated when the loader cannot find required stub files or response files.</exception>
+    /// <exception cref="InvalidOperationException">Propagated when the loader cannot build a valid stub document.</exception>
+    public StubService(IStubDefinitionLoader loader, MatcherService matcherService, ScenarioService scenarioService)
     {
         document = loader.LoadDefaultDefinition();
         responseFileReader = loader.LoadResponseFileContent;
         this.matcherService = matcherService;
+        this.scenarioService = scenarioService;
     }
 
     /// <summary>
@@ -50,7 +66,7 @@ public sealed class StubService : IStubService
     /// <param name="document">The validated stub document to evaluate.</param>
     /// <remarks>Relative <c>x-response-file</c> responses will fail at runtime because no response-file reader is configured by this overload.</remarks>
     public StubService(StubDocument document)
-        : this(document, _ => throw new InvalidOperationException("No response file reader configured."), new MatcherService())
+        : this(document, _ => throw new InvalidOperationException("No response file reader configured."), new MatcherService(), new ScenarioService())
     {
     }
 
@@ -60,15 +76,16 @@ public sealed class StubService : IStubService
     /// <param name="document">The validated stub document to evaluate.</param>
     /// <param name="responseFileReader">Loads the contents of a relative response file selected by the matching stub.</param>
     public StubService(StubDocument document, Func<string, string> responseFileReader)
-        : this(document, responseFileReader, new MatcherService())
+        : this(document, responseFileReader, new MatcherService(), new ScenarioService())
     {
     }
 
-    internal StubService(StubDocument document, Func<string, string> responseFileReader, MatcherService matcherService)
+    internal StubService(StubDocument document, Func<string, string> responseFileReader, MatcherService matcherService, ScenarioService scenarioService)
     {
         this.document = document;
         this.responseFileReader = responseFileReader;
         this.matcherService = matcherService;
+        this.scenarioService = scenarioService;
     }
 
     /// <summary>
@@ -182,7 +199,7 @@ public sealed class StubService : IStubService
     /// <see cref="StubMatchResult.MethodNotAllowed"/> when the path exists but the method does not,
     /// or <see cref="StubMatchResult.ResponseNotConfigured"/> when a route matches but the selected response is missing content or otherwise unusable.
     /// </returns>
-    /// <remarks>This method does not mutate scenario state. When a relative file-backed response is selected, payload text is loaded through the configured response-file reader before returning.</remarks>
+    /// <remarks>When a response defines <c>x-scenario.next</c>, selecting that response advances the in-memory scenario state before returning. Relative file-backed responses are loaded through the configured response-file reader.</remarks>
     public StubMatchResult TryGetResponse(
         string method,
         string path,
@@ -198,16 +215,41 @@ public sealed class StubService : IStubService
             return failedMatchResult;
         }
 
-        var conditionalResult = TryBuildMatchedConditionalResponse(pathItem, operation, query, headers, body, out response);
+        if (OperationUsesScenario(operation))
+        {
+            var evaluation = scenarioService.ExecuteLocked(() => TryGetResponseCore(pathItem, operation, query, headers, body));
+            response = evaluation.Response;
+            return evaluation.MatchResult;
+        }
+
+        var result = TryGetResponseCore(pathItem, operation, query, headers, body);
+        response = result.Response;
+        return result.MatchResult;
+    }
+
+    private static bool OperationUsesScenario(OperationDefinition operation)
+    {
+        return operation.Matches.Any(match => match.Response.Scenario is not null) ||
+               operation.Responses.Values.Any(response => response.Scenario is not null);
+    }
+
+    private (StubMatchResult MatchResult, StubResponse? Response) TryGetResponseCore(
+        PathItemDefinition pathItem,
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
+    {
+        var conditionalResult = TryBuildMatchedConditionalResponse(pathItem, operation, query, headers, body, out var response);
 
         if (conditionalResult.HasValue)
         {
-            return conditionalResult.Value;
+            return (conditionalResult.Value, response);
         }
 
         return TryBuildDefaultOperationResponse(operation, out response)
-            ? StubMatchResult.Matched
-            : StubMatchResult.ResponseNotConfigured;
+            ? (StubMatchResult.Matched, response)
+            : (StubMatchResult.ResponseNotConfigured, null);
     }
 
     private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)
@@ -333,7 +375,13 @@ public sealed class StubService : IStubService
         }
 
         // Query/header/body conditions are combined, then the most specific surviving candidate wins.
-        var matchedCandidate = matcherService.FindBestMatch(pathItem.Parameters, operation, query, headers, body);
+        var matchedCandidate = matcherService.FindBestMatch(
+            pathItem.Parameters,
+            operation,
+            query,
+            headers,
+            body,
+            candidate => scenarioService.IsMatch(candidate.Response.Scenario));
 
         if (matchedCandidate is null)
         {
@@ -344,6 +392,8 @@ public sealed class StubService : IStubService
         {
             return QueryMatchEvaluationResult.MatchedButInvalidResponse;
         }
+
+        scenarioService.Advance(matchedCandidate.Response.Scenario);
 
         return QueryMatchEvaluationResult.Matched;
     }
@@ -410,16 +460,28 @@ public sealed class StubService : IStubService
         response = null!;
 
         var matchedResponse = operation.Responses
-            .FirstOrDefault(entry =>
-                int.TryParse(entry.Key, out _) &&
-                (entry.Value.Content.Count > 0 || !string.IsNullOrEmpty(entry.Value.ResponseFile)));
+            .FirstOrDefault(entry => IsEligibleDefaultResponse(entry.Key, entry.Value));
 
         if (string.IsNullOrEmpty(matchedResponse.Key) || !int.TryParse(matchedResponse.Key, out var statusCode))
         {
             return false;
         }
 
-        return TryBuildStubResponse(statusCode, matchedResponse.Value, out response);
+        var built = TryBuildStubResponse(statusCode, matchedResponse.Value, out response);
+
+        if (built)
+        {
+            scenarioService.Advance(matchedResponse.Value.Scenario);
+        }
+
+        return built;
+    }
+
+    private bool IsEligibleDefaultResponse(string statusCode, ResponseDefinition responseDefinition)
+    {
+        return int.TryParse(statusCode, out _) &&
+               scenarioService.IsMatch(responseDefinition.Scenario) &&
+               (responseDefinition.Content.Count > 0 || !string.IsNullOrEmpty(responseDefinition.ResponseFile));
     }
 
     private bool TryBuildStubResponse(int statusCode, ResponseDefinition responseDefinition, out StubResponse response)
