@@ -9,6 +9,16 @@ namespace SemanticStub.Api.Services;
 public interface IStubService
 {
     /// <summary>
+    /// Returns the HTTP methods currently configured for the supplied path so callers can emit protocol details such as the <c>Allow</c> header on <c>405 Method Not Allowed</c> responses.
+    /// </summary>
+    /// <param name="path">The absolute request path such as <c>/users</c>.</param>
+    /// <returns>The configured methods for the resolved path, or an empty list when no path matches.</returns>
+    IReadOnlyList<string> GetAllowedMethods(string path)
+    {
+        return Array.Empty<string>();
+    }
+
+    /// <summary>
     /// Resolves a response for callers that only need method and path matching.
     /// </summary>
     /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>

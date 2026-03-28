@@ -79,6 +79,13 @@ public sealed class StubController : ControllerBase
 
         if (matchResult == StubMatchResult.MethodNotAllowed)
         {
+            var allowedMethods = stubService.GetAllowedMethods(requestPath);
+
+            if (allowedMethods.Count > 0)
+            {
+                Response.Headers.Allow = string.Join(", ", allowedMethods);
+            }
+
             return StatusCode(StatusCodes.Status405MethodNotAllowed);
         }
 
