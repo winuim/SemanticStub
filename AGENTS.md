@@ -527,3 +527,13 @@ Ask before:
 - Prioritize correctness, readability, and maintainability
 - Flag unclear logic or missing documentation
 - Suggest improvements when confidence is high
+
+---
+
+## Code Review Policy
+
+You MUST always post a review comment.
+
+- If issues are found, describe them clearly.
+- If no issues are found, you MUST respond with:
+  "No issues found"
