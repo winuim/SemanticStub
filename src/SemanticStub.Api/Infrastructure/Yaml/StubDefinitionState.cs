@@ -1,17 +1,20 @@
 using SemanticStub.Api.Models;
+using SemanticStub.Api.Services;
 
 namespace SemanticStub.Api.Infrastructure.Yaml;
 
 internal sealed class StubDefinitionState
 {
     private readonly IStubDefinitionLoader loader;
+    private readonly ScenarioService scenarioService;
     private readonly ILogger<StubDefinitionState> logger;
     private readonly object syncRoot = new();
     private StubDocument currentDocument;
 
-    public StubDefinitionState(IStubDefinitionLoader loader, ILogger<StubDefinitionState> logger)
+    public StubDefinitionState(IStubDefinitionLoader loader, ScenarioService scenarioService, ILogger<StubDefinitionState> logger)
     {
         this.loader = loader;
+        this.scenarioService = scenarioService;
         this.logger = logger;
         currentDocument = loader.LoadDefaultDefinition();
     }
@@ -33,7 +36,12 @@ internal sealed class StubDefinitionState
             try
             {
                 var reloadedDocument = loader.LoadDefaultDefinition();
-                Volatile.Write(ref currentDocument, reloadedDocument);
+                scenarioService.ExecuteLocked(() =>
+                {
+                    Volatile.Write(ref currentDocument, reloadedDocument);
+                    scenarioService.Reset();
+                    return 0;
+                });
                 logger.LogInformation("Reloaded stub definitions from disk.");
                 return true;
             }

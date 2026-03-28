@@ -146,6 +146,85 @@ public sealed class AutomaticReloadTests
         Assert.Equal("dynamic", reloaded);
     }
 
+    [Fact]
+    public async Task PostCheckout_ResetsScenarioStateAfterReload()
+    {
+        using var workspace = ReloadWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /checkout:
+                post:
+                  responses:
+                    "409":
+                      description: pending
+                      x-scenario:
+                        name: checkout-flow
+                        state: initial
+                        next: confirmed
+                      content:
+                        application/json:
+                          example:
+                            result: pending
+                    "200":
+                      description: complete
+                      x-scenario:
+                        name: checkout-flow
+                        state: confirmed
+                      content:
+                        application/json:
+                          example:
+                            result: complete
+            """);
+        using var factory = new ReloadingStubFactory(workspace.RootPath);
+        using var client = factory.CreateClient();
+
+        var firstResponse = await client.PostAsync("/checkout", new StringContent(string.Empty));
+        var firstPayload = await firstResponse.Content.ReadFromJsonAsync<ResultResponse>();
+        Assert.Equal(HttpStatusCode.Conflict, firstResponse.StatusCode);
+        Assert.NotNull(firstPayload);
+        Assert.Equal("pending", firstPayload.Result);
+
+        var secondResponse = await client.PostAsync("/checkout", new StringContent(string.Empty));
+        var secondPayload = await secondResponse.Content.ReadFromJsonAsync<ResultResponse>();
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        Assert.NotNull(secondPayload);
+        Assert.Equal("complete", secondPayload.Result);
+
+        workspace.WriteDefaultDefinition(
+            """
+            openapi: 3.1.0
+            paths:
+              /checkout:
+                post:
+                  responses:
+                    "409":
+                      description: pending
+                      x-scenario:
+                        name: checkout-flow
+                        state: initial
+                        next: confirmed
+                      content:
+                        application/json:
+                          example:
+                            result: reloaded-pending
+                    "200":
+                      description: complete
+                      x-scenario:
+                        name: checkout-flow
+                        state: confirmed
+                      content:
+                        application/json:
+                          example:
+                            result: reloaded-complete
+            """);
+
+        var reloadedResult = await WaitForResultAsync(client, "/checkout", "reloaded-pending");
+
+        Assert.Equal(HttpStatusCode.Conflict, reloadedResult.StatusCode);
+        Assert.Equal("reloaded-pending", reloadedResult.Result);
+    }
+
     private static async Task<string> WaitForMessageAsync(HttpClient client, string path, string expectedMessage)
     {
         var timeoutAt = DateTime.UtcNow.AddSeconds(10);
@@ -176,6 +255,34 @@ public sealed class AutomaticReloadTests
         }
 
         throw new TimeoutException($"Timed out waiting for '{path}' to return message '{expectedMessage}'.", lastException);
+    }
+
+    private static async Task<(HttpStatusCode StatusCode, string Result)> WaitForResultAsync(HttpClient client, string path, string expectedResult)
+    {
+        var timeoutAt = DateTime.UtcNow.AddSeconds(10);
+        Exception? lastException = null;
+
+        while (DateTime.UtcNow < timeoutAt)
+        {
+            try
+            {
+                var response = await client.PostAsync(path, new StringContent(string.Empty));
+                var payload = await response.Content.ReadFromJsonAsync<ResultResponse>();
+
+                if (payload?.Result == expectedResult)
+                {
+                    return (response.StatusCode, payload.Result);
+                }
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+            }
+
+            await Task.Delay(200);
+        }
+
+        throw new TimeoutException($"Timed out waiting for '{path}' to return result '{expectedResult}'.", lastException);
     }
 
     private sealed class ReloadingStubFactory(string contentRootPath) : WebApplicationFactory<Program>
@@ -221,5 +328,10 @@ public sealed class AutomaticReloadTests
     private sealed class MessageResponse
     {
         public string Message { get; set; } = string.Empty;
+    }
+
+    private sealed class ResultResponse
+    {
+        public string Result { get; set; } = string.Empty;
     }
 }
