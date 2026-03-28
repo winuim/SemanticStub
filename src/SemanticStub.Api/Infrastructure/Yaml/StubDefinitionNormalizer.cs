@@ -82,6 +82,7 @@ internal sealed class StubDefinitionNormalizer
                     Response = new QueryMatchResponseDefinition
                     {
                         StatusCode = match.Response.StatusCode,
+                        Scenario = NormalizeScenario(match.Response.Scenario),
                         DelayMilliseconds = match.Response.DelayMilliseconds,
                         ResponseFile = StubDefinitionPathResolver.ResolveResponseFilePath(definitionDirectory, match.Response.ResponseFile),
                         Headers = new Dictionary<string, HeaderDefinition>(match.Response.Headers, StringComparer.OrdinalIgnoreCase),
@@ -94,12 +95,28 @@ internal sealed class StubDefinitionNormalizer
                 entry => new ResponseDefinition
                 {
                     Description = entry.Value.Description,
+                    Scenario = NormalizeScenario(entry.Value.Scenario),
                     DelayMilliseconds = entry.Value.DelayMilliseconds,
                     ResponseFile = StubDefinitionPathResolver.ResolveResponseFilePath(definitionDirectory, entry.Value.ResponseFile),
                     Headers = new Dictionary<string, HeaderDefinition>(entry.Value.Headers, StringComparer.OrdinalIgnoreCase),
                     Content = new Dictionary<string, MediaTypeDefinition>(entry.Value.Content, StringComparer.Ordinal)
                 },
                 StringComparer.Ordinal)
+        };
+    }
+
+    private static ScenarioDefinition? NormalizeScenario(ScenarioDefinition? scenario)
+    {
+        if (scenario is null)
+        {
+            return null;
+        }
+
+        return new ScenarioDefinition
+        {
+            Name = scenario.Name,
+            State = scenario.State,
+            Next = scenario.Next
         };
     }
 }
