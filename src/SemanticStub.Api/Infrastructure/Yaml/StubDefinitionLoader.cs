@@ -158,8 +158,11 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
 
     private static void EnsurePathWithinDefinitionsDirectory(string root, string candidate, string originalPath)
     {
-        if (!candidate.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) &&
-            !candidate.Equals(root, StringComparison.Ordinal))
+        var normalizedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+        var normalizedCandidate = Path.TrimEndingDirectorySeparator(Path.GetFullPath(candidate));
+
+        if (!normalizedCandidate.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal) &&
+            !normalizedCandidate.Equals(normalizedRoot, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"Response file path '{originalPath}' resolves outside the definitions directory.");

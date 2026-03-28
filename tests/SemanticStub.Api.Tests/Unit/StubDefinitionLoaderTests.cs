@@ -1530,6 +1530,38 @@ public sealed class StubDefinitionLoaderTests
         }
     }
 
+    [Fact]
+    public void LoadResponseFileContent_LoadsRelativePathWithinConfiguredDefinitionsDirectoryWithTrailingSeparator()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      x-response-file: payloads/users.json
+            """,
+            sampleFiles:
+            [
+                ("payloads/users.json", "{\"users\":[{\"id\":1}]}")
+            ],
+            definitionsDirectoryName: "custom-stubs");
+
+        var loader = new StubDefinitionLoader(
+            workspace.Environment,
+            Options.Create(new StubSettings
+            {
+                DefinitionsPath = "custom-stubs/"
+            }));
+
+        var body = loader.LoadResponseFileContent("payloads/users.json");
+
+        Assert.Equal("{\"users\":[{\"id\":1}]}", body);
+    }
+
     private sealed class TestWorkspace : IDisposable
     {
         private TestWorkspace(string rootPath)
