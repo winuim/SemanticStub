@@ -13,6 +13,7 @@ namespace SemanticStub.Api.Services;
 public sealed class StubService : IStubService
 {
     private const string JsonContentType = "application/json";
+    private static readonly string[] SupportedMethodOrder = [HttpMethods.Get, HttpMethods.Post, HttpMethods.Put, HttpMethods.Patch, HttpMethods.Delete];
     private readonly StubDocument document;
     private readonly Func<string, string> responseFileReader;
     private readonly MatcherService matcherService;
@@ -104,6 +105,25 @@ public sealed class StubService : IStubService
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body: null,
             out response);
+    }
+
+    /// <summary>
+    /// Returns the configured HTTP methods for the supplied path in a stable order suitable for the <c>Allow</c> response header.
+    /// </summary>
+    /// <param name="path">The absolute request path such as <c>/users</c>.</param>
+    /// <returns>The configured methods for the resolved path, or an empty list when no path matches.</returns>
+    public IReadOnlyList<string> GetAllowedMethods(string path)
+    {
+        var pathItem = ResolvePathItem(path);
+
+        if (pathItem is null)
+        {
+            return Array.Empty<string>();
+        }
+
+        return SupportedMethodOrder
+            .Where(method => GetOperation(method, pathItem) is not null)
+            .ToArray();
     }
 
     /// <summary>

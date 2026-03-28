@@ -1635,6 +1635,51 @@ public sealed class StubServiceTests
         Assert.Equal(StubMatchResult.MethodNotAllowed, matched);
     }
 
+    [Fact]
+    public void GetAllowedMethods_ReturnsConfiguredMethodsForExactPathInStableOrder()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Post = new OperationDefinition(),
+                    Get = new OperationDefinition(),
+                    Delete = new OperationDefinition()
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var allowedMethods = service.GetAllowedMethods("/users");
+
+        Assert.Equal([HttpMethods.Get, HttpMethods.Post, HttpMethods.Delete], allowedMethods);
+    }
+
+    [Fact]
+    public void GetAllowedMethods_ReturnsConfiguredMethodsForTemplatePath()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/orders/{orderId}"] = new()
+                {
+                    Get = new OperationDefinition(),
+                    Patch = new OperationDefinition()
+                }
+            }
+        };
+
+        var service = new StubService(document);
+
+        var allowedMethods = service.GetAllowedMethods("/orders/123");
+
+        Assert.Equal([HttpMethods.Get, HttpMethods.Patch], allowedMethods);
+    }
+
     private sealed class TestStubDefinitionLoader(StubDocument document) : IStubDefinitionLoader
     {
         public StubDocument LoadDefaultDefinition()

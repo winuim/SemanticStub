@@ -64,7 +64,10 @@ public sealed class StubControllerTests
     [Fact]
     public async Task Delete_ReturnsMethodNotAllowed_WhenMethodNotAllowed()
     {
-        var stubService = new RecordingStubService(StubMatchResult.MethodNotAllowed, new StubResponse());
+        var stubService = new RecordingStubService(
+            StubMatchResult.MethodNotAllowed,
+            new StubResponse(),
+            allowedMethods: [HttpMethods.Get, HttpMethods.Post]);
         var controller = CreateController(stubService);
 
         var result = await controller.Delete("users/1");
@@ -72,6 +75,7 @@ public sealed class StubControllerTests
         var statusResult = Assert.IsType<StatusCodeResult>(result);
         Assert.Equal(StatusCodes.Status405MethodNotAllowed, statusResult.StatusCode);
         Assert.Equal(HttpMethods.Delete, stubService.Method);
+        Assert.Equal("GET, POST", controller.Response.Headers.Allow.ToString());
     }
 
     [Fact]
@@ -230,10 +234,11 @@ public sealed class StubControllerTests
         private readonly StubMatchResult matchResult;
         private readonly StubResponse response;
 
-        public RecordingStubService(StubMatchResult matchResult, StubResponse response)
+        public RecordingStubService(StubMatchResult matchResult, StubResponse response, IReadOnlyList<string>? allowedMethods = null)
         {
             this.matchResult = matchResult;
             this.response = response;
+            AllowedMethods = allowedMethods ?? Array.Empty<string>();
         }
 
         public string Method { get; private set; } = string.Empty;
@@ -247,6 +252,13 @@ public sealed class StubControllerTests
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         public string? Body { get; private set; }
+
+        public IReadOnlyList<string> AllowedMethods { get; }
+
+        public IReadOnlyList<string> GetAllowedMethods(string path)
+        {
+            return AllowedMethods;
+        }
 
         public StubMatchResult TryGetResponse(
             string method,
