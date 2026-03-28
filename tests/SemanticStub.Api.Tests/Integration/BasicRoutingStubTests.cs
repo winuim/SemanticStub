@@ -344,6 +344,7 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
         var response = await client.GetAsync("/login");
 
         Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+        Assert.Equal("POST", string.Join(", ", response.Content.Headers.Allow));
     }
 
     [Fact]
@@ -360,6 +361,7 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
         var response = await client.GetAsync("/profile");
 
         Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+        Assert.Equal("PUT, PATCH, DELETE", string.Join(", ", response.Content.Headers.Allow));
     }
 
     [Fact]
@@ -390,6 +392,7 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
         var response = await client.PostAsync("/orders/123", content: null);
 
         Assert.Equal(HttpStatusCode.MethodNotAllowed, response.StatusCode);
+        Assert.Equal("GET", string.Join(", ", response.Content.Headers.Allow));
     }
 
     public sealed class HelloResponse
