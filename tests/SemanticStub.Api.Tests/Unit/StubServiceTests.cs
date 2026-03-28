@@ -8,6 +8,12 @@ namespace SemanticStub.Api.Tests.Unit;
 
 public sealed class StubServiceTests
 {
+    private static StubResponse AssertMatchedResponse(StubMatchResult matched, StubResponse? response)
+    {
+        Assert.Equal(StubMatchResult.Matched, matched);
+        return Assert.IsType<StubResponse>(response);
+    }
+
     [Fact]
     public void InterfaceContract_ExposesConvenienceOverloadForMethodAndPathOnly()
     {
@@ -43,10 +49,9 @@ public sealed class StubServiceTests
         IStubService service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.NotNull(response);
-        Assert.Equal(200, response.StatusCode);
+        Assert.Equal(200, matchedResponse.StatusCode);
     }
 
     [Fact]
@@ -84,10 +89,10 @@ public sealed class StubServiceTests
         var service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal(201, response.StatusCode);
-        Assert.Equal("{\"message\":\"Created\"}", response.Body);
+        Assert.Equal(201, matchedResponse.StatusCode);
+        Assert.Equal("{\"message\":\"Created\"}", matchedResponse.Body);
     }
 
     [Fact]
@@ -126,9 +131,9 @@ public sealed class StubServiceTests
         var service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal(250, response.DelayMilliseconds);
+        Assert.Equal(250, matchedResponse.DelayMilliseconds);
     }
 
     [Fact]
@@ -179,9 +184,9 @@ public sealed class StubServiceTests
         };
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal(125, response.DelayMilliseconds);
+        Assert.Equal(125, matchedResponse.DelayMilliseconds);
     }
 
     [Fact]
@@ -219,9 +224,9 @@ public sealed class StubServiceTests
         var service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Null(response.DelayMilliseconds);
+        Assert.Null(matchedResponse.DelayMilliseconds);
     }
 
     [Fact]
@@ -271,9 +276,9 @@ public sealed class StubServiceTests
         };
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Null(response.DelayMilliseconds);
+        Assert.Null(matchedResponse.DelayMilliseconds);
     }
 
     [Fact]
@@ -339,9 +344,9 @@ public sealed class StubServiceTests
         };
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/search", query, out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("{\"result\":\"ordered\"}", response.Body);
+        Assert.Equal("{\"result\":\"ordered\"}", matchedResponse.Body);
     }
 
     [Fact]
@@ -374,10 +379,10 @@ public sealed class StubServiceTests
         var service = new StubService(document, _ => "{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}");
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/users", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal(200, response.StatusCode);
-        Assert.Equal("{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}", response.Body);
+        Assert.Equal(200, matchedResponse.StatusCode);
+        Assert.Equal("{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}", matchedResponse.Body);
     }
 
     [Fact]
@@ -415,11 +420,11 @@ public sealed class StubServiceTests
             var service = new StubService(document, _ => throw new InvalidOperationException("Response file reader should not be used for absolute paths."));
 
             var matched = service.TryGetResponse(HttpMethods.Get, "/download", out var response);
+            var matchedResponse = AssertMatchedResponse(matched, response);
 
-            Assert.Equal(StubMatchResult.Matched, matched);
-            Assert.Equal(filePath, response.FilePath);
-            Assert.Equal(string.Empty, response.Body);
-            Assert.Equal("application/octet-stream", response.ContentType);
+            Assert.Equal(filePath, matchedResponse.FilePath);
+            Assert.Equal(string.Empty, matchedResponse.Body);
+            Assert.Equal("application/octet-stream", matchedResponse.ContentType);
         }
         finally
         {
@@ -476,10 +481,10 @@ public sealed class StubServiceTests
         var service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("hello", response.Headers["X-Stub-Source"].Single());
-        Assert.Equal("123", response.Headers["X-Trace-Id"].Single());
+        Assert.Equal("hello", matchedResponse.Headers["X-Stub-Source"].Single());
+        Assert.Equal("123", matchedResponse.Headers["X-Trace-Id"].Single());
     }
 
     [Fact]
@@ -524,9 +529,9 @@ public sealed class StubServiceTests
         var service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("2026-03-26T00:00:00.0000000+00:00", response.Headers["Last-Modified"].Single());
+        Assert.Equal("2026-03-26T00:00:00.0000000+00:00", matchedResponse.Headers["Last-Modified"].Single());
     }
 
     [Fact]
@@ -574,9 +579,9 @@ public sealed class StubServiceTests
         var service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("Accept-Encoding, Origin", response.Headers["Vary"].Single());
+        Assert.Equal("Accept-Encoding, Origin", matchedResponse.Headers["Vary"].Single());
     }
 
     [Fact]
@@ -624,9 +629,9 @@ public sealed class StubServiceTests
         var service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal(new[] { "a=1; Path=/", "b=2; Path=/" }, response.Headers["Set-Cookie"].ToArray());
+        Assert.Equal(new[] { "a=1; Path=/", "b=2; Path=/" }, matchedResponse.Headers["Set-Cookie"].ToArray());
     }
 
     [Fact]
@@ -683,9 +688,9 @@ public sealed class StubServiceTests
         };
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("admin", response.Headers["X-User-Role"].Single());
+        Assert.Equal("admin", matchedResponse.Headers["X-User-Role"].Single());
     }
 
     [Fact]
@@ -723,9 +728,9 @@ public sealed class StubServiceTests
         var service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Put, "/profile", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("{\"result\":\"replaced\"}", response.Body);
+        Assert.Equal("{\"result\":\"replaced\"}", matchedResponse.Body);
     }
 
     [Fact]
@@ -763,9 +768,9 @@ public sealed class StubServiceTests
         var service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Delete, "/profile", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("{\"result\":\"deleted\"}", response.Body);
+        Assert.Equal("{\"result\":\"deleted\"}", matchedResponse.Body);
     }
 
     [Fact]
@@ -838,9 +843,9 @@ public sealed class StubServiceTests
         };
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("{\"message\":\"admin-summary\"}", response.Body);
+        Assert.Equal("{\"message\":\"admin-summary\"}", matchedResponse.Body);
     }
 
     [Fact]
@@ -906,9 +911,9 @@ public sealed class StubServiceTests
         };
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("{\"message\":\"default\"}", response.Body);
+        Assert.Equal("{\"message\":\"default\"}", matchedResponse.Body);
     }
 
     [Fact]
@@ -1010,10 +1015,10 @@ public sealed class StubServiceTests
         var service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("text/plain", response.ContentType);
-        Assert.Equal("Hello, world!", response.Body);
+        Assert.Equal("text/plain", matchedResponse.ContentType);
+        Assert.Equal("Hello, world!", matchedResponse.Body);
     }
 
     [Fact]
@@ -1046,10 +1051,10 @@ public sealed class StubServiceTests
         var service = new StubService(document, _ => "<root><item>1</item></root>");
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/data", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("application/xml", response.ContentType);
-        Assert.Equal("<root><item>1</item></root>", response.Body);
+        Assert.Equal("application/xml", matchedResponse.ContentType);
+        Assert.Equal("<root><item>1</item></root>", matchedResponse.Body);
     }
 
     [Fact]
@@ -1093,10 +1098,10 @@ public sealed class StubServiceTests
         var query = new Dictionary<string, string>(StringComparer.Ordinal) { ["format"] = "csv" };
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/report", query, out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("text/csv", response.ContentType);
-        Assert.Equal("id,name\n1,Alice", response.Body);
+        Assert.Equal("text/csv", matchedResponse.ContentType);
+        Assert.Equal("id,name\n1,Alice", matchedResponse.Body);
     }
 
     [Fact]
@@ -1225,9 +1230,9 @@ public sealed class StubServiceTests
             new Dictionary<string, string>(StringComparer.Ordinal),
             "{\"username\":\"demo\",\"password\":\"secret\",\"rememberMe\":true}",
             out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("{\"result\":\"ok\"}", response.Body);
+        Assert.Equal("{\"result\":\"ok\"}", matchedResponse.Body);
     }
 
     [Fact]
@@ -1300,9 +1305,9 @@ public sealed class StubServiceTests
             new Dictionary<string, string>(StringComparer.Ordinal),
             "{\"username\":\"demo\",\"password\":\"secret\"}",
             out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("{\"result\":\"specific\"}", response.Body);
+        Assert.Equal("{\"result\":\"specific\"}", matchedResponse.Body);
     }
 
     [Fact]
@@ -1369,9 +1374,9 @@ public sealed class StubServiceTests
             new Dictionary<string, string>(StringComparer.Ordinal),
             "{not-json",
             out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("{\"result\":\"fallback\"}", response.Body);
+        Assert.Equal("{\"result\":\"fallback\"}", matchedResponse.Body);
     }
 
     [Fact]
@@ -1442,9 +1447,9 @@ public sealed class StubServiceTests
             },
             body: null,
             out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("{\"message\":\"staging\"}", response.Body);
+        Assert.Equal("{\"message\":\"staging\"}", matchedResponse.Body);
     }
 
     [Fact]
@@ -1482,9 +1487,9 @@ public sealed class StubServiceTests
         var service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/orders/123", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("{\"result\":\"pattern\"}", response.Body);
+        Assert.Equal("{\"result\":\"pattern\"}", matchedResponse.Body);
     }
 
     [Fact]
@@ -1544,9 +1549,9 @@ public sealed class StubServiceTests
         var service = new StubService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/orders/special", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
 
-        Assert.Equal(StubMatchResult.Matched, matched);
-        Assert.Equal("{\"result\":\"exact\"}", response.Body);
+        Assert.Equal("{\"result\":\"exact\"}", matchedResponse.Body);
     }
 
     [Fact]
