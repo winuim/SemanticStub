@@ -8,32 +8,57 @@ using System.Globalization;
 namespace SemanticStub.Api.Services;
 
 /// <summary>
-/// Converts matched stub definitions into concrete HTTP responses so controllers can delegate routing, matching, and payload assembly to one place.
+/// Converts a loaded <see cref="StubDocument"/> into concrete <see cref="StubResponse"/> values by applying deterministic path, method, query, header, and body matching rules.
 /// </summary>
-public sealed class StubService
+public sealed class StubService : IStubService
 {
     private const string JsonContentType = "application/json";
     private readonly StubDocument document;
     private readonly Func<string, string> responseFileReader;
     private readonly MatcherService matcherService;
 
-    public StubService(StubDefinitionLoader loader)
+    /// <summary>
+    /// Creates a service that loads its stub document immediately from the configured loader and uses the default matcher implementation.
+    /// </summary>
+    /// <param name="loader">Provides the validated stub document and any relative file-backed response payloads.</param>
+    /// <exception cref="DirectoryNotFoundException">Propagated when the loader cannot locate the configured definitions directory.</exception>
+    /// <exception cref="FileNotFoundException">Propagated when the loader cannot find required stub files or response files.</exception>
+    /// <exception cref="InvalidOperationException">Propagated when the loader cannot build a valid stub document.</exception>
+    public StubService(IStubDefinitionLoader loader)
         : this(loader, new MatcherService())
     {
     }
 
-    public StubService(StubDefinitionLoader loader, MatcherService matcherService)
+    /// <summary>
+    /// Creates a service that loads its stub document immediately from the configured loader and uses the supplied matcher implementation for conditional matches.
+    /// </summary>
+    /// <param name="loader">Provides the validated stub document and any relative file-backed response payloads.</param>
+    /// <param name="matcherService">The matcher used to evaluate <c>x-match</c> candidates when a route and method have been resolved.</param>
+    /// <exception cref="DirectoryNotFoundException">Propagated when the loader cannot locate the configured definitions directory.</exception>
+    /// <exception cref="FileNotFoundException">Propagated when the loader cannot find required stub files or response files.</exception>
+    /// <exception cref="InvalidOperationException">Propagated when the loader cannot build a valid stub document.</exception>
+    public StubService(IStubDefinitionLoader loader, MatcherService matcherService)
     {
         document = loader.LoadDefaultDefinition();
         responseFileReader = loader.LoadResponseFileContent;
         this.matcherService = matcherService;
     }
 
+    /// <summary>
+    /// Creates a service over an already loaded stub document and disables relative file-backed responses.
+    /// </summary>
+    /// <param name="document">The validated stub document to evaluate.</param>
+    /// <remarks>Relative <c>x-response-file</c> responses will fail at runtime because no response-file reader is configured by this overload.</remarks>
     public StubService(StubDocument document)
         : this(document, _ => throw new InvalidOperationException("No response file reader configured."), new MatcherService())
     {
     }
 
+    /// <summary>
+    /// Creates a service over an already loaded stub document and uses the supplied delegate to resolve relative file-backed responses.
+    /// </summary>
+    /// <param name="document">The validated stub document to evaluate.</param>
+    /// <param name="responseFileReader">Loads the contents of a relative response file selected by the matching stub.</param>
     public StubService(StubDocument document, Func<string, string> responseFileReader)
         : this(document, responseFileReader, new MatcherService())
     {
@@ -49,9 +74,11 @@ public sealed class StubService
     /// <summary>
     /// Resolves a response for callers that only need method and path matching.
     /// </summary>
-    /// <param name="response">Receives the assembled response when a matching stub is found.</param>
-    /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
-    public StubMatchResult TryGetResponse(string method, string path, out StubResponse response)
+    /// <param name="method">The HTTP method to evaluate.</param>
+    /// <param name="path">The absolute request path such as <c>/users</c>.</param>
+    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
+    /// <returns>The same result contract as the full overload, with query, header, and body matching treated as unspecified.</returns>
+    public StubMatchResult TryGetResponse(string method, string path, out StubResponse? response)
     {
         return TryGetResponse(
             method,
@@ -65,9 +92,12 @@ public sealed class StubService
     /// <summary>
     /// Resolves a response while considering query-based match conditions so more specific stubs can override broad defaults.
     /// </summary>
-    /// <param name="response">Receives the assembled response when a matching stub is found.</param>
-    /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
-    public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, out StubResponse response)
+    /// <param name="method">The HTTP method to evaluate.</param>
+    /// <param name="path">The absolute request path such as <c>/users</c>.</param>
+    /// <param name="query">Single-value query parameters keyed by parameter name. Missing or empty dictionaries mean no query conditions are available to match.</param>
+    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
+    /// <returns>The same result contract as the full overload, with headers omitted and the body treated as unspecified.</returns>
+    public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, out StubResponse? response)
     {
         return TryGetResponse(
             method,
@@ -81,9 +111,12 @@ public sealed class StubService
     /// <summary>
     /// Resolves a response while considering query-based match conditions so more specific stubs can override broad defaults.
     /// </summary>
-    /// <param name="response">Receives the assembled response when a matching stub is found.</param>
-    /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
-    public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, StringValues> query, out StubResponse response)
+    /// <param name="method">The HTTP method to evaluate.</param>
+    /// <param name="path">The absolute request path such as <c>/users</c>.</param>
+    /// <param name="query">Query parameters keyed by parameter name, including repeated values in request order.</param>
+    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
+    /// <returns>The same result contract as the full overload, with headers omitted and the body treated as unspecified.</returns>
+    public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, StringValues> query, out StubResponse? response)
     {
         return TryGetResponse(
             method,
@@ -97,9 +130,13 @@ public sealed class StubService
     /// <summary>
     /// Resolves a response while considering query and body match conditions so structured request payloads can select a narrower stub.
     /// </summary>
-    /// <param name="response">Receives the assembled response when a matching stub is found.</param>
-    /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
-    public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, string? body, out StubResponse response)
+    /// <param name="method">The HTTP method to evaluate.</param>
+    /// <param name="path">The absolute request path such as <c>/users</c>.</param>
+    /// <param name="query">Single-value query parameters keyed by parameter name.</param>
+    /// <param name="body">The request body used for JSON body matching. <see langword="null"/> means no body conditions can match.</param>
+    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
+    /// <returns>The same result contract as the full overload, with headers omitted.</returns>
+    public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, string? body, out StubResponse? response)
     {
         return TryGetResponse(
             method,
@@ -113,9 +150,13 @@ public sealed class StubService
     /// <summary>
     /// Resolves a response while considering query and body match conditions so structured request payloads can select a narrower stub.
     /// </summary>
-    /// <param name="response">Receives the assembled response when a matching stub is found.</param>
-    /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
-    public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, StringValues> query, string? body, out StubResponse response)
+    /// <param name="method">The HTTP method to evaluate.</param>
+    /// <param name="path">The absolute request path such as <c>/users</c>.</param>
+    /// <param name="query">Query parameters keyed by parameter name, including repeated values in request order.</param>
+    /// <param name="body">The request body used for JSON body matching. <see langword="null"/> means no body conditions can match.</param>
+    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
+    /// <returns>The same result contract as the full overload, with headers omitted.</returns>
+    public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, StringValues> query, string? body, out StubResponse? response)
     {
         return TryGetResponse(
             method,
@@ -129,17 +170,28 @@ public sealed class StubService
     /// <summary>
     /// Resolves the most specific stub response by evaluating path, method, query, headers, and body through the same matching pipeline.
     /// </summary>
-    /// <param name="response">Receives the assembled response when a matching stub is found.</param>
-    /// <returns>A result that distinguishes between no route, unsupported method, invalid configuration, and a successful match.</returns>
+    /// <param name="method">The HTTP method to evaluate. Unsupported methods produce <see cref="StubMatchResult.MethodNotAllowed"/> only after a path match is found.</param>
+    /// <param name="path">The absolute request path such as <c>/users</c>. Exact paths win before template paths.</param>
+    /// <param name="query">Query parameters keyed by parameter name. Repeated values are matched in request order.</param>
+    /// <param name="headers">Request headers keyed by header name. Supply a case-insensitive dictionary for HTTP semantics.</param>
+    /// <param name="body">The request body used for JSON body matching. Invalid JSON does not throw here; it simply prevents structured body conditions from matching.</param>
+    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>; otherwise <see langword="null"/>.</param>
+    /// <returns>
+    /// <see cref="StubMatchResult.Matched"/> when a conditional or default response can be built,
+    /// <see cref="StubMatchResult.PathNotFound"/> when no path matches,
+    /// <see cref="StubMatchResult.MethodNotAllowed"/> when the path exists but the method does not,
+    /// or <see cref="StubMatchResult.ResponseNotConfigured"/> when a route matches but the selected response is missing content or otherwise unusable.
+    /// </returns>
+    /// <remarks>This method does not mutate scenario state. When a relative file-backed response is selected, payload text is loaded through the configured response-file reader before returning.</remarks>
     public StubMatchResult TryGetResponse(
         string method,
         string path,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
         string? body,
-        out StubResponse response)
+        out StubResponse? response)
     {
-        response = null!;
+        response = null;
 
         if (!TryResolveOperation(method, path, out var pathItem, out var operation, out var failedMatchResult))
         {
