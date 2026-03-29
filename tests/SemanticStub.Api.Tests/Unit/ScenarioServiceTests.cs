@@ -1,4 +1,5 @@
 using SemanticStub.Api.Services;
+using SemanticStub.Api.Models;
 using System.Threading;
 using Xunit;
 
@@ -28,6 +29,26 @@ public sealed class ScenarioServiceTests
         await Task.WhenAll(RunLockedSectionAsync(), RunLockedSectionAsync());
 
         Assert.Equal(1, maxConcurrentExecutions);
+    }
+
+    [Fact]
+    public void Reset_ClearsAdvancedScenarioState()
+    {
+        var service = new ScenarioService();
+        var scenario = new ScenarioDefinition
+        {
+            Name = "checkout-flow",
+            State = "initial",
+            Next = "confirmed"
+        };
+
+        service.Advance(scenario);
+
+        Assert.False(service.IsMatch(scenario));
+
+        service.Reset();
+
+        Assert.True(service.IsMatch(scenario));
     }
 
     private static void UpdateMax(ref int target, int candidate)
