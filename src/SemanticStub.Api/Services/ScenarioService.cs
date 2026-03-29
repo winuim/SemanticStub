@@ -43,6 +43,18 @@ public sealed class ScenarioService
     }
 
     /// <summary>
+    /// Clears all in-memory scenario progress so subsequent requests start from each scenario's initial state again.
+    /// </summary>
+    public void Reset()
+    {
+        ExecuteLocked(() =>
+        {
+            currentStates.Clear();
+            return 0;
+        });
+    }
+
+    /// <summary>
     /// Executes scenario-sensitive selection and transition logic under one lock so state checks and advances stay atomic across concurrent requests.
     /// </summary>
     /// <param name="action">The scenario-aware operation to run atomically.</param>
