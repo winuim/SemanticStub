@@ -2,6 +2,8 @@
 
 Semantic-aware API mock server.
 
+日本語版: [README.ja.md](README.ja.md)
+
 ## YAML Extensions
 
 SemanticStub uses OpenAPI 3.1 for the base document structure and `x-*`
