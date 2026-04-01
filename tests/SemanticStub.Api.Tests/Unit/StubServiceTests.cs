@@ -1682,6 +1682,11 @@ public sealed class StubServiceTests
 
     private sealed class TestStubDefinitionLoader(StubDocument document) : IStubDefinitionLoader
     {
+        public string GetDefinitionsDirectoryPath()
+        {
+            throw new InvalidOperationException("Definitions directory path is not available in this test loader.");
+        }
+
         public StubDocument LoadDefaultDefinition()
         {
             return document;

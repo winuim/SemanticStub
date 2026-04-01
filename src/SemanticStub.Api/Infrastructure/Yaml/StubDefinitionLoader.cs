@@ -63,7 +63,13 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
         return MergeDefinitions(documents);
     }
 
-    internal string GetDefinitionsDirectoryPath()
+    /// <summary>
+    /// Resolves the active definitions directory used for YAML discovery and file watching.
+    /// </summary>
+    /// <returns>The absolute path to the current definitions directory.</returns>
+    /// <exception cref="DirectoryNotFoundException">Thrown when the configured definitions directory cannot be located.</exception>
+    /// <exception cref="FileNotFoundException">Thrown when the default definitions directory cannot be found from the current content root.</exception>
+    public string GetDefinitionsDirectoryPath()
     {
         return ResolveDefinitionsDirectory();
     }
