@@ -1,6 +1,8 @@
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Json;
 using System.Diagnostics;
+using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
@@ -30,6 +32,23 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
         var payload = await response.Content.ReadFromJsonAsync<HelloResponse>();
         Assert.NotNull(payload);
         Assert.Equal("Hello from SemanticStub", payload.Message);
+    }
+
+    [Fact]
+    public async Task GetHello_WithAcceptEncodingGzip_ReturnsGzipCompressedResponse()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/hello");
+        request.Headers.AcceptEncoding.ParseAdd("gzip");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("gzip", response.Content.Headers.ContentEncoding);
+
+        var compressedBody = await response.Content.ReadAsByteArrayAsync();
+        var payload = DecompressGzip(compressedBody);
+
+        Assert.Contains("Hello from SemanticStub", payload, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -309,6 +328,24 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public async Task PatchProfile_WithGzipCompressedBody_ReturnsSpecificResponse()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Patch, "/profile")
+        {
+            Content = new ByteArrayContent(CompressGzip("""{"nickname":"stubby"}"""))
+        };
+        request.Content.Headers.ContentType = new("application/json");
+        request.Content.Headers.ContentEncoding.Add("gzip");
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<MutationResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("patched-specific", payload.Result);
+    }
+
+    [Fact]
     public async Task PatchProfile_WithNonMatchingBody_ReturnsFallbackResponse()
     {
         var request = new HttpRequestMessage(HttpMethod.Patch, "/profile")
@@ -448,5 +485,27 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
     public sealed class SearchResponse
     {
         public string Result { get; init; } = string.Empty;
+    }
+
+    private static byte[] CompressGzip(string content)
+    {
+        var input = Encoding.UTF8.GetBytes(content);
+        using var output = new MemoryStream();
+
+        using (var gzipStream = new GZipStream(output, CompressionLevel.SmallestSize, leaveOpen: true))
+        {
+            gzipStream.Write(input, 0, input.Length);
+        }
+
+        return output.ToArray();
+    }
+
+    private static string DecompressGzip(byte[] content)
+    {
+        using var input = new MemoryStream(content);
+        using var gzipStream = new GZipStream(input, CompressionMode.Decompress);
+        using var reader = new StreamReader(gzipStream, Encoding.UTF8);
+
+        return reader.ReadToEnd();
     }
 }
