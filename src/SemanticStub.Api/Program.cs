@@ -7,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddHttpLogging(options =>
 {
-    ConfigureHttpLoggingDefaults(options, builder.Environment);
+    ConfigureHttpLoggingDefaults(options);
     builder.Configuration.GetSection("HttpLogging").Bind(options);
     ConfigureHttpLoggingMediaTypes(options);
 });
@@ -33,16 +33,13 @@ app.MapControllers();
 
 app.Run();
 
-static void ConfigureHttpLoggingDefaults(HttpLoggingOptions options, IWebHostEnvironment environment)
+static void ConfigureHttpLoggingDefaults(HttpLoggingOptions options)
 {
     options.LoggingFields =
         HttpLoggingFields.RequestPropertiesAndHeaders |
         HttpLoggingFields.ResponsePropertiesAndHeaders |
         HttpLoggingFields.RequestBody |
         HttpLoggingFields.ResponseBody;
-
-    options.RequestBodyLogLimit = environment.IsDevelopment() ? 4096 : 1024;
-    options.ResponseBodyLogLimit = environment.IsDevelopment() ? 4096 : 1024;
 }
 
 static void ConfigureHttpLoggingMediaTypes(HttpLoggingOptions options)

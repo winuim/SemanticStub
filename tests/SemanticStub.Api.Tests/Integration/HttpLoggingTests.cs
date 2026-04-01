@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -29,9 +30,23 @@ public sealed class HttpLoggingTests
     [Fact]
     public async Task GetHello_WritesHttpLoggingEntries()
     {
+        using var workspace = HttpLoggingWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /hello:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: hello
+            """);
         var sink = new TestLoggerProvider();
 
-        using var factory = new HttpLoggingFactory("Development", sink);
+        using var factory = new HttpLoggingFactory("Development", sink, workspace.RootPath);
         using var client = factory.CreateClient();
 
         var response = await client.GetAsync("/hello");
@@ -42,6 +57,17 @@ public sealed class HttpLoggingTests
             sink.Entries,
             entry => entry.Category.Contains("HttpLoggingMiddleware", StringComparison.Ordinal) &&
                      entry.Message.Contains("/hello", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CreateClient_ConfiguresHttpLoggingCategoryAtInformation()
+    {
+        using var factory = new HttpLoggingFactory("Production");
+        using var client = factory.CreateClient();
+
+        var configuration = factory.Services.GetRequiredService<IConfiguration>();
+
+        Assert.Equal("Information", configuration["Logging:LogLevel:Microsoft.AspNetCore.HttpLogging"]);
     }
 
     [Fact]
