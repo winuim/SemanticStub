@@ -54,6 +54,49 @@ Notes:
 - When multiple media types are declared, SemanticStub prefers a JSON media
   type for deterministic response selection and otherwise uses the first
   declared type.
+- `x-scenario.name` and `x-scenario.state` are required. `x-scenario.next` is
+  optional and advances the in-memory scenario state after that response is
+  selected.
+
+Scenario example:
+
+```yaml
+paths:
+  /checkout:
+    post:
+      responses:
+        '409':
+          description: pending
+          x-scenario:
+            name: checkout-flow
+            state: initial
+            next: confirmed
+          content:
+            application/json:
+              example:
+                result: pending
+        '200':
+          description: complete
+          x-scenario:
+            name: checkout-flow
+            state: confirmed
+          content:
+            application/json:
+              example:
+                result: complete
+```
+
+Scenario notes:
+
+- Scenario state is stored in memory and shared by scenario name.
+- A response without `x-scenario` is always eligible.
+- When a response defines `next`, later requests use the advanced state until
+  another transition, an automatic stub-definition reload, or an application
+  restart resets it.
+- `x-scenario` can be used on normal `responses` entries and on
+  `x-match[].response` entries.
+- Scenario evaluation and state transitions are serialized per process so a
+  single scenario flow advances deterministically across concurrent requests.
 
 ### Supported operation extensions
 
@@ -88,6 +131,7 @@ paths:
 Each `x-match` entry may contain:
 
 - `query`: exact query-string matches.
+- `x-query-regex`: regex query-string matches.
 - `x-query-partial`: partial query-string matches.
 - `headers`: exact header matches.
 - `body`: exact body match data.
@@ -105,8 +149,9 @@ Notes:
 - `query` supports exact single-value matches, ordered repeated values, and
   typed comparison for declared OpenAPI query parameter types such as
   `integer`, `number`, and `boolean`.
+- `x-query-regex` performs regex matching against query values.
 - `x-query-partial` performs substring matching. Exact `query` matches are
-  preferred over partial matches when multiple candidates succeed.
+  preferred over regex and partial matches when multiple candidates succeed.
 - `body` matching currently applies to JSON request bodies. Body matching is
   partial for objects, so a request may contain additional properties and still
   match.
@@ -131,7 +176,6 @@ This keeps routing deterministic for the current feature set.
 
 ### Current limitations
 
-- Regex query matching is not supported yet.
 - Semantic matching appears only in sample files today; it is not part of the
   current runtime behavior.
 - `body` matching is intended for structured JSON request payloads rather than
