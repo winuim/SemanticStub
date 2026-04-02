@@ -12,9 +12,10 @@ namespace SemanticStub.Api.Services;
 /// <summary>
 /// Evaluates <c>x-match</c> candidates and returns the most specific successful match without mutating request or stub state.
 /// </summary>
-public sealed class MatcherService
+public sealed class MatcherService : IMatcherService
 {
     private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(100);
+    private static readonly IReadOnlyDictionary<string, string> EmptyHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private readonly ILogger<MatcherService>? logger;
 
     /// <summary>
@@ -60,11 +61,7 @@ public sealed class MatcherService
         IReadOnlyDictionary<string, StringValues> query,
         string? body)
     {
-        return FindBestMatch(
-            operation,
-            query,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            body);
+        return FindBestMatchWithOperationParameters(operation, query, EmptyHeaders, body);
     }
 
     /// <summary>
@@ -102,12 +99,7 @@ public sealed class MatcherService
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
-        return FindBestMatch(
-            operation.Parameters,
-            operation,
-            query,
-            headers,
-            body);
+        return FindBestMatchWithOperationParameters(operation, query, headers, body);
     }
 
     /// <summary>
@@ -152,6 +144,20 @@ public sealed class MatcherService
             .ThenByDescending(GetMatchSpecificity)
             .ThenByDescending(GetRegexQuerySpecificity)
             .FirstOrDefault();
+    }
+
+    private QueryMatchDefinition? FindBestMatchWithOperationParameters(
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
+    {
+        return FindBestMatch(
+            operation.Parameters,
+            operation,
+            query,
+            headers,
+            body);
     }
 
     private IEnumerable<QueryMatchDefinition> GetCandidatesMatchingRequest(

@@ -8,6 +8,14 @@ namespace SemanticStub.Api.Infrastructure.Yaml;
 public interface IStubDefinitionLoader
 {
     /// <summary>
+    /// Resolves the active definitions directory used for YAML discovery and file watching.
+    /// </summary>
+    /// <returns>The absolute path to the current definitions directory.</returns>
+    /// <exception cref="DirectoryNotFoundException">Thrown when an explicit configured definitions directory cannot be located.</exception>
+    /// <exception cref="FileNotFoundException">Thrown when the default definitions directory cannot be found from the current search root.</exception>
+    string GetDefinitionsDirectoryPath();
+
+    /// <summary>
     /// Loads the active stub document from the configured definitions location.
     /// </summary>
     /// <returns>A validated and normalized <see cref="StubDocument"/> ready for runtime matching. Relative <c>x-response-file</c> values are resolved during normalization.</returns>

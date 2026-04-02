@@ -2,8 +2,8 @@ using System.IO.Compression;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.RequestDecompression;
 using Microsoft.AspNetCore.ResponseCompression;
+using SemanticStub.Api.Extensions;
 using SemanticStub.Api.Infrastructure.Yaml;
-using SemanticStub.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,16 +24,7 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
     options.Level = CompressionLevel.Fastest;
 });
 builder.Services.Configure<StubSettings>(builder.Configuration.GetSection("StubSettings"));
-builder.Services.AddSingleton<StubDefinitionLoader>();
-builder.Services.AddSingleton<IStubDefinitionLoader>(serviceProvider => serviceProvider.GetRequiredService<StubDefinitionLoader>());
-builder.Services.AddSingleton<StubDefinitionState>();
-builder.Services.AddHostedService<StubDefinitionWatcher>();
-builder.Services.AddSingleton<MatcherService>();
-builder.Services.AddSingleton<ScenarioService>();
-builder.Services.AddSingleton<IStubService>(serviceProvider => new StubService(
-    serviceProvider.GetRequiredService<StubDefinitionState>(),
-    serviceProvider.GetRequiredService<MatcherService>(),
-    serviceProvider.GetRequiredService<ScenarioService>()));
+builder.Services.AddStubServices();
 
 var app = builder.Build();
 
