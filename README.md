@@ -189,7 +189,7 @@ The repository also includes examples that use the following extension names:
 
 | Extension | Sample | Intent |
 | --- | --- | --- |
-| `x-semantic-match` | `samples/semantic-search.yaml` | Describes semantic matching behavior for request content. |
+| `x-semantic-match` | `samples/semantic-search.stub.yaml` | Describes semantic matching behavior for request content. |
 
 These samples document the intended OpenAPI-compatible extension style for
 higher-level features. See the sample files for the exact YAML shape used in

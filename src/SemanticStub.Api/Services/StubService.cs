@@ -1,6 +1,7 @@
 using SemanticStub.Api.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Utilities;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using System.Collections;
 using System.Globalization;
@@ -19,6 +20,8 @@ public sealed class StubService : IStubService
     private readonly Func<string, string> responseFileReader;
     private readonly IMatcherService matcherService;
     private readonly ScenarioService scenarioService;
+    private readonly ISemanticMatcherService? semanticMatcherService;
+    private readonly ILogger<StubService>? logger;
 
     /// <summary>
     /// Creates a service that loads its stub document immediately from the configured loader and uses the supplied matcher implementation for conditional matches.
@@ -30,7 +33,7 @@ public sealed class StubService : IStubService
     /// <exception cref="FileNotFoundException">Propagated when the loader cannot find required stub files or response files.</exception>
     /// <exception cref="InvalidOperationException">Propagated when the loader cannot build a valid stub document.</exception>
     public StubService(IStubDefinitionLoader loader, IMatcherService matcherService, ScenarioService scenarioService)
-        : this(CreateLoadedDocumentAccessor(loader), loader.LoadResponseFileContent, matcherService, scenarioService)
+        : this(CreateLoadedDocumentAccessor(loader), loader.LoadResponseFileContent, matcherService, scenarioService, semanticMatcherService: null, logger: null)
     {
     }
 
@@ -40,8 +43,13 @@ public sealed class StubService : IStubService
     /// <param name="state">Provides the current validated stub document snapshot and file-backed response payloads.</param>
     /// <param name="matcherService">The matcher used to evaluate <c>x-match</c> candidates when a route and method have been resolved.</param>
     /// <param name="scenarioService">Stores in-memory scenario transitions for responses that opt into <c>x-scenario</c>.</param>
-    internal StubService(StubDefinitionState state, IMatcherService matcherService, ScenarioService scenarioService)
-        : this(state.GetCurrentDocument, state.LoadResponseFileContent, matcherService, scenarioService)
+    internal StubService(
+        StubDefinitionState state,
+        IMatcherService matcherService,
+        ScenarioService scenarioService,
+        ISemanticMatcherService semanticMatcherService,
+        ILogger<StubService> logger)
+        : this(state.GetCurrentDocument, state.LoadResponseFileContent, matcherService, scenarioService, semanticMatcherService, logger)
     {
     }
 
@@ -52,7 +60,7 @@ public sealed class StubService : IStubService
     /// <param name="scenarioService">Stores in-memory scenario transitions for responses that opt into <c>x-scenario</c>.</param>
     /// <remarks>Relative <c>x-response-file</c> responses will fail at runtime because no response-file reader is configured by this overload.</remarks>
     public StubService(StubDocument document, ScenarioService scenarioService)
-        : this(document, MissingResponseFileReader, new MatcherService(), scenarioService)
+        : this(document, MissingResponseFileReader, new MatcherService(), scenarioService, semanticMatcherService: null, logger: null)
     {
     }
 
@@ -64,7 +72,18 @@ public sealed class StubService : IStubService
     /// <param name="matcherService">The matcher used to evaluate <c>x-match</c> candidates when a route and method have been resolved.</param>
     /// <param name="scenarioService">Stores in-memory scenario transitions for responses that opt into <c>x-scenario</c>.</param>
     public StubService(StubDocument document, Func<string, string> responseFileReader, IMatcherService matcherService, ScenarioService scenarioService)
-        : this(() => document, responseFileReader, matcherService, scenarioService)
+        : this(() => document, responseFileReader, matcherService, scenarioService, semanticMatcherService: null, logger: null)
+    {
+    }
+
+    internal StubService(
+        StubDocument document,
+        Func<string, string> responseFileReader,
+        IMatcherService matcherService,
+        ScenarioService scenarioService,
+        ISemanticMatcherService? semanticMatcherService,
+        ILogger<StubService>? logger = null)
+        : this(() => document, responseFileReader, matcherService, scenarioService, semanticMatcherService, logger)
     {
     }
 
@@ -72,12 +91,16 @@ public sealed class StubService : IStubService
         Func<StubDocument> documentAccessor,
         Func<string, string> responseFileReader,
         IMatcherService matcherService,
-        ScenarioService scenarioService)
+        ScenarioService scenarioService,
+        ISemanticMatcherService? semanticMatcherService,
+        ILogger<StubService>? logger)
     {
         this.documentAccessor = documentAccessor;
         this.responseFileReader = responseFileReader;
         this.matcherService = matcherService;
         this.scenarioService = scenarioService;
+        this.semanticMatcherService = semanticMatcherService;
+        this.logger = logger;
     }
 
     private static Func<StubDocument> CreateLoadedDocumentAccessor(IStubDefinitionLoader loader)
@@ -235,12 +258,12 @@ public sealed class StubService : IStubService
 
         if (OperationUsesScenario(operation))
         {
-            var evaluation = scenarioService.ExecuteLocked(() => TryGetResponseCore(pathItem, operation, query, headers, body));
+            var evaluation = scenarioService.ExecuteLocked(() => TryGetResponseCore(method, path, pathItem, operation, query, headers, body));
             response = evaluation.Response;
             return evaluation.MatchResult;
         }
 
-        var result = TryGetResponseCore(pathItem, operation, query, headers, body);
+        var result = TryGetResponseCore(method, path, pathItem, operation, query, headers, body);
         response = result.Response;
         return result.MatchResult;
     }
@@ -252,13 +275,15 @@ public sealed class StubService : IStubService
     }
 
     private (StubMatchResult MatchResult, StubResponse? Response) TryGetResponseCore(
+        string method,
+        string path,
         PathItemDefinition pathItem,
         OperationDefinition operation,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
-        var conditionalResult = TryBuildMatchedConditionalResponse(pathItem, operation, query, headers, body, out var response);
+        var conditionalResult = TryBuildMatchedConditionalResponse(method, path, pathItem, operation, query, headers, body, out var response);
 
         if (conditionalResult.HasValue)
         {
@@ -378,6 +403,8 @@ public sealed class StubService : IStubService
     }
 
     private QueryMatchEvaluationResult TryBuildMatchedQueryResponse(
+        string method,
+        string path,
         PathItemDefinition pathItem,
         OperationDefinition operation,
         IReadOnlyDictionary<string, StringValues> query,
@@ -399,7 +426,7 @@ public sealed class StubService : IStubService
             query,
             headers,
             body,
-            candidate => scenarioService.IsMatch(candidate.Response.Scenario));
+            candidate => scenarioService.IsMatch(candidate.Response.Scenario) && IsDeterministicCandidate(candidate));
 
         if (matchedCandidate is null)
         {
@@ -411,9 +438,26 @@ public sealed class StubService : IStubService
             return QueryMatchEvaluationResult.MatchedButInvalidResponse;
         }
 
+        logger?.LogInformation(
+            "Deterministic conditional match selected for '{Path}' {Method}. QueryKeys={QueryKeys}, HeaderKeys={HeaderKeys}, HasBody={HasBody}.",
+            path,
+            method.ToUpperInvariant(),
+            matchedCandidate.Query.Count + matchedCandidate.PartialQuery.Count + matchedCandidate.RegexQuery.Count,
+            matchedCandidate.Headers.Count,
+            matchedCandidate.Body is not null);
+
         scenarioService.Advance(matchedCandidate.Response.Scenario);
 
         return QueryMatchEvaluationResult.Matched;
+    }
+
+    private static bool IsDeterministicCandidate(QueryMatchDefinition candidate)
+    {
+        return candidate.Query.Count > 0 ||
+               candidate.PartialQuery.Count > 0 ||
+               candidate.RegexQuery.Count > 0 ||
+               candidate.Headers.Count > 0 ||
+               candidate.Body is not null;
     }
 
     private bool TryResolveOperation(
@@ -450,6 +494,8 @@ public sealed class StubService : IStubService
     }
 
     private StubMatchResult? TryBuildMatchedConditionalResponse(
+        string method,
+        string path,
         PathItemDefinition pathItem,
         OperationDefinition operation,
         IReadOnlyDictionary<string, StringValues> query,
@@ -459,7 +505,7 @@ public sealed class StubService : IStubService
     {
         response = null!;
 
-        var queryMatchResult = TryBuildMatchedQueryResponse(pathItem, operation, query, headers, body, out response);
+        var queryMatchResult = TryBuildMatchedQueryResponse(method, path, pathItem, operation, query, headers, body, out response);
 
         if (queryMatchResult == QueryMatchEvaluationResult.Matched)
         {
@@ -471,7 +517,77 @@ public sealed class StubService : IStubService
             return StubMatchResult.ResponseNotConfigured;
         }
 
+        var semanticMatchResult = TryBuildSemanticMatchedResponse(method, path, operation, query, headers, body, out response);
+
+        if (semanticMatchResult == QueryMatchEvaluationResult.Matched)
+        {
+            logger?.LogInformation(
+                "Semantic fallback produced a match for '{Path}' {Method}.",
+                path,
+                method.ToUpperInvariant());
+            return StubMatchResult.Matched;
+        }
+
+        if (semanticMatchResult == QueryMatchEvaluationResult.MatchedButInvalidResponse)
+        {
+            return StubMatchResult.ResponseNotConfigured;
+        }
+
         return null;
+    }
+
+    private QueryMatchEvaluationResult TryBuildSemanticMatchedResponse(
+        string method,
+        string path,
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body,
+        out StubResponse response)
+    {
+        response = null!;
+
+        if (semanticMatcherService is null)
+        {
+            return QueryMatchEvaluationResult.NoMatch;
+        }
+
+        if (operation.Matches.Count == 0)
+        {
+            return QueryMatchEvaluationResult.NoMatch;
+        }
+
+        logger?.LogInformation(
+            "Deterministic conditional match not found for '{Path}' {Method}. Trying semantic fallback.",
+            path,
+            method.ToUpperInvariant());
+
+        var matchedCandidate = semanticMatcherService.FindBestMatch(
+            method,
+            path,
+            query,
+            headers,
+            body,
+            operation.Matches,
+            candidate => scenarioService.IsMatch(candidate.Response.Scenario));
+
+        if (matchedCandidate is null)
+        {
+            logger?.LogDebug(
+                "Semantic fallback did not produce a match for '{Path}' {Method}.",
+                path,
+                method.ToUpperInvariant());
+            return QueryMatchEvaluationResult.NoMatch;
+        }
+
+        if (!TryBuildStubResponse(matchedCandidate.Response, out response))
+        {
+            return QueryMatchEvaluationResult.MatchedButInvalidResponse;
+        }
+
+        scenarioService.Advance(matchedCandidate.Response.Scenario);
+
+        return QueryMatchEvaluationResult.Matched;
     }
 
     private bool TryBuildDefaultOperationResponse(OperationDefinition operation, out StubResponse response)

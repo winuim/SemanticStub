@@ -46,6 +46,34 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_PreservesSemanticMatchDuringNormalization()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /search:
+                post:
+                  x-match:
+                    - x-semantic-match: find admin users
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              message: admin
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+        var operation = Assert.IsType<OperationDefinition>(document.Paths["/search"].Post);
+        var match = Assert.Single(operation.Matches);
+
+        Assert.Equal("find admin users", match.SemanticMatch);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_PreservesResponseHeadersDuringNormalization()
     {
         using var workspace = TestWorkspace.Create(
@@ -177,6 +205,32 @@ public sealed class StubDefinitionLoaderTests
 
         Assert.Contains("references missing response file 'missing.json'", exception.Message);
         Assert.Contains("Path '/users' GET responses['200']", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsForEmptySemanticMatch()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /search:
+                post:
+                  x-match:
+                    - x-semantic-match: "   "
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              message: admin
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].x-semantic-match must not be empty", exception.Message);
     }
 
     [Fact]

@@ -164,7 +164,7 @@ paths:
 
 | Extension | Sample | Intent |
 | --- | --- | --- |
-| `x-semantic-match` | `samples/semantic-search.yaml` | リクエスト内容に対する semantic matching の振る舞いを表現します。 |
+| `x-semantic-match` | `samples/semantic-search.stub.yaml` | リクエスト内容に対する semantic matching の振る舞いを表現します。 |
 
 これらのサンプルは、より高レベルな機能のための OpenAPI 互換拡張スタイルを示すものです。正確な YAML 形状は sample ファイルを参照してください。
 
