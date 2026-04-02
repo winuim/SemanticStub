@@ -19,7 +19,7 @@ public interface ISemanticMatcherService
     /// <param name="candidates">The semantic candidates attached to the resolved operation.</param>
     /// <param name="candidateFilter">An optional filter that excludes ineligible candidates before scoring.</param>
     /// <returns>The best acceptable semantic match, or <see langword="null"/> when semantic matching is disabled or no candidate satisfies the threshold.</returns>
-    QueryMatchDefinition? FindBestMatch(
+    Task<QueryMatchDefinition?> FindBestMatchAsync(
         string method,
         string path,
         IReadOnlyDictionary<string, StringValues> query,

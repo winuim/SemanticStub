@@ -37,7 +37,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
     /// <summary>
     /// Finds the best semantic match among the supplied conditional candidates.
     /// </summary>
-    public QueryMatchDefinition? FindBestMatch(
+    public async Task<QueryMatchDefinition?> FindBestMatchAsync(
         string method,
         string path,
         IReadOnlyDictionary<string, StringValues> query,
@@ -93,7 +93,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 Environment.NewLine,
                 requestText);
 
-            var requestEmbedding = GetEmbedding(requestText);
+            var requestEmbedding = await GetEmbeddingAsync(requestText).ConfigureAwait(false);
             QueryMatchDefinition? bestCandidate = null;
             double? bestScore = null;
             double? secondBestScore = null;
@@ -101,7 +101,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             foreach (var candidate in semanticCandidates)
             {
                 var candidateText = candidate.SemanticMatch!;
-                var candidateEmbedding = GetEmbedding(candidateText);
+                var candidateEmbedding = await GetEmbeddingAsync(candidateText).ConfigureAwait(false);
                 var score = CosineSimilarity(requestEmbedding, candidateEmbedding);
 
                 logger.LogDebug(
@@ -190,14 +190,14 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         return true;
     }
 
-    private float[] GetEmbedding(string input)
+    private async Task<float[]> GetEmbeddingAsync(string input)
     {
         var endpoint = NormalizeEndpoint(settings.SemanticMatching.Endpoint!);
-        var response = httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(input)).GetAwaiter().GetResult();
+        var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(input)).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        using var responseStream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
-        using var document = JsonDocument.Parse(responseStream);
+        using var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        using var document = await JsonDocument.ParseAsync(responseStream).ConfigureAwait(false);
 
         if (TryReadEmbedding(document.RootElement, out var embedding))
         {

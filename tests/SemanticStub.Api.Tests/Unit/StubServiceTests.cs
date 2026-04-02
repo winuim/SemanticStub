@@ -1702,7 +1702,7 @@ public sealed class StubServiceTests
     {
         public int CallCount { get; private set; }
 
-        public QueryMatchDefinition? FindBestMatch(
+        public Task<QueryMatchDefinition?> FindBestMatchAsync(
             string method,
             string path,
             IReadOnlyDictionary<string, StringValues> query,
@@ -1715,12 +1715,14 @@ public sealed class StubServiceTests
 
             if (nextMatch is null)
             {
-                return null;
+                return Task.FromResult<QueryMatchDefinition?>(null);
             }
 
-            return candidateFilter is null || candidateFilter(nextMatch)
+            var result = candidateFilter is null || candidateFilter(nextMatch)
                 ? nextMatch
                 : null;
+
+            return Task.FromResult<QueryMatchDefinition?>(result);
         }
     }
 

@@ -130,4 +130,24 @@ public interface IStubService
         IReadOnlyDictionary<string, string> headers,
         string? body,
         out StubResponse? response);
+
+    /// <summary>
+    /// Resolves the most specific stub response asynchronously, enabling semantic fallback matching that makes HTTP calls to an external embedding endpoint without blocking the request thread.
+    /// </summary>
+    /// <param name="method">The HTTP method to evaluate.</param>
+    /// <param name="path">The request path to match.</param>
+    /// <param name="query">The query-string values to evaluate.</param>
+    /// <param name="headers">The request headers to evaluate.</param>
+    /// <param name="body">The request body used for JSON body matching.</param>
+    /// <returns>A tuple of the match result and the assembled response (non-null only when <see cref="StubMatchResult.Matched"/>).</returns>
+    Task<(StubMatchResult Result, StubResponse? Response)> TryGetResponseAsync(
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
+    {
+        var result = TryGetResponse(method, path, query, headers, body, out var response);
+        return Task.FromResult((result, response));
+    }
 }

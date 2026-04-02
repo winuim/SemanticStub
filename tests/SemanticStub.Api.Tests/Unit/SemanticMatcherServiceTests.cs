@@ -15,13 +15,13 @@ namespace SemanticStub.Api.Tests.Unit;
 public sealed class SemanticMatcherServiceTests
 {
     [Fact]
-    public void FindBestMatch_ReturnsNullWhenSemanticMatchingIsDisabled()
+    public async Task FindBestMatchAsync_ReturnsNullWhenSemanticMatchingIsDisabled()
     {
         var service = CreateService(
             new StubSettings(),
             (_, _) => throw new InvalidOperationException("The HTTP client should not be called when semantic matching is disabled."));
 
-        var match = service.FindBestMatch(
+        var match = await service.FindBestMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -33,7 +33,7 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
-    public void FindBestMatch_ReturnsHighestScoringCandidateAboveThreshold()
+    public async Task FindBestMatchAsync_ReturnsHighestScoringCandidateAboveThreshold()
     {
         var service = CreateService(
             new StubSettings
@@ -54,7 +54,7 @@ public sealed class SemanticMatcherServiceTests
         var adminCandidate = CreateCandidate("find admin users");
         var invoiceCandidate = CreateCandidate("show invoices");
 
-        var match = service.FindBestMatch(
+        var match = await service.FindBestMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -66,7 +66,7 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
-    public void FindBestMatch_ReturnsNullWhenEmbeddingCallFails()
+    public async Task FindBestMatchAsync_ReturnsNullWhenEmbeddingCallFails()
     {
         var service = CreateService(
             new StubSettings
@@ -79,7 +79,7 @@ public sealed class SemanticMatcherServiceTests
             },
             (_, _) => throw new HttpRequestException("boom"));
 
-        var match = service.FindBestMatch(
+        var match = await service.FindBestMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -91,7 +91,7 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
-    public void FindBestMatch_ReturnsNullWhenBestScoreIsBelowThreshold()
+    public async Task FindBestMatchAsync_ReturnsNullWhenBestScoreIsBelowThreshold()
     {
         var service = CreateService(
             new StubSettings
@@ -109,7 +109,7 @@ public sealed class SemanticMatcherServiceTests
                 ["find admin users"] = "[0.9,0.1]"
             }));
 
-        var match = service.FindBestMatch(
+        var match = await service.FindBestMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -121,7 +121,7 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
-    public void FindBestMatch_ReturnsNullWhenTopScoreMarginIsTooSmall()
+    public async Task FindBestMatchAsync_ReturnsNullWhenTopScoreMarginIsTooSmall()
     {
         var service = CreateService(
             new StubSettings
@@ -141,7 +141,7 @@ public sealed class SemanticMatcherServiceTests
                 ["find administrator accounts"] = "[0.93,0.07]"
             }));
 
-        var match = service.FindBestMatch(
+        var match = await service.FindBestMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -153,7 +153,7 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
-    public void FindBestMatch_ReturnsBestCandidateWhenTopScoreMarginIsSatisfied()
+    public async Task FindBestMatchAsync_ReturnsBestCandidateWhenTopScoreMarginIsSatisfied()
     {
         var service = CreateService(
             new StubSettings
@@ -176,7 +176,7 @@ public sealed class SemanticMatcherServiceTests
         var adminCandidate = CreateCandidate("find admin users");
         var invoiceCandidate = CreateCandidate("show invoices");
 
-        var match = service.FindBestMatch(
+        var match = await service.FindBestMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
