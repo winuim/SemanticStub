@@ -24,4 +24,9 @@ public sealed class SemanticMatchingSettings
     /// Gets the minimum score gap required between the top two candidates to accept the highest-scoring semantic match.
     /// </summary>
     public double TopScoreMargin { get; init; }
+
+    /// <summary>
+    /// Gets the timeout in seconds applied to each embedding endpoint HTTP request. Defaults to 30 seconds.
+    /// </summary>
+    public int TimeoutSeconds { get; init; } = 30;
 }

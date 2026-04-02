@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using SemanticStub.Api.Infrastructure.Yaml;
 using SemanticStub.Api.Services;
 
@@ -16,7 +17,11 @@ public static class StubServiceCollectionExtensions
     /// <returns>The same service collection for chaining.</returns>
     public static IServiceCollection AddStubServices(this IServiceCollection services)
     {
-        services.AddHttpClient<ISemanticMatcherService, SemanticMatcherService>();
+        services.AddHttpClient<ISemanticMatcherService, SemanticMatcherService>((serviceProvider, client) =>
+        {
+            var settings = serviceProvider.GetRequiredService<IOptions<StubSettings>>().Value;
+            client.Timeout = TimeSpan.FromSeconds(settings.SemanticMatching.TimeoutSeconds);
+        });
         services.AddSingleton<IStubDefinitionLoader, StubDefinitionLoader>();
         services.AddSingleton<StubDefinitionState>();
         services.AddHostedService<StubDefinitionWatcher>();
