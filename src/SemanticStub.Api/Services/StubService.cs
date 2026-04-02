@@ -21,31 +21,6 @@ public sealed class StubService : IStubService
     private readonly ScenarioService scenarioService;
 
     /// <summary>
-    /// Creates a service that loads its stub document immediately from the configured loader and uses the default matcher implementation.
-    /// </summary>
-    /// <param name="loader">Provides the validated stub document and any relative file-backed response payloads.</param>
-    /// <exception cref="DirectoryNotFoundException">Propagated when the loader cannot locate the configured definitions directory.</exception>
-    /// <exception cref="FileNotFoundException">Propagated when the loader cannot find required stub files or response files.</exception>
-    /// <exception cref="InvalidOperationException">Propagated when the loader cannot build a valid stub document.</exception>
-    public StubService(IStubDefinitionLoader loader)
-        : this(loader, CreateDefaultMatcher(), CreateDefaultScenarioService())
-    {
-    }
-
-    /// <summary>
-    /// Creates a service that loads its stub document immediately from the configured loader and uses the supplied matcher implementation for conditional matches.
-    /// </summary>
-    /// <param name="loader">Provides the validated stub document and any relative file-backed response payloads.</param>
-    /// <param name="matcherService">The matcher used to evaluate <c>x-match</c> candidates when a route and method have been resolved.</param>
-    /// <exception cref="DirectoryNotFoundException">Propagated when the loader cannot locate the configured definitions directory.</exception>
-    /// <exception cref="FileNotFoundException">Propagated when the loader cannot find required stub files or response files.</exception>
-    /// <exception cref="InvalidOperationException">Propagated when the loader cannot build a valid stub document.</exception>
-    public StubService(IStubDefinitionLoader loader, IMatcherService matcherService)
-        : this(loader, matcherService, CreateDefaultScenarioService())
-    {
-    }
-
-    /// <summary>
     /// Creates a service that loads its stub document immediately from the configured loader and uses the supplied matcher implementation for conditional matches.
     /// </summary>
     /// <param name="loader">Provides the validated stub document and any relative file-backed response payloads.</param>
@@ -74,9 +49,10 @@ public sealed class StubService : IStubService
     /// Creates a service over an already loaded stub document and disables relative file-backed responses.
     /// </summary>
     /// <param name="document">The validated stub document to evaluate.</param>
+    /// <param name="scenarioService">Stores in-memory scenario transitions for responses that opt into <c>x-scenario</c>.</param>
     /// <remarks>Relative <c>x-response-file</c> responses will fail at runtime because no response-file reader is configured by this overload.</remarks>
-    public StubService(StubDocument document)
-        : this(document, MissingResponseFileReader, CreateDefaultMatcher(), CreateDefaultScenarioService())
+    public StubService(StubDocument document, ScenarioService scenarioService)
+        : this(document, MissingResponseFileReader, new MatcherService(), scenarioService)
     {
     }
 
@@ -85,12 +61,9 @@ public sealed class StubService : IStubService
     /// </summary>
     /// <param name="document">The validated stub document to evaluate.</param>
     /// <param name="responseFileReader">Loads the contents of a relative response file selected by the matching stub.</param>
-    public StubService(StubDocument document, Func<string, string> responseFileReader)
-        : this(document, responseFileReader, CreateDefaultMatcher(), CreateDefaultScenarioService())
-    {
-    }
-
-    internal StubService(StubDocument document, Func<string, string> responseFileReader, IMatcherService matcherService, ScenarioService scenarioService)
+    /// <param name="matcherService">The matcher used to evaluate <c>x-match</c> candidates when a route and method have been resolved.</param>
+    /// <param name="scenarioService">Stores in-memory scenario transitions for responses that opt into <c>x-scenario</c>.</param>
+    public StubService(StubDocument document, Func<string, string> responseFileReader, IMatcherService matcherService, ScenarioService scenarioService)
         : this(() => document, responseFileReader, matcherService, scenarioService)
     {
     }
@@ -107,20 +80,10 @@ public sealed class StubService : IStubService
         this.scenarioService = scenarioService;
     }
 
-    private static IMatcherService CreateDefaultMatcher()
-    {
-        return new MatcherService();
-    }
-
     private static Func<StubDocument> CreateLoadedDocumentAccessor(IStubDefinitionLoader loader)
     {
         var document = loader.LoadDefaultDefinition();
         return () => document;
-    }
-
-    private static ScenarioService CreateDefaultScenarioService()
-    {
-        return new ScenarioService();
     }
 
     /// <summary>
