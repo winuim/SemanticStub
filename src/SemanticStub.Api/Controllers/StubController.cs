@@ -70,7 +70,7 @@ public sealed class StubController : ControllerBase
         var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
         Request.EnableBuffering();
         var requestBody = await ReadRequestBodyAsync();
-        var matchResult = stubService.TryGetResponse(method, requestPath, query, headers, requestBody, out var response);
+        var (matchResult, response) = await stubService.TryGetResponseAsync(method, requestPath, query, headers, requestBody);
 
         if (matchResult == StubMatchResult.PathNotFound)
         {

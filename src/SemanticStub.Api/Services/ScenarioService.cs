@@ -10,7 +10,7 @@ public sealed class ScenarioService
 {
     private const string InitialState = "initial";
     private readonly ConcurrentDictionary<string, string> currentStates = new(StringComparer.Ordinal);
-    private readonly object syncRoot = new();
+    private readonly SemaphoreSlim semaphore = new(1, 1);
 
     /// <summary>
     /// Returns whether the supplied scenario definition is eligible for the current in-memory state.
@@ -60,9 +60,31 @@ public sealed class ScenarioService
     /// <param name="action">The scenario-aware operation to run atomically.</param>
     public T ExecuteLocked<T>(Func<T> action)
     {
-        lock (syncRoot)
+        semaphore.Wait();
+        try
         {
             return action();
+        }
+        finally
+        {
+            semaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// Executes scenario-sensitive selection and transition logic under one asynchronous lock so state checks and advances stay atomic across concurrent async requests.
+    /// </summary>
+    /// <param name="action">The scenario-aware async operation to run atomically.</param>
+    public async Task<T> ExecuteLockedAsync<T>(Func<Task<T>> action)
+    {
+        await semaphore.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            return await action().ConfigureAwait(false);
+        }
+        finally
+        {
+            semaphore.Release();
         }
     }
 }

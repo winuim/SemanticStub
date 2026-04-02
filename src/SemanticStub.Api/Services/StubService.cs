@@ -248,24 +248,33 @@ public sealed class StubService : IStubService
         string? body,
         out StubResponse? response)
     {
-        response = null;
+        var (matchResult, r) = TryGetResponseAsync(method, path, query, headers, body).GetAwaiter().GetResult();
+        response = r;
+        return matchResult;
+    }
+
+    /// <inheritdoc/>
+    public async Task<(StubMatchResult Result, StubResponse? Response)> TryGetResponseAsync(
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
+    {
         var document = documentAccessor();
 
         if (!TryResolveOperation(document, method, path, out var pathItem, out var operation, out var failedMatchResult))
         {
-            return failedMatchResult;
+            return (failedMatchResult, null);
         }
 
         if (OperationUsesScenario(operation))
         {
-            var evaluation = scenarioService.ExecuteLocked(() => TryGetResponseCore(method, path, pathItem, operation, query, headers, body));
-            response = evaluation.Response;
-            return evaluation.MatchResult;
+            return await scenarioService.ExecuteLockedAsync(
+                () => TryGetResponseCoreAsync(method, path, pathItem, operation, query, headers, body)).ConfigureAwait(false);
         }
 
-        var result = TryGetResponseCore(method, path, pathItem, operation, query, headers, body);
-        response = result.Response;
-        return result.MatchResult;
+        return await TryGetResponseCoreAsync(method, path, pathItem, operation, query, headers, body).ConfigureAwait(false);
     }
 
     private static bool OperationUsesScenario(OperationDefinition operation)
@@ -274,7 +283,7 @@ public sealed class StubService : IStubService
                operation.Responses.Values.Any(response => response.Scenario is not null);
     }
 
-    private (StubMatchResult MatchResult, StubResponse? Response) TryGetResponseCore(
+    private async Task<(StubMatchResult MatchResult, StubResponse? Response)> TryGetResponseCoreAsync(
         string method,
         string path,
         PathItemDefinition pathItem,
@@ -283,7 +292,7 @@ public sealed class StubService : IStubService
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
-        var conditionalResult = TryBuildMatchedConditionalResponse(method, path, pathItem, operation, query, headers, body, out var response);
+        var (conditionalResult, response) = await TryBuildMatchedConditionalResponseAsync(method, path, pathItem, operation, query, headers, body).ConfigureAwait(false);
 
         if (conditionalResult.HasValue)
         {
@@ -493,31 +502,28 @@ public sealed class StubService : IStubService
         return true;
     }
 
-    private StubMatchResult? TryBuildMatchedConditionalResponse(
+    private async Task<(StubMatchResult? Result, StubResponse Response)> TryBuildMatchedConditionalResponseAsync(
         string method,
         string path,
         PathItemDefinition pathItem,
         OperationDefinition operation,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
-        string? body,
-        out StubResponse response)
+        string? body)
     {
-        response = null!;
-
-        var queryMatchResult = TryBuildMatchedQueryResponse(method, path, pathItem, operation, query, headers, body, out response);
+        var queryMatchResult = TryBuildMatchedQueryResponse(method, path, pathItem, operation, query, headers, body, out var response);
 
         if (queryMatchResult == QueryMatchEvaluationResult.Matched)
         {
-            return StubMatchResult.Matched;
+            return (StubMatchResult.Matched, response);
         }
 
         if (queryMatchResult == QueryMatchEvaluationResult.MatchedButInvalidResponse)
         {
-            return StubMatchResult.ResponseNotConfigured;
+            return (StubMatchResult.ResponseNotConfigured, null!);
         }
 
-        var semanticMatchResult = TryBuildSemanticMatchedResponse(method, path, operation, query, headers, body, out response);
+        var (semanticMatchResult, semanticResponse) = await TryBuildSemanticMatchedResponseAsync(method, path, operation, query, headers, body).ConfigureAwait(false);
 
         if (semanticMatchResult == QueryMatchEvaluationResult.Matched)
         {
@@ -525,36 +531,33 @@ public sealed class StubService : IStubService
                 "Semantic fallback produced a match for '{Path}' {Method}.",
                 path,
                 method.ToUpperInvariant());
-            return StubMatchResult.Matched;
+            return (StubMatchResult.Matched, semanticResponse);
         }
 
         if (semanticMatchResult == QueryMatchEvaluationResult.MatchedButInvalidResponse)
         {
-            return StubMatchResult.ResponseNotConfigured;
+            return (StubMatchResult.ResponseNotConfigured, null!);
         }
 
-        return null;
+        return (null, null!);
     }
 
-    private QueryMatchEvaluationResult TryBuildSemanticMatchedResponse(
+    private async Task<(QueryMatchEvaluationResult Result, StubResponse Response)> TryBuildSemanticMatchedResponseAsync(
         string method,
         string path,
         OperationDefinition operation,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
-        string? body,
-        out StubResponse response)
+        string? body)
     {
-        response = null!;
-
         if (semanticMatcherService is null)
         {
-            return QueryMatchEvaluationResult.NoMatch;
+            return (QueryMatchEvaluationResult.NoMatch, null!);
         }
 
         if (operation.Matches.Count == 0)
         {
-            return QueryMatchEvaluationResult.NoMatch;
+            return (QueryMatchEvaluationResult.NoMatch, null!);
         }
 
         logger?.LogInformation(
@@ -562,14 +565,14 @@ public sealed class StubService : IStubService
             path,
             method.ToUpperInvariant());
 
-        var matchedCandidate = semanticMatcherService.FindBestMatch(
+        var matchedCandidate = await semanticMatcherService.FindBestMatchAsync(
             method,
             path,
             query,
             headers,
             body,
             operation.Matches,
-            candidate => scenarioService.IsMatch(candidate.Response.Scenario));
+            candidate => scenarioService.IsMatch(candidate.Response.Scenario)).ConfigureAwait(false);
 
         if (matchedCandidate is null)
         {
@@ -577,17 +580,17 @@ public sealed class StubService : IStubService
                 "Semantic fallback did not produce a match for '{Path}' {Method}.",
                 path,
                 method.ToUpperInvariant());
-            return QueryMatchEvaluationResult.NoMatch;
+            return (QueryMatchEvaluationResult.NoMatch, null!);
         }
 
-        if (!TryBuildStubResponse(matchedCandidate.Response, out response))
+        if (!TryBuildStubResponse(matchedCandidate.Response, out var response))
         {
-            return QueryMatchEvaluationResult.MatchedButInvalidResponse;
+            return (QueryMatchEvaluationResult.MatchedButInvalidResponse, null!);
         }
 
         scenarioService.Advance(matchedCandidate.Response.Scenario);
 
-        return QueryMatchEvaluationResult.Matched;
+        return (QueryMatchEvaluationResult.Matched, response);
     }
 
     private bool TryBuildDefaultOperationResponse(OperationDefinition operation, out StubResponse response)
