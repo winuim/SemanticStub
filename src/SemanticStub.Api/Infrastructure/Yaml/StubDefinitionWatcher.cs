@@ -3,7 +3,7 @@ namespace SemanticStub.Api.Infrastructure.Yaml;
 internal sealed class StubDefinitionWatcher : IHostedService, IDisposable
 {
     private static readonly TimeSpan ReloadDebounceDelay = TimeSpan.FromMilliseconds(250);
-    private readonly StubDefinitionLoader loader;
+    private readonly IStubDefinitionLoader loader;
     private readonly StubDefinitionState state;
     private readonly ILogger<StubDefinitionWatcher> logger;
     private readonly object syncRoot = new();
@@ -12,7 +12,7 @@ internal sealed class StubDefinitionWatcher : IHostedService, IDisposable
     private string? pendingPath;
 
     public StubDefinitionWatcher(
-        StubDefinitionLoader loader,
+        IStubDefinitionLoader loader,
         StubDefinitionState state,
         ILogger<StubDefinitionWatcher> logger)
     {
