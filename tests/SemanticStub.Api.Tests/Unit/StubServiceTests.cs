@@ -47,7 +47,7 @@ public sealed class StubServiceTests
             }
         };
 
-        IStubService service = new StubService(document);
+        IStubService service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -88,7 +88,7 @@ public sealed class StubServiceTests
         };
 
         var loader = new TestStubDefinitionLoader(document);
-        var service = new StubService(loader, new MatcherService());
+        var service = new StubService(loader, new MatcherService(), new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -128,7 +128,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -170,7 +170,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -219,7 +219,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
         var query = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["role"] = "admin"
@@ -263,7 +263,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -311,7 +311,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
         var query = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["role"] = "admin"
@@ -379,7 +379,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
         var query = new Dictionary<string, StringValues>(StringComparer.Ordinal)
         {
             ["tag"] = new StringValues(["alpha", "beta"])
@@ -418,7 +418,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document, _ => "{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}");
+        var service = new StubService(document, _ => "{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}", new MatcherService(), new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/users", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -459,7 +459,7 @@ public sealed class StubServiceTests
                 }
             };
 
-            var service = new StubService(document, _ => throw new InvalidOperationException("Response file reader should not be used for absolute paths."));
+            var service = new StubService(document, _ => throw new InvalidOperationException("Response file reader should not be used for absolute paths."), new MatcherService(), new ScenarioService());
 
             var matched = service.TryGetResponse(HttpMethods.Get, "/download", out var response);
             var matchedResponse = AssertMatchedResponse(matched, response);
@@ -520,7 +520,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -568,7 +568,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -618,7 +618,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -668,7 +668,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -723,7 +723,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
         var query = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["role"] = "admin"
@@ -767,7 +767,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Put, "/profile", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -807,7 +807,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Delete, "/profile", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -877,7 +877,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
         var query = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["role"] = "admin",
@@ -946,7 +946,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
         var query = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["role"] = "guest"
@@ -1014,7 +1014,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
         var query = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["role"] = "admin"
@@ -1054,7 +1054,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -1090,7 +1090,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document, _ => "<root><item>1</item></root>");
+        var service = new StubService(document, _ => "<root><item>1</item></root>", new MatcherService(), new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/data", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -1136,7 +1136,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
         var query = new Dictionary<string, string>(StringComparer.Ordinal) { ["format"] = "csv" };
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/report", query, out var response);
@@ -1196,7 +1196,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
         var query = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["role"] = "guest"
@@ -1264,7 +1264,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(
             HttpMethods.Post,
@@ -1339,7 +1339,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(
             HttpMethods.Post,
@@ -1408,7 +1408,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(
             HttpMethods.Post,
@@ -1477,7 +1477,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(
             HttpMethods.Get,
@@ -1526,7 +1526,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/orders/123", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -1588,7 +1588,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/orders/special", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -1628,7 +1628,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var matched = service.TryGetResponse(HttpMethods.Post, "/orders/123", out _);
 
@@ -1651,7 +1651,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var allowedMethods = service.GetAllowedMethods("/users");
 
@@ -1673,7 +1673,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var allowedMethods = service.GetAllowedMethods("/orders/123");
 
@@ -1682,6 +1682,11 @@ public sealed class StubServiceTests
 
     private sealed class TestStubDefinitionLoader(StubDocument document) : IStubDefinitionLoader
     {
+        public string GetDefinitionsDirectoryPath()
+        {
+            throw new InvalidOperationException("Definitions directory path is not available in this test loader.");
+        }
+
         public StubDocument LoadDefaultDefinition()
         {
             return document;
@@ -1749,7 +1754,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
 
         var firstMatch = service.TryGetResponse(HttpMethods.Post, "/checkout", out var firstResponse);
         var firstMatchedResponse = AssertMatchedResponse(firstMatch, firstResponse);
@@ -1834,7 +1839,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var service = new StubService(document);
+        var service = new StubService(document, new ScenarioService());
         var query = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["step"] = "1"
