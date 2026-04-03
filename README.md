@@ -137,6 +137,7 @@ Each `x-match` entry may contain:
 - `x-query-partial`: partial query-string matches.
 - `headers`: exact header matches.
 - `body`: exact body match data.
+- `x-semantic-match`: natural-language description used for semantic fallback matching.
 - `response`: the response returned when the match succeeds.
 
 Notes:
@@ -158,10 +159,76 @@ Notes:
   partial for objects, so a request may contain additional properties and still
   match.
 - Invalid JSON request bodies do not satisfy `body` match conditions.
+- `x-semantic-match` entries are evaluated only after all deterministic
+  conditions fail. They require semantic matching to be enabled in application
+  configuration. An entry with `x-semantic-match` must not be combined with
+  `query`, `x-query-regex`, `x-query-partial`, `headers`, or `body`.
 - When no `x-match` entry succeeds, SemanticStub falls back to the standard
   `responses` section.
 - When multiple `x-match` entries succeed, SemanticStub chooses the most
   specific candidate so narrower conditions win over broader ones.
+
+### Semantic matching
+
+When all deterministic `x-match` candidates fail, SemanticStub can fall back to
+semantic matching. Each `x-match` entry that contains only `x-semantic-match` is
+scored against the incoming request using vector embeddings from a
+[Text Embeddings Inference](https://huggingface.co/docs/text-embeddings-inference/en/index)
+endpoint. The candidate with the highest cosine similarity above the configured
+threshold is selected.
+
+Example:
+
+```yaml
+paths:
+  /search:
+    post:
+      x-match:
+        - x-semantic-match: find administrator user accounts in the identity directory by email address
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  result: admin-user
+        - x-semantic-match: show unpaid billing invoices due this month
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  result: due-invoices
+      responses:
+        "404":
+          description: No match found
+```
+
+Configure semantic matching in `appsettings.json`:
+
+```json
+"SemanticMatching": {
+  "Enabled": true,
+  "Endpoint": "http://localhost:8081",
+  "Threshold": 0.8,
+  "TopScoreMargin": 0,
+  "TimeoutSeconds": 30
+}
+```
+
+| Setting | Description | Default |
+| --- | --- | --- |
+| `Enabled` | Enables semantic matching fallback. | `false` |
+| `Endpoint` | Base URL of the TEI endpoint. | `""` |
+| `Threshold` | Minimum cosine similarity to accept a match (-1.0–1.0). | `0.8` |
+| `TopScoreMargin` | Minimum score gap between the top two candidates; `0` disables the ambiguity check. | `0` |
+| `TimeoutSeconds` | HTTP request timeout for the embedding endpoint. | `30` |
+
+Semantic matching notes:
+
+- The full incoming request (method, path, query parameters, headers, and body)
+  is used as the query text for embedding.
+- When the embedding service is unavailable or times out, semantic matching is
+  skipped and the request falls through to the standard `responses` section.
 
 ### Matching precedence
 
@@ -171,29 +238,16 @@ Request handling follows these precedence rules:
 2. Matching HTTP method on the selected path.
 3. Matching `x-match` candidate on the operation, preferring more specific
    exact query conditions before broader candidates.
-4. Fallback to the standard OpenAPI `responses` section when no `x-match`
-   candidate succeeds.
+4. Semantic matching fallback when no deterministic `x-match` candidate
+   succeeds and semantic matching is enabled.
+5. Fallback to the standard OpenAPI `responses` section.
 
 This keeps routing deterministic for the current feature set.
 
 ### Current limitations
 
-- Semantic matching appears only in sample files today; it is not part of the
-  current runtime behavior.
 - `body` matching is intended for structured JSON request payloads rather than
   arbitrary binary request bodies.
-
-### Sample-only extensions
-
-The repository also includes examples that use the following extension names:
-
-| Extension | Sample | Intent |
-| --- | --- | --- |
-| `x-semantic-match` | `samples/semantic-search.stub.yaml` | Describes semantic matching behavior for request content. |
-
-These samples document the intended OpenAPI-compatible extension style for
-higher-level features. See the sample files for the exact YAML shape used in
-this repository.
 
 ## Development
 - Source: `src/`
