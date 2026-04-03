@@ -99,3 +99,65 @@ Accept: application/json
 ### Unknown route returns 404
 GET {{host}}/missing
 Accept: application/json
+
+### Semantic search examples
+### These requests assume `samples/semantic-search.stub.yaml` is the active stub definition.
+
+### Semantic search matches the admin-user candidate
+POST {{host}}/semantic-search
+Content-Type: application/json
+Accept: application/json
+
+{
+  "query": "look up an administrator account in the identity directory by email address"
+}
+
+### Semantic search matches the due-invoices candidate
+POST {{host}}/semantic-search?scope=invoice&status=due
+Content-Type: application/json
+X-Team: finance
+Accept: application/json
+
+{
+  "request": "show unpaid billing invoices due this month for finance"
+}
+
+### Semantic search falls back to the default 404 response
+POST {{host}}/semantic-search
+Content-Type: application/json
+Accept: application/json
+
+{
+  "query": "find nearby coffee shops"
+}
+
+### Semantic search matches using a plain text body
+POST {{host}}/semantic-search/plain-text
+Content-Type: text/plain
+Accept: application/json
+
+find admin user by email
+
+### Semantic search matches using query-string context
+GET {{host}}/semantic-search/by-query?scope=invoice&status=due&month=this-month&team=finance&collection=accounts-receivable
+Accept: application/json
+
+### Semantic search matches using header context
+POST {{host}}/semantic-search/by-header
+Content-Type: application/json
+X-Team: finance
+X-Intent: unpaid-invoices
+Accept: application/json
+
+{
+  "request": "show accounts receivable items due this month"
+}
+
+### Semantic search matches using path context
+POST {{host}}/semantic-search/admin-users
+Content-Type: application/json
+Accept: application/json
+
+{
+  "text": "find an administrator user account by email"
+}

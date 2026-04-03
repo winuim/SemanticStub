@@ -1,0 +1,109 @@
+openapi: 3.1.0
+info:
+  title: Semantic Search Example
+  version: 1.0.0
+
+paths:
+  /semantic-search:
+    post:
+      operationId: semanticSearch
+      x-match:
+        - x-semantic-match: find administrator user accounts in the identity directory by email address or account email lookup
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  result: admin-user
+                  source: semantic
+        - x-semantic-match: show unpaid billing invoices due this month for finance and accounts receivable
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  result: due-invoices
+                  source: semantic
+      responses:
+        "404":
+          description: No deterministic or semantic match
+          content:
+            application/json:
+              example:
+                message: no match
+  /semantic-search/plain-text:
+    post:
+      operationId: semanticSearchPlainText
+      x-match:
+        - x-semantic-match: find administrator user accounts in the identity directory by email address or account email lookup
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  result: admin-user
+                  source: semantic-plain-text
+      responses:
+        "404":
+          description: No deterministic or semantic match
+          content:
+            application/json:
+              example:
+                message: no match
+  /semantic-search/by-query:
+    get:
+      operationId: semanticSearchByQueryString
+      x-match:
+        - x-semantic-match: query string scope invoice status due month this-month for unpaid billing invoices and accounts receivable
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  result: due-invoices
+                  source: semantic-query-string
+      responses:
+        "404":
+          description: No deterministic or semantic match
+          content:
+            application/json:
+              example:
+                message: no match
+  /semantic-search/by-header:
+    post:
+      operationId: semanticSearchByHeader
+      x-match:
+        - x-semantic-match: show unpaid billing invoices due this month for finance and accounts receivable
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  result: due-invoices
+                  source: semantic-header
+      responses:
+        "404":
+          description: No deterministic or semantic match
+          content:
+            application/json:
+              example:
+                message: no match
+  /semantic-search/admin-users:
+    post:
+      operationId: semanticSearchByPath
+      x-match:
+        - x-semantic-match: find administrator user accounts in the identity directory by email address or account email lookup
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  result: admin-user
+                  source: semantic-path
+      responses:
+        "404":
+          description: No deterministic or semantic match
+          content:
+            application/json:
+              example:
+                message: no match

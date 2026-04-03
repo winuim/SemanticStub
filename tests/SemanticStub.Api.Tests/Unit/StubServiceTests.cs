@@ -1698,6 +1698,216 @@ public sealed class StubServiceTests
         }
     }
 
+    private sealed class SpySemanticMatcherService(QueryMatchDefinition? nextMatch = null) : ISemanticMatcherService
+    {
+        public int CallCount { get; private set; }
+
+        public Task<QueryMatchDefinition?> FindBestMatchAsync(
+            string method,
+            string path,
+            IReadOnlyDictionary<string, StringValues> query,
+            IReadOnlyDictionary<string, string> headers,
+            string? body,
+            IReadOnlyCollection<QueryMatchDefinition> candidates,
+            Func<QueryMatchDefinition, bool>? candidateFilter = null)
+        {
+            CallCount++;
+
+            if (nextMatch is null)
+            {
+                return Task.FromResult<QueryMatchDefinition?>(null);
+            }
+
+            var result = candidateFilter is null || candidateFilter(nextMatch)
+                ? nextMatch
+                : null;
+
+            return Task.FromResult<QueryMatchDefinition?>(result);
+        }
+    }
+
+    [Fact]
+    public void TryGetResponse_UsesSemanticFallbackWhenDeterministicMatchFails()
+    {
+        var semanticCandidate = new QueryMatchDefinition
+        {
+            Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin"
+            },
+            SemanticMatch = "find admin users",
+            Response = new QueryMatchResponseDefinition
+            {
+                StatusCode = 202,
+                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                {
+                    ["application/json"] = new()
+                    {
+                        Example = new Dictionary<object, object>
+                        {
+                            ["message"] = "semantic-admin"
+                        }
+                    }
+                }
+            }
+        };
+
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Matches = [semanticCandidate]
+                    }
+                }
+            }
+        };
+
+        var semanticMatcher = new SpySemanticMatcherService(semanticCandidate);
+        var service = new StubService(
+            document,
+            _ => throw new InvalidOperationException("No response file loading expected."),
+            new MatcherService(),
+            new ScenarioService(),
+            semanticMatcher);
+        var query = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["role"] = "guest"
+        };
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
+
+        Assert.Equal(1, semanticMatcher.CallCount);
+        Assert.Equal(202, matchedResponse.StatusCode);
+        Assert.Equal("{\"message\":\"semantic-admin\"}", matchedResponse.Body);
+    }
+
+    [Fact]
+    public void TryGetResponse_DoesNotUseSemanticFallbackWhenDeterministicMatchSucceeds()
+    {
+        var semanticCandidate = new QueryMatchDefinition
+        {
+            Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin"
+            },
+            SemanticMatch = "find admin users",
+            Response = new QueryMatchResponseDefinition
+            {
+                StatusCode = 200,
+                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                {
+                    ["application/json"] = new()
+                    {
+                        Example = new Dictionary<object, object>
+                        {
+                            ["message"] = "admin"
+                        }
+                    }
+                }
+            }
+        };
+
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Matches = [semanticCandidate]
+                    }
+                }
+            }
+        };
+
+        var semanticMatcher = new SpySemanticMatcherService(semanticCandidate);
+        var service = new StubService(
+            document,
+            _ => throw new InvalidOperationException("No response file loading expected."),
+            new MatcherService(),
+            new ScenarioService(),
+            semanticMatcher);
+        var query = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["role"] = "admin"
+        };
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
+
+        Assert.Equal(0, semanticMatcher.CallCount);
+        Assert.Equal(200, matchedResponse.StatusCode);
+        Assert.Equal("{\"message\":\"admin\"}", matchedResponse.Body);
+    }
+
+    [Fact]
+    public void TryGetResponse_DoesNotTreatSemanticOnlyCandidateAsDeterministicMatch()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                SemanticMatch = "find admin users",
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 202,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new()
+                                        {
+                                            Example = new Dictionary<object, object>
+                                            {
+                                                ["message"] = "semantic-admin"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["404"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["message"] = "default"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document, new ScenarioService());
+
+        var matched = service.TryGetResponse(HttpMethods.Get, "/users", out var response);
+        var matchedResponse = AssertMatchedResponse(matched, response);
+
+        Assert.Equal(404, matchedResponse.StatusCode);
+        Assert.Equal("{\"message\":\"default\"}", matchedResponse.Body);
+    }
+
     [Fact]
     public void TryGetResponse_AdvancesScenarioStateAcrossRequests()
     {
