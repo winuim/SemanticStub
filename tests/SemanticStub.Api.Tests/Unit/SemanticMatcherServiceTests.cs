@@ -227,21 +227,27 @@ public sealed class SemanticMatcherServiceTests
         {
             var body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
             using var document = JsonDocument.Parse(body);
-            var input = document.RootElement.GetProperty("inputs").GetString()
-                ?? throw new InvalidOperationException("The embedding request must contain an inputs value.");
+            var inputs = document.RootElement.GetProperty("inputs")
+                .EnumerateArray()
+                .Select(e => e.GetString()!)
+                .ToArray();
 
-            foreach (var pair in embeddingsByInput)
+            var results = new List<string>();
+
+            foreach (var input in inputs)
             {
-                if (string.Equals(input, pair.Key, StringComparison.Ordinal))
+                if (!embeddingsByInput.TryGetValue(input, out var embedding))
                 {
-                    return new HttpResponseMessage(HttpStatusCode.OK)
-                    {
-                        Content = new StringContent(pair.Value, Encoding.UTF8, "application/json")
-                    };
+                    return new HttpResponseMessage(HttpStatusCode.NotFound);
                 }
+
+                results.Add(embedding);
             }
 
-            return new HttpResponseMessage(HttpStatusCode.NotFound);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent($"[{string.Join(",", results)}]", Encoding.UTF8, "application/json")
+            };
         };
     }
 

@@ -86,15 +86,22 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 semanticSettings.Threshold,
                 semanticSettings.TopScoreMargin,
                 semanticCandidates.Length);
-            var requestEmbedding = await GetEmbeddingAsync(requestText).ConfigureAwait(false);
+
+            var allTexts = new List<string>(semanticCandidates.Length + 1) { requestText };
+            allTexts.AddRange(semanticCandidates.Select(c => c.SemanticMatch!));
+
+            var allEmbeddings = await GetEmbeddingsAsync(allTexts).ConfigureAwait(false);
+            var requestEmbedding = allEmbeddings[0];
+
             QueryMatchDefinition? bestCandidate = null;
             double? bestScore = null;
             double? secondBestScore = null;
 
-            foreach (var candidate in semanticCandidates)
+            for (var i = 0; i < semanticCandidates.Length; i++)
             {
+                var candidate = semanticCandidates[i];
                 var candidateText = candidate.SemanticMatch!;
-                var candidateEmbedding = await GetEmbeddingAsync(candidateText).ConfigureAwait(false);
+                var candidateEmbedding = allEmbeddings[i + 1];
                 var score = CosineSimilarity(requestEmbedding, candidateEmbedding);
 
                 logger.LogDebug(
@@ -201,18 +208,18 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         return true;
     }
 
-    private async Task<float[]> GetEmbeddingAsync(string input)
+    private async Task<IReadOnlyList<float[]>> GetEmbeddingsAsync(IReadOnlyList<string> inputs)
     {
         var endpoint = NormalizeEndpoint(settings.SemanticMatching.Endpoint!);
-        var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(input)).ConfigureAwait(false);
+        var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs)).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         using var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
         using var document = await JsonDocument.ParseAsync(responseStream).ConfigureAwait(false);
 
-        if (TryReadEmbedding(document.RootElement, out var embedding))
+        if (TryReadEmbeddings(document.RootElement, inputs.Count, out var embeddings))
         {
-            return embedding;
+            return embeddings;
         }
 
         throw new InvalidOperationException("The embedding endpoint returned an unexpected response shape.");
@@ -226,41 +233,38 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             : normalized + "/embed";
     }
 
-    private static bool TryReadEmbedding(JsonElement element, out float[] embedding)
+    private static bool TryReadEmbeddings(JsonElement root, int expectedCount, out IReadOnlyList<float[]> embeddings)
     {
-        embedding = [];
+        embeddings = [];
 
-        if (element.ValueKind != JsonValueKind.Array)
+        if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() != expectedCount)
         {
             return false;
         }
 
-        if (element.GetArrayLength() == 0)
-        {
-            return false;
-        }
+        var result = new float[expectedCount][];
 
-        var firstElement = element[0];
-
-        if (firstElement.ValueKind == JsonValueKind.Number)
+        for (var i = 0; i < expectedCount; i++)
         {
-            embedding = element
-                .EnumerateArray()
-                .Select(value => value.GetSingle())
+            var element = root[i];
+
+            if (element.ValueKind != JsonValueKind.Array)
+            {
+                return false;
+            }
+
+            result[i] = element.EnumerateArray()
+                .Select(v => v.GetSingle())
                 .ToArray();
-            return embedding.Length > 0;
+
+            if (result[i].Length == 0)
+            {
+                return false;
+            }
         }
 
-        if (firstElement.ValueKind == JsonValueKind.Array)
-        {
-            embedding = firstElement
-                .EnumerateArray()
-                .Select(value => value.GetSingle())
-                .ToArray();
-            return embedding.Length > 0;
-        }
-
-        return false;
+        embeddings = result;
+        return true;
     }
 
     private static string BuildRequestText(
@@ -338,5 +342,5 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         return dot / (Math.Sqrt(leftMagnitude) * Math.Sqrt(rightMagnitude));
     }
 
-    private sealed record EmbedRequest(string Inputs);
+    private sealed record EmbedRequest(IReadOnlyList<string> Inputs);
 }
