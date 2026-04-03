@@ -120,6 +120,13 @@ internal sealed class StubDefinitionValidator
         {
             var match = operation.Matches[index];
 
+            ValidateSemanticMatchDefinition(
+                path,
+                method,
+                index,
+                match.SemanticMatch,
+                errors);
+
             foreach (var queryKey in match.Query.Keys)
             {
                 if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
@@ -197,6 +204,24 @@ internal sealed class StubDefinitionValidator
                 $"x-match[{index}].response.x-scenario",
                 match.Response.Scenario,
                 errors);
+        }
+    }
+
+    private static void ValidateSemanticMatchDefinition(
+        string path,
+        string method,
+        int index,
+        string? semanticMatch,
+        ICollection<string> errors)
+    {
+        if (semanticMatch is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(semanticMatch))
+        {
+            errors.Add($"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-semantic-match must not be empty.");
         }
     }
 
