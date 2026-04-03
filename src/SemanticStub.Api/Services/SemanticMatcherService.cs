@@ -152,11 +152,29 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
             return bestCandidate;
         }
-        catch (Exception ex)
+        catch (HttpRequestException ex)
         {
             logger.LogWarning(
                 ex,
-                "Semantic matching failed for '{Path}' {Method}. Treating the request as a non-match.",
+                "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request failed. Treating the request as a non-match.",
+                path,
+                normalizedMethod);
+            return null;
+        }
+        catch (TaskCanceledException ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request timed out. Treating the request as a non-match.",
+                path,
+                normalizedMethod);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex,
+                "Semantic matching encountered an unexpected error for '{Path}' {Method}. Treating the request as a non-match.",
                 path,
                 normalizedMethod);
             return null;
