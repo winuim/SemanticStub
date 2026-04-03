@@ -17,11 +17,16 @@ public sealed class SemanticMatchingSettings
 
     /// <summary>
     /// Gets the minimum cosine similarity required to accept a semantic match.
+    /// Values range from -1.0 (opposite) to 1.0 (identical). The default of 0.8
+    /// targets high-confidence matches while still allowing moderate paraphrasing.
     /// </summary>
     public double Threshold { get; init; } = 0.8d;
 
     /// <summary>
-    /// Gets the minimum score gap required between the top two candidates to accept the highest-scoring semantic match.
+    /// Gets the minimum score gap required between the top two candidates to accept
+    /// the highest-scoring semantic match. When two candidates score within this
+    /// margin of each other the match is treated as ambiguous and no candidate is
+    /// selected. Defaults to 0, which disables the ambiguity check entirely.
     /// </summary>
     public double TopScoreMargin { get; init; }
 
