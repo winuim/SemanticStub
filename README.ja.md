@@ -126,6 +126,7 @@ paths:
 - `x-query-partial`: 部分一致の query string 条件
 - `headers`: 完全一致の header 条件
 - `body`: リクエストボディ条件
+- `x-semantic-match`: セマンティックフォールバックマッチングに使う自然言語の説明
 - `response`: 条件に一致したときに返すレスポンス
 
 補足:
@@ -139,8 +140,64 @@ paths:
 - `x-query-partial` は部分文字列一致を行います。複数候補が成功した場合は、完全一致の `query` が regex や partial より優先されます。
 - `body` マッチは現在 JSON リクエストボディに対して適用されます。object に対する body マッチは部分一致なので、追加プロパティを含んでいても一致できます。
 - 不正な JSON リクエストボディは `body` 条件に一致しません。
+- `x-semantic-match` エントリは、すべての決定的な条件が失敗したときのみ評価されます。アプリケーション設定でセマンティックマッチングを有効化する必要があります。`x-semantic-match` を含むエントリに `query`、`x-query-regex`、`x-query-partial`、`headers`、`body` を同時に指定することはできません。
 - どの `x-match` も成功しない場合、SemanticStub は標準の `responses` セクションへフォールバックします。
 - 複数の `x-match` が成功した場合、SemanticStub はより具体的な候補を選び、狭い条件が広い条件より優先されます。
+
+### セマンティックマッチング
+
+決定的な `x-match` 候補がすべて失敗した場合、SemanticStub はセマンティックマッチングにフォールバックできます。`x-semantic-match` のみを含む `x-match` エントリは、[Text Embeddings Inference](https://huggingface.co/docs/text-embeddings-inference/en/index) エンドポイントのベクトル埋め込みを使い、受信リクエストとのコサイン類似度でスコアリングされます。設定されたしきい値を超えた最高スコアの候補が選択されます。
+
+例:
+
+```yaml
+paths:
+  /search:
+    post:
+      x-match:
+        - x-semantic-match: find administrator user accounts in the identity directory by email address
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  result: admin-user
+        - x-semantic-match: show unpaid billing invoices due this month
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  result: due-invoices
+      responses:
+        "404":
+          description: No match found
+```
+
+`appsettings.json` でセマンティックマッチングを設定します:
+
+```json
+"SemanticMatching": {
+  "Enabled": true,
+  "Endpoint": "http://localhost:8081",
+  "Threshold": 0.8,
+  "TopScoreMargin": 0,
+  "TimeoutSeconds": 30
+}
+```
+
+| 設定 | 説明 | デフォルト |
+| --- | --- | --- |
+| `Enabled` | セマンティックマッチングフォールバックを有効化します。 | `false` |
+| `Endpoint` | TEI エンドポイントのベース URL。 | `""` |
+| `Threshold` | マッチを受け入れる最小コサイン類似度 (-1.0〜1.0)。 | `0.8` |
+| `TopScoreMargin` | 上位2候補間の最小スコア差。`0` で曖昧性チェックを無効化します。 | `0` |
+| `TimeoutSeconds` | 埋め込みエンドポイントへの HTTP リクエストタイムアウト（秒）。 | `30` |
+
+セマンティックマッチングに関する補足:
+
+- リクエスト全体（メソッド、パス、クエリパラメータ、ヘッダー、ボディ）が埋め込みのクエリテキストとして使われます。
+- 埋め込みサービスが利用できない場合やタイムアウトした場合、セマンティックマッチングはスキップされ、リクエストは標準の `responses` セクションへフォールバックします。
 
 ### マッチング優先順位
 
@@ -148,25 +205,15 @@ paths:
 
 1. template path より exact path を優先
 2. 選ばれた path 上での HTTP method 一致
-3. operation 上の `x-match` 候補一致
-4. どの `x-match` も成功しない場合は標準 OpenAPI の `responses` にフォールバック
+3. operation 上の `x-match` 候補一致（より具体的な完全一致条件が広い条件より優先）
+4. 決定的な `x-match` 候補がすべて失敗し、セマンティックマッチングが有効な場合はセマンティックマッチングフォールバック
+5. どの `x-match` も成功しない場合は標準 OpenAPI の `responses` にフォールバック
 
 これにより、現在の機能セットでは決定的なルーティングを維持します。
 
 ### 現在の制限
 
-- semantic matching は現時点では sample ファイル上の表現のみで、runtime behavior には含まれていません。
 - `body` マッチは任意のバイナリリクエストではなく、構造化された JSON リクエストペイロード向けです。
-
-### サンプル専用拡張
-
-このリポジトリには、次の拡張名を使用したサンプルも含まれています。
-
-| Extension | Sample | Intent |
-| --- | --- | --- |
-| `x-semantic-match` | `samples/semantic-search.stub.yaml` | リクエスト内容に対する semantic matching の振る舞いを表現します。 |
-
-これらのサンプルは、より高レベルな機能のための OpenAPI 互換拡張スタイルを示すものです。正確な YAML 形状は sample ファイルを参照してください。
 
 ## 開発
 
