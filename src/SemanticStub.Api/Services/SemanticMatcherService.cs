@@ -86,13 +86,6 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 semanticSettings.Threshold,
                 semanticSettings.TopScoreMargin,
                 semanticCandidates.Length);
-            logger.LogDebug(
-                "Semantic request text for '{Path}' {Method}:{NewLine}{RequestText}",
-                path,
-                normalizedMethod,
-                Environment.NewLine,
-                requestText);
-
             var requestEmbedding = await GetEmbeddingAsync(requestText).ConfigureAwait(false);
             QueryMatchDefinition? bestCandidate = null;
             double? bestScore = null;
