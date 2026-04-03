@@ -71,17 +71,14 @@ public sealed class StubService : IStubService
     /// <param name="responseFileReader">Loads the contents of a relative response file selected by the matching stub.</param>
     /// <param name="matcherService">The matcher used to evaluate <c>x-match</c> candidates when a route and method have been resolved.</param>
     /// <param name="scenarioService">Stores in-memory scenario transitions for responses that opt into <c>x-scenario</c>.</param>
-    public StubService(StubDocument document, Func<string, string> responseFileReader, IMatcherService matcherService, ScenarioService scenarioService)
-        : this(() => document, responseFileReader, matcherService, scenarioService, semanticMatcherService: null, logger: null)
-    {
-    }
-
-    internal StubService(
+    /// <param name="semanticMatcherService">When supplied, enables semantic fallback matching for candidates that define <c>x-semantic-match</c>.</param>
+    /// <param name="logger">When supplied, emits structured log events for match selection and semantic scoring.</param>
+    public StubService(
         StubDocument document,
         Func<string, string> responseFileReader,
         IMatcherService matcherService,
         ScenarioService scenarioService,
-        ISemanticMatcherService? semanticMatcherService,
+        ISemanticMatcherService? semanticMatcherService = null,
         ILogger<StubService>? logger = null)
         : this(() => document, responseFileReader, matcherService, scenarioService, semanticMatcherService, logger)
     {
