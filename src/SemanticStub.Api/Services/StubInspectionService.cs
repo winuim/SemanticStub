@@ -92,14 +92,17 @@ internal sealed class StubInspectionService : IStubInspectionService
 
     private static string ComputeDocumentHash(StubDocument document)
     {
-        // Serialize a stable, ordered summary to avoid issues with object?-typed fields
-        // and to ensure the hash changes whenever paths or methods are added/removed.
+        // Serialize a stable, ordered summary of the full route configuration.
+        // Includes operation-level details (operationId, response keys, match rules,
+        // semantic match descriptions) so that changes within existing routes are reflected
+        // in the hash, not just path/method presence changes.
+        // Avoids object?-typed fields (query dicts, body) to prevent serialization issues.
         var summary = document.Paths
             .OrderBy(p => p.Key, StringComparer.Ordinal)
             .Select(p => new
             {
                 Path = p.Key,
-                Methods = GetDefinedMethods(p.Value),
+                Operations = GetOperationSummaries(p.Value),
             });
 
         var json = JsonSerializer.Serialize(summary);
@@ -107,12 +110,33 @@ internal sealed class StubInspectionService : IStubInspectionService
         return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
     }
 
-    private static IEnumerable<string> GetDefinedMethods(PathItemDefinition pathItem)
+    private static IEnumerable<object> GetOperationSummaries(PathItemDefinition pathItem)
     {
-        if (pathItem.Get is not null) yield return "GET";
-        if (pathItem.Post is not null) yield return "POST";
-        if (pathItem.Put is not null) yield return "PUT";
-        if (pathItem.Patch is not null) yield return "PATCH";
-        if (pathItem.Delete is not null) yield return "DELETE";
+        var methods = new (string Method, OperationDefinition? Op)[]
+        {
+            ("GET", pathItem.Get),
+            ("POST", pathItem.Post),
+            ("PUT", pathItem.Put),
+            ("PATCH", pathItem.Patch),
+            ("DELETE", pathItem.Delete),
+        };
+
+        foreach (var (method, op) in methods)
+        {
+            if (op is null) continue;
+
+            yield return new
+            {
+                Method = method,
+                OperationId = op.OperationId,
+                Responses = op.Responses.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList(),
+                MatchCount = op.Matches.Count,
+                SemanticMatches = op.Matches
+                    .Where(m => m.SemanticMatch is not null)
+                    .Select(m => m.SemanticMatch!)
+                    .OrderBy(s => s, StringComparer.Ordinal)
+                    .ToList(),
+            };
+        }
     }
 }

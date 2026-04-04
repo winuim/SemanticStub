@@ -180,6 +180,97 @@ public sealed class StubInspectionServiceTests
     }
 
     [Fact]
+    public void GetConfigSnapshot_ConfigurationHash_DiffersWhenOperationIdChanges()
+    {
+        var hash1 = CreateService(SingleGetDocument("/hello", operationId: "opA")).GetConfigSnapshot().ConfigurationHash;
+        var hash2 = CreateService(SingleGetDocument("/hello", operationId: "opB")).GetConfigSnapshot().ConfigurationHash;
+
+        Assert.NotEqual(hash1, hash2);
+    }
+
+    [Fact]
+    public void GetConfigSnapshot_ConfigurationHash_DiffersWhenResponseAdded()
+    {
+        var docWith200 = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/items"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new(),
+                        },
+                    },
+                },
+            },
+        };
+
+        var docWith200And404 = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/items"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new(),
+                            ["404"] = new(),
+                        },
+                    },
+                },
+            },
+        };
+
+        var hash1 = CreateService(docWith200).GetConfigSnapshot().ConfigurationHash;
+        var hash2 = CreateService(docWith200And404).GetConfigSnapshot().ConfigurationHash;
+
+        Assert.NotEqual(hash1, hash2);
+    }
+
+    [Fact]
+    public void GetConfigSnapshot_ConfigurationHash_DiffersWhenSemanticMatchAdded()
+    {
+        var docWithout = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/search"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal) { ["200"] = new() },
+                    },
+                },
+            },
+        };
+
+        var docWith = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/search"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Matches = [new QueryMatchDefinition { SemanticMatch = "find admin" }],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal) { ["200"] = new() },
+                    },
+                },
+            },
+        };
+
+        var hash1 = CreateService(docWithout).GetConfigSnapshot().ConfigurationHash;
+        var hash2 = CreateService(docWith).GetConfigSnapshot().ConfigurationHash;
+
+        Assert.NotEqual(hash1, hash2);
+    }
+
+    [Fact]
     public void GetConfigSnapshot_ConfigurationHash_IsLowercaseHex()
     {
         var service = CreateService(SingleGetDocument());
