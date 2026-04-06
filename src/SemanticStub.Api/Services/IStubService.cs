@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Primitives;
+using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Models;
 
 namespace SemanticStub.Api.Services;
@@ -140,14 +141,37 @@ public interface IStubService
     /// <param name="headers">The request headers to evaluate.</param>
     /// <param name="body">The request body used for JSON body matching.</param>
     /// <returns>A tuple of the match result and the assembled response (non-null only when <see cref="StubMatchResult.Matched"/>).</returns>
-    Task<(StubMatchResult Result, StubResponse? Response)> TryGetResponseAsync(
+    async Task<(StubMatchResult Result, StubResponse? Response)> TryGetResponseAsync(
         string method,
         string path,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
-        var result = TryGetResponse(method, path, query, headers, body, out var response);
-        return Task.FromResult((result, response));
+        var dispatch = await DispatchAsync(method, path, query, headers, body).ConfigureAwait(false);
+        return (dispatch.Result, dispatch.Response);
     }
+
+    /// <summary>
+    /// Resolves the request and returns the captured explanation from the same evaluation used for real dispatch.
+    /// </summary>
+    /// <param name="method">The HTTP method to evaluate.</param>
+    /// <param name="path">The request path to match.</param>
+    /// <param name="query">The query-string values to evaluate.</param>
+    /// <param name="headers">The request headers to evaluate.</param>
+    /// <param name="body">The request body used for JSON body matching.</param>
+    /// <returns>The dispatch result, including the assembled response and explanation captured from the same evaluation.</returns>
+    Task<StubDispatchResult> DispatchAsync(
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body);
+
+    /// <summary>
+    /// Explains how the runtime would evaluate the supplied virtual request without executing a response or mutating scenario state.
+    /// </summary>
+    /// <param name="request">The virtual request to evaluate.</param>
+    /// <returns>The explanation produced by the shared matching pipeline.</returns>
+    Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request);
 }

@@ -14,17 +14,22 @@ internal sealed class StubInspectionService : IStubInspectionService
     private readonly IStubDefinitionLoader loader;
     private readonly IOptions<StubSettings> settings;
     private readonly ScenarioService scenarioService;
+    private readonly IStubService stubService;
+    private readonly object lastMatchSyncRoot = new();
+    private MatchExplanationInfo? lastMatchExplanation;
 
     public StubInspectionService(
         StubDefinitionState state,
         IStubDefinitionLoader loader,
         IOptions<StubSettings> settings,
-        ScenarioService scenarioService)
+        ScenarioService scenarioService,
+        IStubService stubService)
     {
         this.state = state;
         this.loader = loader;
         this.settings = settings;
         this.scenarioService = scenarioService;
+        this.stubService = stubService;
     }
 
     /// <inheritdoc/>
@@ -71,6 +76,36 @@ internal sealed class StubInspectionService : IStubInspectionService
                 })
                 .ToList();
         });
+    }
+
+    /// <inheritdoc/>
+    public async Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request)
+    {
+        return (await stubService.ExplainMatchAsync(request).ConfigureAwait(false)).Result;
+    }
+
+    /// <inheritdoc/>
+    public Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request)
+    {
+        return stubService.ExplainMatchAsync(request);
+    }
+
+    /// <inheritdoc/>
+    public MatchExplanationInfo? GetLastMatchExplanation()
+    {
+        lock (lastMatchSyncRoot)
+        {
+            return lastMatchExplanation;
+        }
+    }
+
+    /// <inheritdoc/>
+    public void RecordLastMatchExplanation(MatchExplanationInfo explanation)
+    {
+        lock (lastMatchSyncRoot)
+        {
+            lastMatchExplanation = explanation;
+        }
     }
 
     /// <inheritdoc/>

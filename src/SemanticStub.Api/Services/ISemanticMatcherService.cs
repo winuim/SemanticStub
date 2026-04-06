@@ -27,4 +27,26 @@ public interface ISemanticMatcherService
         string? body,
         IReadOnlyCollection<QueryMatchDefinition> candidates,
         Func<QueryMatchDefinition, bool>? candidateFilter = null);
+
+    /// <summary>
+    /// Evaluates semantic fallback candidates and returns explanation details for the selection.
+    /// </summary>
+    /// <param name="method">The HTTP method being evaluated.</param>
+    /// <param name="path">The request path being evaluated.</param>
+    /// <param name="query">The request query values keyed by parameter name.</param>
+    /// <param name="headers">The request headers keyed by header name.</param>
+    /// <param name="body">The optional request body.</param>
+    /// <param name="candidates">The semantic candidates attached to the resolved operation.</param>
+    /// <param name="candidateFilter">An optional filter that excludes ineligible candidates before scoring.</param>
+    /// <param name="includeCandidateScores">Whether per-candidate scores should be returned.</param>
+    /// <returns>The semantic evaluation details, including scores and the selected candidate when one was accepted.</returns>
+    Task<SemanticMatchExplanation> ExplainMatchAsync(
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body,
+        IReadOnlyCollection<QueryMatchDefinition> candidates,
+        Func<QueryMatchDefinition, bool>? candidateFilter = null,
+        bool includeCandidateScores = false);
 }

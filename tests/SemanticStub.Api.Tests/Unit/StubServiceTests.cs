@@ -1724,6 +1724,34 @@ public sealed class StubServiceTests
 
             return Task.FromResult<QueryMatchDefinition?>(result);
         }
+
+        public Task<SemanticMatchExplanation> ExplainMatchAsync(
+            string method,
+            string path,
+            IReadOnlyDictionary<string, StringValues> query,
+            IReadOnlyDictionary<string, string> headers,
+            string? body,
+            IReadOnlyCollection<QueryMatchDefinition> candidates,
+            Func<QueryMatchDefinition, bool>? candidateFilter = null,
+            bool includeCandidateScores = false)
+        {
+            CallCount++;
+
+            if (nextMatch is null)
+            {
+                return Task.FromResult(new SemanticMatchExplanation { Attempted = true });
+            }
+
+            var result = candidateFilter is null || candidateFilter(nextMatch)
+                ? nextMatch
+                : null;
+
+            return Task.FromResult(new SemanticMatchExplanation
+            {
+                Attempted = true,
+                SelectedCandidate = result,
+            });
+        }
     }
 
     [Fact]

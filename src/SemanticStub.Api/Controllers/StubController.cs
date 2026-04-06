@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
 
@@ -12,10 +13,12 @@ namespace SemanticStub.Api.Controllers;
 public sealed class StubController : ControllerBase
 {
     private readonly IStubService stubService;
+    private readonly IStubInspectionService inspectionService;
 
-    public StubController(IStubService stubService)
+    public StubController(IStubService stubService, IStubInspectionService inspectionService)
     {
         this.stubService = stubService;
+        this.inspectionService = inspectionService;
     }
 
     /// <summary>
@@ -70,7 +73,14 @@ public sealed class StubController : ControllerBase
         var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
         Request.EnableBuffering();
         var requestBody = await ReadRequestBodyAsync();
-        var (matchResult, response) = await stubService.TryGetResponseAsync(method, requestPath, query, headers, requestBody);
+        var dispatch = await stubService.DispatchAsync(method, requestPath, query, headers, requestBody).ConfigureAwait(false);
+        var matchResult = dispatch.Result;
+        var response = dispatch.Response;
+
+        if (matchResult == StubMatchResult.Matched)
+        {
+            inspectionService.RecordLastMatchExplanation(dispatch.Explanation);
+        }
 
         if (matchResult == StubMatchResult.PathNotFound)
         {
