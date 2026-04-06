@@ -24,6 +24,7 @@ public static class StubServiceCollectionExtensions
         });
         services.AddSingleton<IStubDefinitionLoader, StubDefinitionLoader>();
         services.AddSingleton<StubDefinitionState>();
+        services.AddSingleton<IStubInspectionService, StubInspectionService>();
         services.AddHostedService<StubDefinitionWatcher>();
         services.AddSingleton<IMatcherService, MatcherService>();
         services.AddSingleton<ScenarioService>();

@@ -249,6 +249,15 @@ This keeps routing deterministic for the current feature set.
 - `body` matching is intended for structured JSON request payloads rather than
   arbitrary binary request bodies.
 
+## Runtime inspection
+
+SemanticStub exposes read-only runtime inspection endpoints under the reserved
+prefix `/_semanticstub/runtime`.
+
+- `GET /_semanticstub/runtime/config` returns metadata for the active effective configuration snapshot.
+- `GET /_semanticstub/runtime/routes` returns the active normalized route list.
+- YAML stub definitions under `/_semanticstub/runtime/*` are reserved for these inspection endpoints and are not reachable as normal stub routes.
+
 ## Development
 - Source: `src/`
 - Tests: `tests/`

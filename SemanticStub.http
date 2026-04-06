@@ -1,5 +1,13 @@
 @host = http://localhost:5000
 
+### Runtime inspection config summary
+GET {{host}}/_semanticstub/runtime/config
+Accept: application/json
+
+### Runtime inspection route list
+GET {{host}}/_semanticstub/runtime/routes
+Accept: application/json
+
 ### Hello world stub
 GET {{host}}/hello
 Accept: application/json
