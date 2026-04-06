@@ -187,6 +187,46 @@ public sealed class SemanticMatcherServiceTests
         Assert.Same(adminCandidate, match);
     }
 
+    [Fact]
+    public async Task ExplainMatchAsync_ReturnsScoresAndSelectedCandidate()
+    {
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei",
+                    Threshold = 0.8d,
+                    TopScoreMargin = 0.03d
+                }
+            },
+            CreateEmbeddingHandler(new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["method: POST\npath: /search\nbody:\nadmin search"] = "[1.0,0.0]",
+                ["find admin users"] = "[0.95,0.05]",
+                ["show invoices"] = "[0.60,0.40]"
+            }));
+
+        var adminCandidate = CreateCandidate("find admin users");
+        var invoiceCandidate = CreateCandidate("show invoices");
+
+        var explanation = await service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [adminCandidate, invoiceCandidate],
+            includeCandidateScores: true);
+
+        Assert.True(explanation.Attempted);
+        Assert.Same(adminCandidate, explanation.SelectedCandidate);
+        Assert.Equal(0.8d, explanation.Threshold);
+        Assert.Equal(2, explanation.CandidateScores.Count);
+        Assert.Contains(explanation.CandidateScores, score => ReferenceEquals(score.Candidate, adminCandidate) && score.AboveThreshold);
+    }
+
     private static QueryMatchDefinition CreateCandidate(string semanticMatch)
     {
         return new QueryMatchDefinition

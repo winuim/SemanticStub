@@ -23,6 +23,29 @@ public interface IStubInspectionService
     IReadOnlyList<ScenarioStateInfo> GetScenarioStates();
 
     /// <summary>
+    /// Simulates how the runtime would match the supplied virtual request without executing a response or mutating scenario state.
+    /// </summary>
+    /// <param name="request">The virtual request to evaluate.</param>
+    Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request);
+
+    /// <summary>
+    /// Explains how the runtime evaluated the supplied virtual request without executing a response or mutating scenario state.
+    /// </summary>
+    /// <param name="request">The virtual request to evaluate.</param>
+    Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request);
+
+    /// <summary>
+    /// Returns the explanation captured for the most recent real request, when one has been recorded.
+    /// </summary>
+    MatchExplanationInfo? GetLastMatchExplanation();
+
+    /// <summary>
+    /// Captures the explanation for the most recent real request so it can be retrieved later.
+    /// </summary>
+    /// <param name="explanation">The explanation captured from the real request dispatch.</param>
+    void RecordLastMatchExplanation(MatchExplanationInfo explanation);
+
+    /// <summary>
     /// Resets all configured scenarios back to their initial state.
     /// </summary>
     void ResetScenarioStates();
