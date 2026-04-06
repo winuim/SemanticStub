@@ -256,13 +256,34 @@ prefix `/_semanticstub/runtime`.
 
 - `GET /_semanticstub/runtime/config` returns metadata for the active effective configuration snapshot.
 - `GET /_semanticstub/runtime/routes` returns the active normalized route list.
+- `GET /_semanticstub/runtime/scenarios` returns the current scenario state snapshot.
+- `POST /_semanticstub/runtime/test-match` evaluates a virtual request without executing a real response or mutating scenario state.
+- `POST /_semanticstub/runtime/explain` returns structured match details for a virtual request, including deterministic and semantic evaluation when applicable.
+- `GET /_semanticstub/runtime/explain/last` returns the latest explanation captured from a real matched request in the current process.
 - YAML stub definitions under `/_semanticstub/runtime/*` are reserved for these inspection endpoints and are not reachable as normal stub routes.
 
 Inspection notes:
 
 - `/_semanticstub/runtime/config` is a summary view. It currently returns snapshot metadata such as timestamp, configuration hash, definitions directory, route count, and whether semantic matching is enabled.
 - `/_semanticstub/runtime/routes` returns one item per active path and HTTP method with stable external fields such as route id, normalized path pattern, semantic matching usage, scenario usage, and response count.
+- `/_semanticstub/runtime/scenarios` returns one item per known scenario with its current state and whether it is active.
+- `/_semanticstub/runtime/test-match` and `/_semanticstub/runtime/explain` accept a virtual request payload with method, path, optional query/header/body values, and optional candidate-detail flags.
+- `/_semanticstub/runtime/explain/last` is process-local and only updates after a real request produces a matched stub response.
 - These endpoints do not currently expose full per-route response definitions, raw YAML, or detailed `x-match` conditions.
+
+Example request body for `POST /_semanticstub/runtime/test-match` and
+`POST /_semanticstub/runtime/explain`:
+
+```json
+{
+  "method": "GET",
+  "path": "/users",
+  "query": {
+    "role": ["admin"]
+  },
+  "includeCandidates": true
+}
+```
 
 ## Development
 - Source: `src/`
