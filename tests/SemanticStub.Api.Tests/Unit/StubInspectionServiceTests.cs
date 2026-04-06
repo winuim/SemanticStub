@@ -41,13 +41,18 @@ public sealed class StubInspectionServiceTests
         {
             SemanticMatching = new SemanticMatchingSettings { Enabled = semanticMatchingEnabled },
         });
+        var stubService = new StubService(
+            document,
+            _ => throw new InvalidOperationException("Not used in inspection tests"),
+            matcherService ?? new MatcherService(),
+            scenarioService,
+            semanticMatcherService ?? new NoOpSemanticMatcherService());
         return new StubInspectionService(
             state,
             loader,
             settings,
             scenarioService,
-            matcherService ?? new MatcherService(),
-            semanticMatcherService ?? new NoOpSemanticMatcherService());
+            stubService);
     }
 
     private static StubDocument EmptyDocument() => new StubDocument
@@ -683,7 +688,8 @@ public sealed class StubInspectionServiceTests
         var scenarioService = new ScenarioService();
         var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
         var settings = Options.Create(new StubSettings());
-        var service = new StubInspectionService(state, loader, settings, scenarioService, new MatcherService(), new NoOpSemanticMatcherService());
+        var stubService = new StubService(document, _ => throw new InvalidOperationException("Not used in inspection tests"), new MatcherService(), scenarioService, new NoOpSemanticMatcherService());
+        var service = new StubInspectionService(state, loader, settings, scenarioService, stubService);
 
         scenarioService.Advance(new ScenarioDefinition
         {
@@ -755,7 +761,8 @@ public sealed class StubInspectionServiceTests
         var scenarioService = new ScenarioService();
         var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
         var settings = Options.Create(new StubSettings());
-        var service = new StubInspectionService(state, loader, settings, scenarioService, new MatcherService(), new NoOpSemanticMatcherService());
+        var stubService = new StubService(document, _ => throw new InvalidOperationException("Not used in inspection tests"), new MatcherService(), scenarioService, new NoOpSemanticMatcherService());
+        var service = new StubInspectionService(state, loader, settings, scenarioService, stubService);
 
         scenarioService.Advance(new ScenarioDefinition { Name = "checkout-flow", State = "initial", Next = "confirmed" });
         scenarioService.Advance(new ScenarioDefinition { Name = "payment-flow", State = "initial", Next = "authorized" });
@@ -816,13 +823,13 @@ public sealed class StubInspectionServiceTests
         var loader = new TestStubDefinitionLoader(document);
         var scenarioService = new ScenarioService();
         var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
+        var stubService = new StubService(document, _ => throw new InvalidOperationException("Not used in inspection tests"), new MatcherService(), scenarioService, new NoOpSemanticMatcherService());
         var service = new StubInspectionService(
             state,
             loader,
             Options.Create(new StubSettings()),
             scenarioService,
-            new MatcherService(),
-            new NoOpSemanticMatcherService());
+            stubService);
 
         var result = await service.TestMatchAsync(new MatchRequestInfo
         {

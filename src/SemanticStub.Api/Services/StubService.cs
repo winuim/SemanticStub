@@ -259,6 +259,43 @@ public sealed class StubService : IStubService
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
+        return await EvaluateAsync(
+            method,
+            path,
+            query,
+            headers,
+            body,
+            mutateScenarioState: true,
+            includeCandidates: true,
+            includeSemanticCandidates: false).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc/>
+    public async Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request)
+    {
+        var dispatch = await EvaluateAsync(
+            NormalizeMethod(request.Method),
+            NormalizePath(request.Path),
+            ConvertQueryValues(request.Query),
+            new Dictionary<string, string>(request.Headers, StringComparer.OrdinalIgnoreCase),
+            string.IsNullOrWhiteSpace(request.Body) ? null : request.Body,
+            mutateScenarioState: false,
+            includeCandidates: request.IncludeCandidates,
+            includeSemanticCandidates: request.IncludeSemanticCandidates).ConfigureAwait(false);
+
+        return dispatch.Explanation;
+    }
+
+    private async Task<StubDispatchResult> EvaluateAsync(
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body,
+        bool mutateScenarioState,
+        bool includeCandidates,
+        bool includeSemanticCandidates)
+    {
         var document = documentAccessor();
 
         if (!TryResolveOperation(document, method, path, out var pathPattern, out var pathItem, out var operation, out var failedMatchResult))
@@ -275,10 +312,10 @@ public sealed class StubService : IStubService
         if (OperationUsesScenario(operation))
         {
             return await scenarioService.ExecuteLockedAsync(
-                () => DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body)).ConfigureAwait(false);
+                () => DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates)).ConfigureAwait(false);
         }
 
-        return await DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body).ConfigureAwait(false);
+        return await DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -307,10 +344,13 @@ public sealed class StubService : IStubService
         OperationDefinition operation,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
-        string? body)
+        string? body,
+        bool mutateScenarioState,
+        bool includeCandidates,
+        bool includeSemanticCandidates)
     {
         var routeId = GetRouteId(method, pathPattern, operation);
-        var request = CreateInspectionRequest(method, path, query, headers, body);
+        var request = CreateInspectionRequest(method, path, query, headers, body, includeCandidates, includeSemanticCandidates);
         var scenarioSnapshots = GetScenarioSnapshots(operation);
         var deterministicEvaluations = matcherService.EvaluateCandidates(pathItem.Parameters, operation, query, headers, body)
             .Select((evaluation, index) => CreateCandidateInfo(evaluation, index, scenarioSnapshots))
@@ -353,7 +393,10 @@ public sealed class StubService : IStubService
                 selectedDeterministicCandidate.Headers.Count,
                 selectedDeterministicCandidate.Body is not null);
 
-            scenarioService.Advance(selectedDeterministicCandidate.Response.Scenario);
+            if (mutateScenarioState)
+            {
+                scenarioService.Advance(selectedDeterministicCandidate.Response.Scenario);
+            }
 
             return CreateMatchedDispatchResult(
                 request,
@@ -381,11 +424,11 @@ public sealed class StubService : IStubService
                 body,
                 operation.Matches,
                 candidate => scenarioService.IsMatch(candidate.Response.Scenario),
-                includeCandidateScores: false).ConfigureAwait(false);
+                includeCandidateScores: includeSemanticCandidates).ConfigureAwait(false);
 
         if (semanticExplanation.Attempted)
         {
-            semanticEvaluationInfo = CreateSemanticMatchInfo(semanticExplanation, operation);
+            semanticEvaluationInfo = CreateSemanticMatchInfo(semanticExplanation, operation, includeSemanticCandidates);
         }
 
         if (semanticExplanation.SelectedCandidate is not null)
@@ -425,7 +468,10 @@ public sealed class StubService : IStubService
                 path,
                 method.ToUpperInvariant());
 
-            scenarioService.Advance(semanticExplanation.SelectedCandidate.Response.Scenario);
+            if (mutateScenarioState)
+            {
+                scenarioService.Advance(semanticExplanation.SelectedCandidate.Response.Scenario);
+            }
 
             return CreateMatchedDispatchResult(
                 request,
@@ -442,7 +488,7 @@ public sealed class StubService : IStubService
                 selectionReason: "Semantic fallback selected the highest-scoring eligible candidate.");
         }
 
-        if (TryBuildDefaultOperationResponse(operation, out var response))
+        if (TryBuildDefaultOperationResponse(operation, mutateScenarioState, out var response))
         {
             var defaultResponse = GetDefaultResponse(operation, scenarioSnapshots);
             return CreateMatchedDispatchResult(
@@ -480,6 +526,14 @@ public sealed class StubService : IStubService
         return query.ToDictionary(
             entry => entry.Key,
             entry => new StringValues(entry.Value),
+            StringComparer.Ordinal);
+    }
+
+    private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string[]> query)
+    {
+        return query.ToDictionary(
+            entry => entry.Key,
+            entry => new StringValues(entry.Value ?? Array.Empty<string>()),
             StringComparer.Ordinal);
     }
 
@@ -763,7 +817,9 @@ public sealed class StubService : IStubService
         string path,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
-        string? body)
+        string? body,
+        bool includeCandidates,
+        bool includeSemanticCandidates)
     {
         return new MatchRequestInfo
         {
@@ -775,6 +831,8 @@ public sealed class StubService : IStubService
                 StringComparer.Ordinal),
             Headers = new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase),
             Body = body,
+            IncludeCandidates = includeCandidates,
+            IncludeSemanticCandidates = includeSemanticCandidates,
         };
     }
 
@@ -832,7 +890,8 @@ public sealed class StubService : IStubService
 
     private static SemanticMatchInfo CreateSemanticMatchInfo(
         SemanticMatchExplanation explanation,
-        OperationDefinition operation)
+        OperationDefinition operation,
+        bool includeCandidates)
     {
         return new SemanticMatchInfo
         {
@@ -842,7 +901,18 @@ public sealed class StubService : IStubService
             SelectedScore = explanation.SelectedScore,
             SecondBestScore = explanation.SecondBestScore,
             MarginToSecondBest = explanation.MarginToSecondBest,
-            Candidates = [],
+            Candidates = includeCandidates
+                ? explanation.CandidateScores
+                    .Select(score => new SemanticCandidateInfo
+                    {
+                        CandidateIndex = operation.Matches.FindIndex(candidate => ReferenceEquals(candidate, score.Candidate)),
+                        SemanticMatch = score.Candidate.SemanticMatch ?? string.Empty,
+                        Eligible = score.Eligible,
+                        Score = score.Score,
+                        AboveThreshold = score.AboveThreshold,
+                    })
+                    .ToList()
+                : [],
         };
     }
 
@@ -851,6 +921,21 @@ public sealed class StubService : IStubService
         return string.IsNullOrEmpty(operation.OperationId)
             ? $"{method}:{pathPattern}"
             : operation.OperationId;
+    }
+
+    private static string NormalizeMethod(string method)
+        => string.IsNullOrWhiteSpace(method) ? HttpMethods.Get : method.Trim().ToUpperInvariant();
+
+    private static string NormalizePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return "/";
+        }
+
+        return path.StartsWith('/')
+            ? path
+            : "/" + path;
     }
 
     private static bool IsConfiguredResponse(QueryMatchResponseDefinition response)
@@ -902,7 +987,7 @@ public sealed class StubService : IStubService
         return null;
     }
 
-    private bool TryBuildDefaultOperationResponse(OperationDefinition operation, out StubResponse response)
+    private bool TryBuildDefaultOperationResponse(OperationDefinition operation, bool mutateScenarioState, out StubResponse response)
     {
         response = null!;
 
@@ -916,7 +1001,7 @@ public sealed class StubService : IStubService
 
         var built = TryBuildStubResponse(statusCode, matchedResponse.Value, out response);
 
-        if (built)
+        if (built && mutateScenarioState)
         {
             scenarioService.Advance(matchedResponse.Value.Scenario);
         }

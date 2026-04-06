@@ -167,4 +167,11 @@ public interface IStubService
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
         string? body);
+
+    /// <summary>
+    /// Explains how the runtime would evaluate the supplied virtual request without executing a response or mutating scenario state.
+    /// </summary>
+    /// <param name="request">The virtual request to evaluate.</param>
+    /// <returns>The explanation produced by the shared matching pipeline.</returns>
+    Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request);
 }

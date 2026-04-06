@@ -187,5 +187,26 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
         Assert.True(payload.MethodMatched);
         Assert.Equal("Matched", payload.Result.MatchResult);
         Assert.Equal("listUsers", payload.Result.RouteId);
+        Assert.NotEmpty(payload.Result.Candidates);
+    }
+
+    [Fact]
+    public async Task ExplainLastMatch_IsNotOverwrittenByFailedProbe()
+    {
+        var matchedResponse = await client.GetAsync("/users?role=admin");
+        matchedResponse.EnsureSuccessStatusCode();
+
+        var failedProbe = await client.GetAsync("/does-not-exist");
+        Assert.Equal(HttpStatusCode.NotFound, failedProbe.StatusCode);
+
+        var response = await client.GetAsync("/_semanticstub/runtime/explain/last");
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<MatchExplanationInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(payload);
+        Assert.Equal("Matched", payload!.Result.MatchResult);
+        Assert.Equal("listUsers", payload.Result.RouteId);
     }
 }

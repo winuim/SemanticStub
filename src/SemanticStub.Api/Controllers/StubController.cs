@@ -74,9 +74,13 @@ public sealed class StubController : ControllerBase
         Request.EnableBuffering();
         var requestBody = await ReadRequestBodyAsync();
         var dispatch = await stubService.DispatchAsync(method, requestPath, query, headers, requestBody).ConfigureAwait(false);
-        inspectionService.RecordLastMatchExplanation(dispatch.Explanation);
         var matchResult = dispatch.Result;
         var response = dispatch.Response;
+
+        if (matchResult == StubMatchResult.Matched)
+        {
+            inspectionService.RecordLastMatchExplanation(dispatch.Explanation);
+        }
 
         if (matchResult == StubMatchResult.PathNotFound)
         {

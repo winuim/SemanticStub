@@ -237,6 +237,30 @@ public sealed class StubControllerTests
         var recorded = Assert.IsType<MatchExplanationInfo>(inspectionService.LastRecordedExplanation);
         Assert.Equal("Matched", recorded.Result.MatchResult);
         Assert.Equal("/users", recorded.Result.PathPattern);
+        Assert.NotEmpty(recorded.Result.Candidates);
+    }
+
+    [Fact]
+    public async Task Get_DoesNotOverwriteLastMatchExplanation_WhenRequestDoesNotMatch()
+    {
+        var stubService = new RecordingStubService(StubMatchResult.PathNotFound, new StubResponse());
+        var inspectionService = new RecordingInspectionService
+        {
+            LastRecordedExplanation = new MatchExplanationInfo
+            {
+                Result = new MatchSimulationInfo
+                {
+                    MatchResult = "Matched",
+                    PathPattern = "/users"
+                }
+            }
+        };
+        var controller = CreateController(stubService, inspectionService);
+
+        await controller.Get("unknown");
+
+        Assert.NotNull(inspectionService.LastRecordedExplanation);
+        Assert.Equal("/users", inspectionService.LastRecordedExplanation!.Result.PathPattern);
     }
 
     private static readonly RecordingInspectionService controllerInspectionService = new();
@@ -332,13 +356,43 @@ public sealed class StubControllerTests
                 {
                     PathMatched = true,
                     MethodMatched = true,
+                    DeterministicCandidates =
+                    [
+                        new MatchCandidateInfo
+                        {
+                            CandidateIndex = 0,
+                            Matched = matchResult == StubMatchResult.Matched
+                        }
+                    ],
                     Result = new MatchSimulationInfo
                     {
                         Matched = matchResult == StubMatchResult.Matched,
                         MatchResult = matchResult.ToString(),
                         Method = method,
                         PathPattern = path,
+                        Candidates =
+                        [
+                            new MatchCandidateInfo
+                            {
+                                CandidateIndex = 0,
+                                Matched = matchResult == StubMatchResult.Matched
+                            }
+                        ]
                     }
+                }
+            });
+        }
+
+        public Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request)
+        {
+            return Task.FromResult(new MatchExplanationInfo
+            {
+                Result = new MatchSimulationInfo
+                {
+                    Matched = matchResult == StubMatchResult.Matched,
+                    MatchResult = matchResult.ToString(),
+                    Method = request.Method,
+                    PathPattern = request.Path,
                 }
             });
         }
