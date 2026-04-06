@@ -19,7 +19,7 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
     [Fact]
     public async Task GetConfig_ReturnsOk()
     {
-        var response = await client.GetAsync("/api/stub-inspect/config");
+        var response = await client.GetAsync("/_semanticstub/runtime/config");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -27,7 +27,7 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
     [Fact]
     public async Task GetConfig_ResponseDeserializesToStubConfigSnapshot()
     {
-        var response = await client.GetAsync("/api/stub-inspect/config");
+        var response = await client.GetAsync("/_semanticstub/runtime/config");
         response.EnsureSuccessStatusCode();
 
         var snapshot = await response.Content.ReadFromJsonAsync<StubConfigSnapshot>(
@@ -45,7 +45,7 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
     {
         // Verify the inspection endpoint is not swallowed by StubController's {*path} catch-all.
         // A 200 with a deserializable StubConfigSnapshot proves the inspection controller handled it.
-        var response = await client.GetAsync("/api/stub-inspect/config");
+        var response = await client.GetAsync("/_semanticstub/runtime/config");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
@@ -54,7 +54,7 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
     [Fact]
     public async Task GetRoutes_ReturnsOk()
     {
-        var response = await client.GetAsync("/api/stub-inspect/routes");
+        var response = await client.GetAsync("/_semanticstub/runtime/routes");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -62,7 +62,7 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
     [Fact]
     public async Task GetRoutes_ResponseIsJsonArray()
     {
-        var response = await client.GetAsync("/api/stub-inspect/routes");
+        var response = await client.GetAsync("/_semanticstub/runtime/routes");
         response.EnsureSuccessStatusCode();
 
         var content = await response.Content.ReadAsStringAsync();
@@ -73,7 +73,7 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
     [Fact]
     public async Task GetRoutes_ArrayElementsDeserializeToStubRouteInfo()
     {
-        var response = await client.GetAsync("/api/stub-inspect/routes");
+        var response = await client.GetAsync("/_semanticstub/runtime/routes");
         response.EnsureSuccessStatusCode();
 
         var routes = await response.Content.ReadFromJsonAsync<StubRouteInfo[]>(

@@ -7,12 +7,12 @@ namespace SemanticStub.Api.Controllers;
 /// Exposes read-only runtime inspection endpoints for the active stub configuration.
 /// </summary>
 /// <remarks>
-/// The route prefix <c>api/stub-inspect</c> is reserved for the inspection feature.
-/// YAML stub definitions that use paths under <c>/api/stub-inspect</c> will be
+/// The route prefix <c>_semanticstub/runtime</c> is reserved for the inspection feature.
+/// YAML stub definitions that use paths under <c>/_semanticstub/runtime</c> will be
 /// shadowed by these endpoints and will not be reachable at runtime.
 /// </remarks>
 [ApiController]
-[Route("api/stub-inspect")]
+[Route("_semanticstub/runtime")]
 public sealed class StubInspectionController : ControllerBase
 {
     private readonly IStubInspectionService inspectionService;
