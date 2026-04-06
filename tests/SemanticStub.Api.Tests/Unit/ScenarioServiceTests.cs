@@ -51,6 +51,28 @@ public sealed class ScenarioServiceTests
         Assert.True(service.IsMatch(scenario));
     }
 
+    [Fact]
+    public void ResetWithinLock_ClearsAdvancedScenarioStateWithoutDeadlock()
+    {
+        var service = new ScenarioService();
+        var scenario = new ScenarioDefinition
+        {
+            Name = "checkout-flow",
+            State = "initial",
+            Next = "confirmed"
+        };
+
+        service.Advance(scenario);
+
+        service.ExecuteLocked(() =>
+        {
+            service.ResetWithinLock();
+            return 0;
+        });
+
+        Assert.True(service.IsMatch(scenario));
+    }
+
     private static void UpdateMax(ref int target, int candidate)
     {
         while (true)

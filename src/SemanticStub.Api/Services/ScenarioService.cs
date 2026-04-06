@@ -49,9 +49,14 @@ public sealed class ScenarioService
     {
         ExecuteLocked(() =>
         {
-            currentStates.Clear();
+            ResetWithinLock();
             return 0;
         });
+    }
+
+    internal void ResetWithinLock()
+    {
+        currentStates.Clear();
     }
 
     /// <summary>
