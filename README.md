@@ -258,13 +258,41 @@ prefix `/_semanticstub/runtime`.
 - `GET /_semanticstub/runtime/routes` returns the active normalized route list.
 - YAML stub definitions under `/_semanticstub/runtime/*` are reserved for these inspection endpoints and are not reachable as normal stub routes.
 
+Inspection notes:
+
+- `/_semanticstub/runtime/config` is a summary view. It currently returns snapshot metadata such as timestamp, configuration hash, definitions directory, route count, and whether semantic matching is enabled.
+- `/_semanticstub/runtime/routes` returns one item per active path and HTTP method with stable external fields such as route id, normalized path pattern, semantic matching usage, scenario usage, and response count.
+- These endpoints do not currently expose full per-route response definitions, raw YAML, or detailed `x-match` conditions.
+
 ## Development
 - Source: `src/`
 - Tests: `tests/`
 - Samples: `samples/`
 
+Configuration notes:
+
+- `appsettings.json` provides the default runtime settings.
+- `appsettings.Development.json` is applied only when the app runs with the `Development` environment, for example to enable local semantic matching settings or more verbose logging.
+- The sample requests in `SemanticStub.http` assume the app is running locally and may be easier to verify with the `Development` environment enabled.
+
+Sample files:
+
+- `samples/basic-routing.yaml` demonstrates the core routing, matching, scenario, and file-response features.
+- `samples/semantic-search.stub.yaml` demonstrates semantic matching routes and is useful when testing the `SemanticMatching` settings locally.
+
 ## Run
+
+Default:
+
+```sh
 dotnet run --project src/SemanticStub.Api
+```
+
+Run with the Development environment so `appsettings.Development.json` is applied:
+
+```sh
+ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/SemanticStub.Api
+```
 
 ## Test
 dotnet test
