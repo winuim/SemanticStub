@@ -8,6 +8,42 @@ Accept: application/json
 GET {{host}}/_semanticstub/runtime/routes
 Accept: application/json
 
+### Runtime inspection scenario state
+GET {{host}}/_semanticstub/runtime/scenarios
+Accept: application/json
+
+### Runtime inspection test-match
+POST {{host}}/_semanticstub/runtime/test-match
+Content-Type: application/json
+Accept: application/json
+
+{
+  "method": "GET",
+  "path": "/users",
+  "query": {
+    "role": ["admin"]
+  },
+  "includeCandidates": true
+}
+
+### Runtime inspection explain
+POST {{host}}/_semanticstub/runtime/explain
+Content-Type: application/json
+Accept: application/json
+
+{
+  "method": "GET",
+  "path": "/users",
+  "query": {
+    "role": ["admin"]
+  },
+  "includeCandidates": true
+}
+
+### Runtime inspection explain last real request
+GET {{host}}/_semanticstub/runtime/explain/last
+Accept: application/json
+
 ### Hello world stub
 GET {{host}}/hello
 Accept: application/json
