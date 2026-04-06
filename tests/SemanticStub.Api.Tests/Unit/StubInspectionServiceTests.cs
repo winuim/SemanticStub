@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
@@ -29,7 +30,9 @@ public sealed class StubInspectionServiceTests
     private static IStubInspectionService CreateService(
         StubDocument document,
         string directoryPath = "/test/definitions",
-        bool semanticMatchingEnabled = false)
+        bool semanticMatchingEnabled = false,
+        IMatcherService? matcherService = null,
+        ISemanticMatcherService? semanticMatcherService = null)
     {
         var loader = new TestStubDefinitionLoader(document, directoryPath);
         var scenarioService = new ScenarioService();
@@ -38,7 +41,13 @@ public sealed class StubInspectionServiceTests
         {
             SemanticMatching = new SemanticMatchingSettings { Enabled = semanticMatchingEnabled },
         });
-        return new StubInspectionService(state, loader, settings, scenarioService);
+        return new StubInspectionService(
+            state,
+            loader,
+            settings,
+            scenarioService,
+            matcherService ?? new MatcherService(),
+            semanticMatcherService ?? new NoOpSemanticMatcherService());
     }
 
     private static StubDocument EmptyDocument() => new StubDocument
@@ -64,6 +73,62 @@ public sealed class StubInspectionServiceTests
                 },
             },
         };
+
+    private sealed class NoOpSemanticMatcherService : ISemanticMatcherService
+    {
+        public Task<QueryMatchDefinition?> FindBestMatchAsync(
+            string method,
+            string path,
+            IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query,
+            IReadOnlyDictionary<string, string> headers,
+            string? body,
+            IReadOnlyCollection<QueryMatchDefinition> candidates,
+            Func<QueryMatchDefinition, bool>? candidateFilter = null)
+        {
+            return Task.FromResult<QueryMatchDefinition?>(null);
+        }
+
+        public Task<SemanticMatchExplanation> ExplainMatchAsync(
+            string method,
+            string path,
+            IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query,
+            IReadOnlyDictionary<string, string> headers,
+            string? body,
+            IReadOnlyCollection<QueryMatchDefinition> candidates,
+            Func<QueryMatchDefinition, bool>? candidateFilter = null,
+            bool includeCandidateScores = false)
+        {
+            return Task.FromResult(new SemanticMatchExplanation());
+        }
+    }
+
+    private sealed class StubSemanticMatcherService(SemanticMatchExplanation explanation) : ISemanticMatcherService
+    {
+        public Task<QueryMatchDefinition?> FindBestMatchAsync(
+            string method,
+            string path,
+            IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query,
+            IReadOnlyDictionary<string, string> headers,
+            string? body,
+            IReadOnlyCollection<QueryMatchDefinition> candidates,
+            Func<QueryMatchDefinition, bool>? candidateFilter = null)
+        {
+            return Task.FromResult(explanation.SelectedCandidate);
+        }
+
+        public Task<SemanticMatchExplanation> ExplainMatchAsync(
+            string method,
+            string path,
+            IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query,
+            IReadOnlyDictionary<string, string> headers,
+            string? body,
+            IReadOnlyCollection<QueryMatchDefinition> candidates,
+            Func<QueryMatchDefinition, bool>? candidateFilter = null,
+            bool includeCandidateScores = false)
+        {
+            return Task.FromResult(explanation);
+        }
+    }
 
     // ---------------------------------------------------------------------------
     // GetConfigSnapshot — definitions directory
@@ -618,7 +683,7 @@ public sealed class StubInspectionServiceTests
         var scenarioService = new ScenarioService();
         var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
         var settings = Options.Create(new StubSettings());
-        var service = new StubInspectionService(state, loader, settings, scenarioService);
+        var service = new StubInspectionService(state, loader, settings, scenarioService, new MatcherService(), new NoOpSemanticMatcherService());
 
         scenarioService.Advance(new ScenarioDefinition
         {
@@ -690,7 +755,7 @@ public sealed class StubInspectionServiceTests
         var scenarioService = new ScenarioService();
         var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
         var settings = Options.Create(new StubSettings());
-        var service = new StubInspectionService(state, loader, settings, scenarioService);
+        var service = new StubInspectionService(state, loader, settings, scenarioService, new MatcherService(), new NoOpSemanticMatcherService());
 
         scenarioService.Advance(new ScenarioDefinition { Name = "checkout-flow", State = "initial", Next = "confirmed" });
         scenarioService.Advance(new ScenarioDefinition { Name = "payment-flow", State = "initial", Next = "authorized" });
@@ -705,5 +770,289 @@ public sealed class StubInspectionServiceTests
             Assert.Equal("initial", scenario.CurrentState);
             Assert.NotNull(scenario.LastUpdatedTimestamp);
         });
+    }
+
+    [Fact]
+    public void GetLastMatchExplanation_ReturnsNull_WhenNothingHasBeenRecorded()
+    {
+        var service = CreateService(EmptyDocument());
+
+        var explanation = service.GetLastMatchExplanation();
+
+        Assert.Null(explanation);
+    }
+
+    [Fact]
+    public async Task TestMatchAsync_ReturnsDeterministicMatchWithoutMutatingScenarioState()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/checkout"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "checkout-flow",
+                                    State = "initial",
+                                    Next = "confirmed"
+                                },
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["ok"] = true } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        var loader = new TestStubDefinitionLoader(document);
+        var scenarioService = new ScenarioService();
+        var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
+        var service = new StubInspectionService(
+            state,
+            loader,
+            Options.Create(new StubSettings()),
+            scenarioService,
+            new MatcherService(),
+            new NoOpSemanticMatcherService());
+
+        var result = await service.TestMatchAsync(new MatchRequestInfo
+        {
+            Method = "POST",
+            Path = "/checkout"
+        });
+
+        Assert.True(result.Matched);
+        Assert.Equal("Matched", result.MatchResult);
+        Assert.Equal("fallback", result.MatchMode);
+        Assert.Equal("initial", scenarioService.GetSnapshot("checkout-flow").State);
+        Assert.Null(scenarioService.GetSnapshot("checkout-flow").LastUpdatedTimestamp);
+    }
+
+    [Fact]
+    public async Task ExplainMatchAsync_ReturnsDeterministicCandidateEvaluations()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        OperationId = "listUsers",
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                                {
+                                    ["role"] = "admin"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new() { Example = new Dictionary<object, object> { ["role"] = "admin" } }
+                                    }
+                                }
+                            },
+                            new QueryMatchDefinition
+                            {
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                                {
+                                    ["role"] = "guest"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new() { Example = new Dictionary<object, object> { ["role"] = "guest" } }
+                                    }
+                                }
+                            }
+                        ],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["role"] = "default" } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = CreateService(document);
+
+        var explanation = await service.ExplainMatchAsync(new MatchRequestInfo
+        {
+            Method = "GET",
+            Path = "/users",
+            Query = new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["role"] = ["admin"]
+            },
+            IncludeCandidates = true
+        });
+
+        Assert.True(explanation.Result.Matched);
+        Assert.Equal("exact", explanation.Result.MatchMode);
+        Assert.Equal("listUsers", explanation.Result.RouteId);
+        Assert.Equal(2, explanation.DeterministicCandidates.Count);
+        Assert.True(explanation.DeterministicCandidates[0].Matched);
+        Assert.False(explanation.DeterministicCandidates[1].Matched);
+        Assert.Equal(2, explanation.Result.Candidates.Count);
+    }
+
+    [Fact]
+    public async Task ExplainMatchAsync_ReturnsSemanticEvaluationDetailsWhenRequested()
+    {
+        var semanticCandidate = new QueryMatchDefinition
+        {
+            SemanticMatch = "find administrator user accounts",
+            Response = new QueryMatchResponseDefinition
+            {
+                StatusCode = 200,
+                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                {
+                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["result"] = "admin-user" } }
+                }
+            }
+        };
+        var otherCandidate = new QueryMatchDefinition
+        {
+            SemanticMatch = "show unpaid invoices",
+            Response = new QueryMatchResponseDefinition
+            {
+                StatusCode = 200,
+                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                {
+                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["result"] = "invoices" } }
+                }
+            }
+        };
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/semantic-search"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Matches = [semanticCandidate, otherCandidate],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["404"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["message"] = "no match" } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        var semanticMatcher = new StubSemanticMatcherService(new SemanticMatchExplanation
+        {
+            Attempted = true,
+            SelectedCandidate = semanticCandidate,
+            SelectedScore = 0.97d,
+            Threshold = 0.8d,
+            RequiredMargin = 0.05d,
+            SecondBestScore = 0.81d,
+            MarginToSecondBest = 0.16d,
+            CandidateScores =
+            [
+                new SemanticCandidateScore
+                {
+                    Candidate = semanticCandidate,
+                    Eligible = true,
+                    Score = 0.97d,
+                    AboveThreshold = true
+                },
+                new SemanticCandidateScore
+                {
+                    Candidate = otherCandidate,
+                    Eligible = true,
+                    Score = 0.81d,
+                    AboveThreshold = true
+                }
+            ]
+        });
+        var service = CreateService(document, semanticMatchingEnabled: true, semanticMatcherService: semanticMatcher);
+
+        var explanation = await service.ExplainMatchAsync(new MatchRequestInfo
+        {
+            Method = "POST",
+            Path = "/semantic-search",
+            Body = "find admin users by email",
+            IncludeSemanticCandidates = true
+        });
+
+        Assert.True(explanation.Result.Matched);
+        Assert.Equal("semantic", explanation.Result.MatchMode);
+        Assert.NotNull(explanation.SemanticEvaluation);
+        Assert.Equal(0.97d, explanation.SemanticEvaluation!.SelectedScore);
+        Assert.Equal(0.8d, explanation.SemanticEvaluation.Threshold);
+        Assert.Equal(2, explanation.SemanticEvaluation.Candidates.Count);
+    }
+
+    [Fact]
+    public async Task RecordLastMatchAsync_StoresExplanationForMostRecentRealRequest()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        OperationId = "listUsers",
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["users"] = Array.Empty<object>() } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        var service = CreateService(document);
+
+        await service.RecordLastMatchAsync(new MatchRequestInfo
+        {
+            Method = "GET",
+            Path = "/users"
+        });
+
+        var explanation = service.GetLastMatchExplanation();
+
+        Assert.NotNull(explanation);
+        Assert.True(explanation!.Result.Matched);
+        Assert.Equal("fallback", explanation.Result.MatchMode);
+        Assert.Equal("listUsers", explanation.Result.RouteId);
     }
 }

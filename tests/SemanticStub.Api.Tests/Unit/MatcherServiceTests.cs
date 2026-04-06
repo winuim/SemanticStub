@@ -248,6 +248,56 @@ public sealed class MatcherServiceTests
     }
 
     [Fact]
+    public void EvaluateCandidates_ReturnsPerDimensionResults()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "admin"
+                    },
+                    Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["X-Env"] = "staging"
+                    }
+                },
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["role"] = "guest"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var evaluations = matcher.EvaluateCandidates(
+            [],
+            operation,
+            new Dictionary<string, StringValues>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["X-Env"] = "staging"
+            },
+            body: null);
+
+        Assert.Equal(2, evaluations.Count);
+        Assert.True(evaluations[0].Matched);
+        Assert.True(evaluations[0].HeaderMatched);
+        Assert.False(evaluations[1].Matched);
+        Assert.False(evaluations[1].QueryMatched);
+    }
+
+    [Fact]
     public void FindBestMatch_MatchesHeadersUsingCaseInsensitiveHeaderNames()
     {
         var operation = new OperationDefinition

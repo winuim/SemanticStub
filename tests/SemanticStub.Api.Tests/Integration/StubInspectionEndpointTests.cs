@@ -125,4 +125,67 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task TestMatch_ReturnsSimulationPayload()
+    {
+        var response = await client.PostAsJsonAsync("/_semanticstub/runtime/test-match", new MatchRequestInfo
+        {
+            Method = "GET",
+            Path = "/hello"
+        });
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<MatchSimulationInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(payload);
+        Assert.True(payload.Matched);
+        Assert.Equal("Matched", payload.MatchResult);
+        Assert.Equal("getHello", payload.RouteId);
+    }
+
+    [Fact]
+    public async Task ExplainMatch_ReturnsExplanationPayload()
+    {
+        var response = await client.PostAsJsonAsync("/_semanticstub/runtime/explain", new MatchRequestInfo
+        {
+            Method = "GET",
+            Path = "/users",
+            Query = new Dictionary<string, string[]>
+            {
+                ["role"] = ["admin"]
+            },
+            IncludeCandidates = true
+        });
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<MatchExplanationInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(payload);
+        Assert.True(payload.PathMatched);
+        Assert.True(payload.MethodMatched);
+        Assert.Equal("Matched", payload.Result.MatchResult);
+        Assert.NotEmpty(payload.DeterministicCandidates);
+    }
+
+    [Fact]
+    public async Task ExplainLastMatch_ReturnsMostRecentRealRequestExplanation()
+    {
+        var routedResponse = await client.GetAsync("/users?role=admin");
+        routedResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync("/_semanticstub/runtime/explain/last");
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<MatchExplanationInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(payload);
+        Assert.True(payload!.PathMatched);
+        Assert.True(payload.MethodMatched);
+        Assert.Equal("Matched", payload.Result.MatchResult);
+        Assert.Equal("listUsers", payload.Result.RouteId);
+    }
 }

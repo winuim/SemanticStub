@@ -146,6 +146,32 @@ public sealed class MatcherService : IMatcherService
             .FirstOrDefault();
     }
 
+    /// <inheritdoc/>
+    public IReadOnlyList<QueryMatchCandidateEvaluation> EvaluateCandidates(
+        IReadOnlyCollection<ParameterDefinition> pathParameters,
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
+    {
+        using var bodyDocument = ParseRequestBody(body);
+        var queryParameterTypes = BuildQueryParameterTypes(pathParameters, operation.Parameters);
+        var evaluations = new List<QueryMatchCandidateEvaluation>(operation.Matches.Count);
+
+        foreach (var candidate in operation.Matches)
+        {
+            evaluations.Add(new QueryMatchCandidateEvaluation
+            {
+                Candidate = candidate,
+                QueryMatched = IsQueryMatch(candidate, query, queryParameterTypes),
+                HeaderMatched = IsExactHeaderMatch(candidate.Headers, headers),
+                BodyMatched = IsBodyMatch(candidate.Body, bodyDocument?.RootElement),
+            });
+        }
+
+        return evaluations;
+    }
+
     private QueryMatchDefinition? FindBestMatchWithOperationParameters(
         OperationDefinition operation,
         IReadOnlyDictionary<string, StringValues> query,

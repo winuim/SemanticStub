@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
+using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Controllers;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
@@ -46,6 +47,9 @@ public sealed class StubControllerTests
         Assert.Equal("admin", Assert.Single(stubService.Query["role"]));
         Assert.Equal("staging", stubService.Headers["X-Env"]);
         Assert.Equal("{\"username\":\"demo\"}", stubService.Body);
+        Assert.NotNull(controllerInspectionService.LastRecordedRequest);
+        Assert.Equal(HttpMethods.Post, controllerInspectionService.LastRecordedRequest!.Method);
+        Assert.Equal("/users", controllerInspectionService.LastRecordedRequest.Path);
     }
 
     [Fact]
@@ -218,15 +222,64 @@ public sealed class StubControllerTests
         Assert.Equal("value", controller.Response.Headers["X-Custom"].ToString());
     }
 
-    private static StubController CreateController(IStubService stubService)
+    [Fact]
+    public async Task Get_RecordsLastMatchRequestForInspection()
     {
-        return new StubController(stubService)
+        var stubService = new RecordingStubService(StubMatchResult.Matched, new StubResponse { StatusCode = 200 });
+        var inspectionService = new RecordingInspectionService();
+        var controller = CreateController(stubService, inspectionService);
+        controller.Request.QueryString = new QueryString("?role=admin&role=owner");
+        controller.Request.Headers["X-Env"] = "staging";
+
+        await controller.Get("users");
+
+        var recorded = Assert.IsType<MatchRequestInfo>(inspectionService.LastRecordedRequest);
+        Assert.Equal(HttpMethods.Get, recorded.Method);
+        Assert.Equal("/users", recorded.Path);
+        Assert.Equal(["admin", "owner"], recorded.Query["role"]);
+        Assert.Equal("staging", recorded.Headers["X-Env"]);
+    }
+
+    private static readonly RecordingInspectionService controllerInspectionService = new();
+
+    private static StubController CreateController(IStubService stubService, IStubInspectionService? inspectionService = null)
+    {
+        controllerInspectionService.LastRecordedRequest = null;
+
+        return new StubController(stubService, inspectionService ?? controllerInspectionService)
         {
             ControllerContext = new ControllerContext
             {
                 HttpContext = new DefaultHttpContext()
             }
         };
+    }
+
+    private sealed class RecordingInspectionService : IStubInspectionService
+    {
+        public MatchRequestInfo? LastRecordedRequest { get; set; }
+
+        public StubConfigSnapshot GetConfigSnapshot() => throw new NotSupportedException();
+
+        public IReadOnlyList<StubRouteInfo> GetRoutes() => throw new NotSupportedException();
+
+        public IReadOnlyList<ScenarioStateInfo> GetScenarioStates() => throw new NotSupportedException();
+
+        public Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request) => throw new NotSupportedException();
+
+        public Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request) => throw new NotSupportedException();
+
+        public MatchExplanationInfo? GetLastMatchExplanation() => throw new NotSupportedException();
+
+        public Task RecordLastMatchAsync(MatchRequestInfo request)
+        {
+            LastRecordedRequest = request;
+            return Task.CompletedTask;
+        }
+
+        public void ResetScenarioStates() => throw new NotSupportedException();
+
+        public bool ResetScenarioState(string scenarioName) => throw new NotSupportedException();
     }
 
     private sealed class RecordingStubService : IStubService

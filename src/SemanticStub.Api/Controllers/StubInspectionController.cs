@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Services;
 
 namespace SemanticStub.Api.Controllers;
@@ -33,6 +34,28 @@ public sealed class StubInspectionController : ControllerBase
     /// <summary>Returns the current runtime state for all configured scenarios.</summary>
     [HttpGet("scenarios")]
     public IActionResult GetScenarios() => Ok(inspectionService.GetScenarioStates());
+
+    /// <summary>Simulates how the runtime would match a virtual request without executing a response.</summary>
+    [HttpPost("test-match")]
+    public async Task<IActionResult> TestMatch([FromBody] MatchRequestInfo request)
+    {
+        return Ok(await inspectionService.TestMatchAsync(request).ConfigureAwait(false));
+    }
+
+    /// <summary>Explains how the runtime evaluated a virtual request without executing a response.</summary>
+    [HttpPost("explain")]
+    public async Task<IActionResult> ExplainMatch([FromBody] MatchRequestInfo request)
+    {
+        return Ok(await inspectionService.ExplainMatchAsync(request).ConfigureAwait(false));
+    }
+
+    /// <summary>Returns the explanation captured for the most recent real request.</summary>
+    [HttpGet("explain/last")]
+    public IActionResult ExplainLastMatch()
+    {
+        var explanation = inspectionService.GetLastMatchExplanation();
+        return explanation is null ? NotFound() : Ok(explanation);
+    }
 
     /// <summary>Resets all configured scenarios back to their initial state.</summary>
     [HttpPost("scenarios/reset")]
