@@ -29,4 +29,25 @@ public sealed class StubInspectionController : ControllerBase
     /// <summary>Returns the list of all routes currently defined in the loaded stub definitions.</summary>
     [HttpGet("routes")]
     public IActionResult GetRoutes() => Ok(inspectionService.GetRoutes());
+
+    /// <summary>Returns the current runtime state for all configured scenarios.</summary>
+    [HttpGet("scenarios")]
+    public IActionResult GetScenarios() => Ok(inspectionService.GetScenarioStates());
+
+    /// <summary>Resets all configured scenarios back to their initial state.</summary>
+    [HttpPost("scenarios/reset")]
+    public IActionResult ResetScenarios()
+    {
+        inspectionService.ResetScenarioStates();
+        return NoContent();
+    }
+
+    /// <summary>Resets a configured scenario back to its initial state.</summary>
+    [HttpPost("scenarios/{name}/reset")]
+    public IActionResult ResetScenario(string name)
+    {
+        return inspectionService.ResetScenarioState(name)
+            ? NoContent()
+            : NotFound();
+    }
 }

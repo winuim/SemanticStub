@@ -13,15 +13,18 @@ internal sealed class StubInspectionService : IStubInspectionService
     private readonly StubDefinitionState state;
     private readonly IStubDefinitionLoader loader;
     private readonly IOptions<StubSettings> settings;
+    private readonly ScenarioService scenarioService;
 
     public StubInspectionService(
         StubDefinitionState state,
         IStubDefinitionLoader loader,
-        IOptions<StubSettings> settings)
+        IOptions<StubSettings> settings,
+        ScenarioService scenarioService)
     {
         this.state = state;
         this.loader = loader;
         this.settings = settings;
+        this.scenarioService = scenarioService;
     }
 
     /// <inheritdoc/>
@@ -45,6 +48,58 @@ internal sealed class StubInspectionService : IStubInspectionService
     {
         var document = state.GetCurrentDocument();
         return BuildRoutes(document);
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<ScenarioStateInfo> GetScenarioStates()
+    {
+        return scenarioService.ExecuteLocked(() =>
+        {
+            var document = state.GetCurrentDocument();
+            var scenarioNames = GetScenarioNames(document);
+
+            return scenarioNames
+                .Select(name =>
+                {
+                    var snapshot = scenarioService.GetSnapshotWithinLock(name);
+                    return new ScenarioStateInfo
+                    {
+                        Name = name,
+                        CurrentState = snapshot.State,
+                        LastUpdatedTimestamp = snapshot.LastUpdatedTimestamp,
+                    };
+                })
+                .ToList();
+        });
+    }
+
+    /// <inheritdoc/>
+    public void ResetScenarioStates()
+    {
+        scenarioService.ExecuteLocked(() =>
+        {
+            var document = state.GetCurrentDocument();
+            scenarioService.ResetScenariosWithinLock(GetScenarioNames(document), DateTimeOffset.UtcNow);
+            return 0;
+        });
+    }
+
+    /// <inheritdoc/>
+    public bool ResetScenarioState(string scenarioName)
+    {
+        return scenarioService.ExecuteLocked(() =>
+        {
+            var document = state.GetCurrentDocument();
+            var scenarioNames = GetScenarioNames(document);
+
+            if (!scenarioNames.Contains(scenarioName, StringComparer.Ordinal))
+            {
+                return false;
+            }
+
+            scenarioService.ResetScenarioWithinLock(scenarioName, DateTimeOffset.UtcNow);
+            return true;
+        });
     }
 
     private static IReadOnlyList<StubRouteInfo> BuildRoutes(StubDocument document)
@@ -89,6 +144,46 @@ internal sealed class StubInspectionService : IStubInspectionService
     private static bool HasScenario(OperationDefinition op)
         => op.Responses.Values.Any(r => r.Scenario is not null)
         || op.Matches.Any(m => m.Response.Scenario is not null);
+
+    private static IReadOnlyList<string> GetScenarioNames(StubDocument document)
+    {
+        var scenarioNames = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var pathItem in document.Paths.Values)
+        {
+            AddScenarioNames(pathItem.Get, scenarioNames);
+            AddScenarioNames(pathItem.Post, scenarioNames);
+            AddScenarioNames(pathItem.Put, scenarioNames);
+            AddScenarioNames(pathItem.Patch, scenarioNames);
+            AddScenarioNames(pathItem.Delete, scenarioNames);
+        }
+
+        return scenarioNames.OrderBy(name => name, StringComparer.Ordinal).ToList();
+    }
+
+    private static void AddScenarioNames(OperationDefinition? operation, ISet<string> scenarioNames)
+    {
+        if (operation is null)
+        {
+            return;
+        }
+
+        foreach (var response in operation.Responses.Values)
+        {
+            if (response.Scenario is not null)
+            {
+                scenarioNames.Add(response.Scenario.Name);
+            }
+        }
+
+        foreach (var match in operation.Matches)
+        {
+            if (match.Response.Scenario is not null)
+            {
+                scenarioNames.Add(match.Response.Scenario.Name);
+            }
+        }
+    }
 
     private static string ComputeDocumentHash(StubDocument document)
     {

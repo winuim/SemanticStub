@@ -52,6 +52,78 @@ public sealed class ScenarioServiceTests
     }
 
     [Fact]
+    public void GetSnapshot_ReturnsInitialStateWithNullTimestamp_WhenScenarioHasNotAdvanced()
+    {
+        var service = new ScenarioService();
+
+        var snapshot = service.GetSnapshot("checkout-flow");
+
+        Assert.Equal("initial", snapshot.State);
+        Assert.Null(snapshot.LastUpdatedTimestamp);
+    }
+
+    [Fact]
+    public void Advance_StoresCurrentStateTimestamp()
+    {
+        var service = new ScenarioService();
+        var scenario = new ScenarioDefinition
+        {
+            Name = "checkout-flow",
+            State = "initial",
+            Next = "confirmed"
+        };
+        var before = DateTimeOffset.UtcNow;
+
+        service.Advance(scenario);
+
+        var after = DateTimeOffset.UtcNow;
+        var snapshot = service.GetSnapshot("checkout-flow");
+
+        Assert.Equal("confirmed", snapshot.State);
+        Assert.NotNull(snapshot.LastUpdatedTimestamp);
+        Assert.True(snapshot.LastUpdatedTimestamp >= before);
+        Assert.True(snapshot.LastUpdatedTimestamp <= after);
+    }
+
+    [Fact]
+    public void ResetScenario_RestoresInitialStateWithTimestamp()
+    {
+        var service = new ScenarioService();
+        var scenario = new ScenarioDefinition
+        {
+            Name = "checkout-flow",
+            State = "initial",
+            Next = "confirmed"
+        };
+
+        service.Advance(scenario);
+
+        service.ResetScenario("checkout-flow");
+
+        var snapshot = service.GetSnapshot("checkout-flow");
+        Assert.Equal("initial", snapshot.State);
+        Assert.NotNull(snapshot.LastUpdatedTimestamp);
+    }
+
+    [Fact]
+    public void ResetScenarios_ResetsOnlyTheSuppliedScenarioSet()
+    {
+        var service = new ScenarioService();
+        service.Advance(new ScenarioDefinition { Name = "checkout-flow", State = "initial", Next = "confirmed" });
+        service.Advance(new ScenarioDefinition { Name = "payment-flow", State = "initial", Next = "authorized" });
+
+        service.ResetScenarios(["checkout-flow"]);
+
+        var checkoutSnapshot = service.GetSnapshot("checkout-flow");
+        var paymentSnapshot = service.GetSnapshot("payment-flow");
+
+        Assert.Equal("initial", checkoutSnapshot.State);
+        Assert.NotNull(checkoutSnapshot.LastUpdatedTimestamp);
+        Assert.Equal("initial", paymentSnapshot.State);
+        Assert.Null(paymentSnapshot.LastUpdatedTimestamp);
+    }
+
+    [Fact]
     public void ResetWithinLock_ClearsAdvancedScenarioStateWithoutDeadlock()
     {
         var service = new ScenarioService();

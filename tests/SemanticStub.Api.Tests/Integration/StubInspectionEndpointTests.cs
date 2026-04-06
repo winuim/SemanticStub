@@ -89,4 +89,40 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
             Assert.NotEmpty(route.PathPattern);
         }
     }
+
+    [Fact]
+    public async Task GetScenarios_ReturnsOk()
+    {
+        var response = await client.GetAsync("/_semanticstub/runtime/scenarios");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetScenarios_ResponseDeserializesToScenarioStateInfoArray()
+    {
+        var response = await client.GetAsync("/_semanticstub/runtime/scenarios");
+        response.EnsureSuccessStatusCode();
+
+        var scenarios = await response.Content.ReadFromJsonAsync<ScenarioStateInfo[]>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(scenarios);
+    }
+
+    [Fact]
+    public async Task ResetScenarios_ReturnsNoContent()
+    {
+        var response = await client.PostAsync("/_semanticstub/runtime/scenarios/reset", content: null);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ResetScenario_ReturnsNotFound_WhenScenarioDoesNotExist()
+    {
+        var response = await client.PostAsync("/_semanticstub/runtime/scenarios/does-not-exist/reset", content: null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
 }
