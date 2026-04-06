@@ -9,7 +9,7 @@ namespace SemanticStub.Api.Services;
 public sealed class ScenarioService
 {
     private const string InitialState = "initial";
-    private readonly ConcurrentDictionary<string, string> currentStates = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ScenarioStateSnapshot> currentStates = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim semaphore = new(1, 1);
 
     /// <summary>
@@ -23,7 +23,9 @@ public sealed class ScenarioService
             return true;
         }
 
-        var currentState = currentStates.GetValueOrDefault(scenario.Name, InitialState);
+        var currentState = currentStates.TryGetValue(scenario.Name, out var snapshot)
+            ? snapshot.State
+            : InitialState;
 
         return string.Equals(currentState, scenario.State, StringComparison.Ordinal);
     }
@@ -39,7 +41,7 @@ public sealed class ScenarioService
             return;
         }
 
-        currentStates[scenario.Name] = scenario.Next;
+        currentStates[scenario.Name] = new ScenarioStateSnapshot(scenario.Next, DateTimeOffset.UtcNow);
     }
 
     /// <summary>
@@ -57,6 +59,84 @@ public sealed class ScenarioService
     internal void ResetWithinLock()
     {
         currentStates.Clear();
+    }
+
+    /// <summary>
+    /// Returns the point-in-time snapshot for the supplied scenario.
+    /// </summary>
+    /// <param name="scenarioName">The scenario name defined in YAML.</param>
+    public ScenarioStateSnapshot GetSnapshot(string scenarioName)
+    {
+        return ExecuteLocked(() => GetSnapshotWithinLock(scenarioName));
+    }
+
+    /// <summary>
+    /// Returns point-in-time snapshots for the supplied scenarios.
+    /// </summary>
+    /// <param name="scenarioNames">The scenario names defined in YAML.</param>
+    public IReadOnlyDictionary<string, ScenarioStateSnapshot> GetSnapshots(IEnumerable<string> scenarioNames)
+    {
+        return ExecuteLocked(() =>
+        {
+            var snapshots = new Dictionary<string, ScenarioStateSnapshot>(StringComparer.Ordinal);
+
+            foreach (var scenarioName in scenarioNames)
+            {
+                snapshots[scenarioName] = GetSnapshotWithinLock(scenarioName);
+            }
+
+            return snapshots;
+        });
+    }
+
+    /// <summary>
+    /// Resets the supplied scenario back to its initial state.
+    /// </summary>
+    /// <param name="scenarioName">The scenario name defined in YAML.</param>
+    public void ResetScenario(string scenarioName)
+    {
+        ExecuteLocked(() =>
+        {
+            ResetScenarioWithinLock(scenarioName, DateTimeOffset.UtcNow);
+            return 0;
+        });
+    }
+
+    /// <summary>
+    /// Resets the supplied scenarios back to their initial state.
+    /// </summary>
+    /// <param name="scenarioNames">The scenario names defined in YAML.</param>
+    public void ResetScenarios(IEnumerable<string> scenarioNames)
+    {
+        ExecuteLocked(() =>
+        {
+            ResetScenariosWithinLock(scenarioNames, DateTimeOffset.UtcNow);
+            return 0;
+        });
+    }
+
+    internal ScenarioStateSnapshot GetSnapshotWithinLock(string scenarioName)
+    {
+        return currentStates.TryGetValue(scenarioName, out var snapshot)
+            ? snapshot
+            : new ScenarioStateSnapshot(InitialState, null);
+    }
+
+    internal void ResetScenarioWithinLock(string scenarioName, DateTimeOffset timestamp)
+    {
+        currentStates[scenarioName] = new ScenarioStateSnapshot(InitialState, timestamp);
+    }
+
+    internal void ResetScenariosWithinLock(IEnumerable<string> scenarioNames, DateTimeOffset timestamp)
+    {
+        var scenarioNameSet = new HashSet<string>(scenarioNames, StringComparer.Ordinal);
+
+        currentStates.Clear();
+
+        foreach (var scenarioName in scenarioNameSet)
+        {
+            currentStates[scenarioName] = new ScenarioStateSnapshot(InitialState, timestamp);
+        }
     }
 
     /// <summary>
@@ -93,3 +173,8 @@ public sealed class ScenarioService
         }
     }
 }
+
+/// <summary>
+/// Describes a scenario's current runtime state and when it last changed.
+/// </summary>
+public sealed record ScenarioStateSnapshot(string State, DateTimeOffset? LastUpdatedTimestamp);
