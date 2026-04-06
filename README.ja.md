@@ -215,6 +215,15 @@ paths:
 
 - `body` マッチは任意のバイナリリクエストではなく、構造化された JSON リクエストペイロード向けです。
 
+## Runtime inspection
+
+SemanticStub は、読み取り専用の runtime inspection endpoint を予約プレフィックス
+`/_semanticstub/runtime` 配下に公開します。
+
+- `GET /_semanticstub/runtime/config` は、現在有効な effective configuration snapshot のメタデータを返します。
+- `GET /_semanticstub/runtime/routes` は、現在有効な正規化済み route list を返します。
+- `/_semanticstub/runtime/*` 配下の YAML stub 定義は inspection endpoint 用に予約されており、通常の stub route としては到達できません。
+
 ## 開発
 
 - Source: `src/`
