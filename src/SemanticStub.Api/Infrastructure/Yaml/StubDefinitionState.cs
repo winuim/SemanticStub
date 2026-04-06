@@ -39,7 +39,7 @@ internal sealed class StubDefinitionState
                 scenarioService.ExecuteLocked(() =>
                 {
                     Volatile.Write(ref currentDocument, reloadedDocument);
-                    scenarioService.Reset();
+                    scenarioService.ResetWithinLock();
                     return 0;
                 });
                 logger.LogInformation("Reloaded stub definitions from disk.");
