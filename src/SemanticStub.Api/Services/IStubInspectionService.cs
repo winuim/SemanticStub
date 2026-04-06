@@ -40,10 +40,10 @@ public interface IStubInspectionService
     MatchExplanationInfo? GetLastMatchExplanation();
 
     /// <summary>
-    /// Captures the explanation for the supplied real request so it can be retrieved later.
+    /// Captures the explanation for the most recent real request so it can be retrieved later.
     /// </summary>
-    /// <param name="request">The real request to evaluate and store.</param>
-    Task RecordLastMatchAsync(MatchRequestInfo request);
+    /// <param name="explanation">The explanation captured from the real request dispatch.</param>
+    void RecordLastMatchExplanation(MatchExplanationInfo explanation);
 
     /// <summary>
     /// Resets all configured scenarios back to their initial state.

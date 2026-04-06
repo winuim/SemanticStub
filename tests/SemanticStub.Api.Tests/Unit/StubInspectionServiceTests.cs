@@ -1015,7 +1015,7 @@ public sealed class StubInspectionServiceTests
     }
 
     [Fact]
-    public async Task RecordLastMatchAsync_StoresExplanationForMostRecentRealRequest()
+    public async Task RecordLastMatchExplanation_StoresExplanationForMostRecentRealRequest()
     {
         var document = new StubDocument
         {
@@ -1042,11 +1042,12 @@ public sealed class StubInspectionServiceTests
         };
         var service = CreateService(document);
 
-        await service.RecordLastMatchAsync(new MatchRequestInfo
+        var evaluated = await service.ExplainMatchAsync(new MatchRequestInfo
         {
             Method = "GET",
             Path = "/users"
         });
+        service.RecordLastMatchExplanation(evaluated);
 
         var explanation = service.GetLastMatchExplanation();
 

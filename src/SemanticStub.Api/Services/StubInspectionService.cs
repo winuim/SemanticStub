@@ -104,10 +104,8 @@ internal sealed class StubInspectionService : IStubInspectionService
     }
 
     /// <inheritdoc/>
-    public async Task RecordLastMatchAsync(MatchRequestInfo request)
+    public void RecordLastMatchExplanation(MatchExplanationInfo explanation)
     {
-        var explanation = await EvaluateMatchAsync(request).ConfigureAwait(false);
-
         lock (lastMatchSyncRoot)
         {
             lastMatchExplanation = explanation;

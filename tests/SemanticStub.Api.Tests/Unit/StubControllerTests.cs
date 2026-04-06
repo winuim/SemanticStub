@@ -47,9 +47,10 @@ public sealed class StubControllerTests
         Assert.Equal("admin", Assert.Single(stubService.Query["role"]));
         Assert.Equal("staging", stubService.Headers["X-Env"]);
         Assert.Equal("{\"username\":\"demo\"}", stubService.Body);
-        Assert.NotNull(controllerInspectionService.LastRecordedRequest);
-        Assert.Equal(HttpMethods.Post, controllerInspectionService.LastRecordedRequest!.Method);
-        Assert.Equal("/users", controllerInspectionService.LastRecordedRequest.Path);
+        Assert.NotNull(controllerInspectionService.LastRecordedExplanation);
+        Assert.Equal("Matched", controllerInspectionService.LastRecordedExplanation!.Result.MatchResult);
+        Assert.Equal(HttpMethods.Post, controllerInspectionService.LastRecordedExplanation.Result.Method);
+        Assert.Equal("/users", controllerInspectionService.LastRecordedExplanation.Result.PathPattern);
     }
 
     [Fact]
@@ -233,18 +234,16 @@ public sealed class StubControllerTests
 
         await controller.Get("users");
 
-        var recorded = Assert.IsType<MatchRequestInfo>(inspectionService.LastRecordedRequest);
-        Assert.Equal(HttpMethods.Get, recorded.Method);
-        Assert.Equal("/users", recorded.Path);
-        Assert.Equal(["admin", "owner"], recorded.Query["role"]);
-        Assert.Equal("staging", recorded.Headers["X-Env"]);
+        var recorded = Assert.IsType<MatchExplanationInfo>(inspectionService.LastRecordedExplanation);
+        Assert.Equal("Matched", recorded.Result.MatchResult);
+        Assert.Equal("/users", recorded.Result.PathPattern);
     }
 
     private static readonly RecordingInspectionService controllerInspectionService = new();
 
     private static StubController CreateController(IStubService stubService, IStubInspectionService? inspectionService = null)
     {
-        controllerInspectionService.LastRecordedRequest = null;
+        controllerInspectionService.LastRecordedExplanation = null;
 
         return new StubController(stubService, inspectionService ?? controllerInspectionService)
         {
@@ -257,7 +256,7 @@ public sealed class StubControllerTests
 
     private sealed class RecordingInspectionService : IStubInspectionService
     {
-        public MatchRequestInfo? LastRecordedRequest { get; set; }
+        public MatchExplanationInfo? LastRecordedExplanation { get; set; }
 
         public StubConfigSnapshot GetConfigSnapshot() => throw new NotSupportedException();
 
@@ -271,10 +270,9 @@ public sealed class StubControllerTests
 
         public MatchExplanationInfo? GetLastMatchExplanation() => throw new NotSupportedException();
 
-        public Task RecordLastMatchAsync(MatchRequestInfo request)
+        public void RecordLastMatchExplanation(MatchExplanationInfo explanation)
         {
-            LastRecordedRequest = request;
-            return Task.CompletedTask;
+            LastRecordedExplanation = explanation;
         }
 
         public void ResetScenarioStates() => throw new NotSupportedException();
@@ -311,6 +309,38 @@ public sealed class StubControllerTests
         public IReadOnlyList<string> GetAllowedMethods(string path)
         {
             return AllowedMethods;
+        }
+
+        public Task<StubDispatchResult> DispatchAsync(
+            string method,
+            string path,
+            IReadOnlyDictionary<string, StringValues> query,
+            IReadOnlyDictionary<string, string> headers,
+            string? body)
+        {
+            Method = method;
+            Path = path;
+            Query = query;
+            Headers = headers;
+            Body = body;
+
+            return Task.FromResult(new StubDispatchResult
+            {
+                Result = matchResult,
+                Response = matchResult == StubMatchResult.Matched ? response : null,
+                Explanation = new MatchExplanationInfo
+                {
+                    PathMatched = true,
+                    MethodMatched = true,
+                    Result = new MatchSimulationInfo
+                    {
+                        Matched = matchResult == StubMatchResult.Matched,
+                        MatchResult = matchResult.ToString(),
+                        Method = method,
+                        PathPattern = path,
+                    }
+                }
+            });
         }
 
         public StubMatchResult TryGetResponse(

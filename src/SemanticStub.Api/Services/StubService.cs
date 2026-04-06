@@ -1,4 +1,5 @@
 using SemanticStub.Api.Infrastructure.Yaml;
+using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Utilities;
 using Microsoft.Extensions.Logging;
@@ -245,9 +246,39 @@ public sealed class StubService : IStubService
         string? body,
         out StubResponse? response)
     {
-        var (matchResult, r) = TryGetResponseAsync(method, path, query, headers, body).GetAwaiter().GetResult();
-        response = r;
-        return matchResult;
+        var dispatch = DispatchAsync(method, path, query, headers, body).GetAwaiter().GetResult();
+        response = dispatch.Response;
+        return dispatch.Result;
+    }
+
+    /// <inheritdoc/>
+    public async Task<StubDispatchResult> DispatchAsync(
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
+    {
+        var document = documentAccessor();
+
+        if (!TryResolveOperation(document, method, path, out var pathPattern, out var pathItem, out var operation, out var failedMatchResult))
+        {
+            return CreateFailedDispatchResult(
+                failedMatchResult,
+                failedMatchResult == StubMatchResult.MethodNotAllowed
+                    ? "The request path matched, but the HTTP method is not configured for that route."
+                    : "No configured route matched the supplied request path.",
+                pathMatched: failedMatchResult == StubMatchResult.MethodNotAllowed,
+                methodMatched: false);
+        }
+
+        if (OperationUsesScenario(operation))
+        {
+            return await scenarioService.ExecuteLockedAsync(
+                () => DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body)).ConfigureAwait(false);
+        }
+
+        return await DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -258,20 +289,8 @@ public sealed class StubService : IStubService
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
-        var document = documentAccessor();
-
-        if (!TryResolveOperation(document, method, path, out var pathItem, out var operation, out var failedMatchResult))
-        {
-            return (failedMatchResult, null);
-        }
-
-        if (OperationUsesScenario(operation))
-        {
-            return await scenarioService.ExecuteLockedAsync(
-                () => TryGetResponseCoreAsync(method, path, pathItem, operation, query, headers, body)).ConfigureAwait(false);
-        }
-
-        return await TryGetResponseCoreAsync(method, path, pathItem, operation, query, headers, body).ConfigureAwait(false);
+        var dispatch = await DispatchAsync(method, path, query, headers, body).ConfigureAwait(false);
+        return (dispatch.Result, dispatch.Response);
     }
 
     private static bool OperationUsesScenario(OperationDefinition operation)
@@ -280,25 +299,180 @@ public sealed class StubService : IStubService
                operation.Responses.Values.Any(response => response.Scenario is not null);
     }
 
-    private async Task<(StubMatchResult MatchResult, StubResponse? Response)> TryGetResponseCoreAsync(
+    private async Task<StubDispatchResult> DispatchCoreAsync(
         string method,
         string path,
+        string pathPattern,
         PathItemDefinition pathItem,
         OperationDefinition operation,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
-        var (conditionalResult, response) = await TryBuildMatchedConditionalResponseAsync(method, path, pathItem, operation, query, headers, body).ConfigureAwait(false);
+        var routeId = GetRouteId(method, pathPattern, operation);
+        var request = CreateInspectionRequest(method, path, query, headers, body);
+        var scenarioSnapshots = GetScenarioSnapshots(operation);
+        var deterministicEvaluations = matcherService.EvaluateCandidates(pathItem.Parameters, operation, query, headers, body)
+            .Select((evaluation, index) => CreateCandidateInfo(evaluation, index, scenarioSnapshots))
+            .ToList();
+        var selectedDeterministicCandidate = matcherService.FindBestMatch(
+            pathItem.Parameters,
+            operation,
+            query,
+            headers,
+            body,
+            candidate => scenarioService.IsMatch(candidate.Response.Scenario) && IsDeterministicCandidate(candidate));
 
-        if (conditionalResult.HasValue)
+        if (selectedDeterministicCandidate is not null)
         {
-            return (conditionalResult.Value, response);
+            var matchedCandidate = deterministicEvaluations.First(candidate =>
+                ReferenceEquals(operation.Matches[candidate.CandidateIndex], selectedDeterministicCandidate));
+
+            if (!TryBuildStubResponse(selectedDeterministicCandidate.Response, out var deterministicResponse))
+            {
+                return CreateMatchedDispatchResult(
+                    request,
+                    routeId,
+                    method,
+                    pathPattern,
+                    deterministicEvaluations,
+                    semanticEvaluation: null,
+                    StubMatchResult.ResponseNotConfigured,
+                    response: null,
+                    matchMode: "exact",
+                    selectedResponseId: matchedCandidate.ResponseId,
+                    selectedResponseStatusCode: matchedCandidate.ResponseStatusCode,
+                    selectionReason: $"Deterministic candidate {matchedCandidate.CandidateIndex} matched, but its response is not configured.");
+            }
+
+            logger?.LogInformation(
+                "Deterministic conditional match selected for '{Path}' {Method}. QueryKeys={QueryKeys}, HeaderKeys={HeaderKeys}, HasBody={HasBody}.",
+                path,
+                method.ToUpperInvariant(),
+                selectedDeterministicCandidate.Query.Count + selectedDeterministicCandidate.PartialQuery.Count + selectedDeterministicCandidate.RegexQuery.Count,
+                selectedDeterministicCandidate.Headers.Count,
+                selectedDeterministicCandidate.Body is not null);
+
+            scenarioService.Advance(selectedDeterministicCandidate.Response.Scenario);
+
+            return CreateMatchedDispatchResult(
+                request,
+                routeId,
+                method,
+                pathPattern,
+                deterministicEvaluations,
+                semanticEvaluation: null,
+                StubMatchResult.Matched,
+                deterministicResponse,
+                matchMode: "exact",
+                selectedResponseId: matchedCandidate.ResponseId,
+                selectedResponseStatusCode: matchedCandidate.ResponseStatusCode,
+                selectionReason: $"Deterministic candidate {matchedCandidate.CandidateIndex} matched all configured conditions and was selected.");
         }
 
-        return TryBuildDefaultOperationResponse(operation, out response)
-            ? (StubMatchResult.Matched, response)
-            : (StubMatchResult.ResponseNotConfigured, null);
+        SemanticMatchInfo? semanticEvaluationInfo = null;
+        var semanticExplanation = semanticMatcherService is null
+            ? new SemanticMatchExplanation()
+            : await semanticMatcherService.ExplainMatchAsync(
+                method,
+                path,
+                query,
+                headers,
+                body,
+                operation.Matches,
+                candidate => scenarioService.IsMatch(candidate.Response.Scenario),
+                includeCandidateScores: false).ConfigureAwait(false);
+
+        if (semanticExplanation.Attempted)
+        {
+            semanticEvaluationInfo = CreateSemanticMatchInfo(semanticExplanation, operation);
+        }
+
+        if (semanticExplanation.SelectedCandidate is not null)
+        {
+            var selectedCandidate = deterministicEvaluations.FirstOrDefault(candidate =>
+                    ReferenceEquals(operation.Matches[candidate.CandidateIndex], semanticExplanation.SelectedCandidate))
+                ?? CreateCandidateInfo(
+                    new QueryMatchCandidateEvaluation
+                    {
+                        Candidate = semanticExplanation.SelectedCandidate,
+                        QueryMatched = false,
+                        HeaderMatched = false,
+                        BodyMatched = false,
+                    },
+                    operation.Matches.FindIndex(candidate => ReferenceEquals(candidate, semanticExplanation.SelectedCandidate)),
+                    scenarioSnapshots);
+
+            if (!TryBuildStubResponse(semanticExplanation.SelectedCandidate.Response, out var semanticResponse))
+            {
+                return CreateMatchedDispatchResult(
+                    request,
+                    routeId,
+                    method,
+                    pathPattern,
+                    deterministicEvaluations,
+                    semanticEvaluationInfo,
+                    StubMatchResult.ResponseNotConfigured,
+                    response: null,
+                    matchMode: "semantic",
+                    selectedResponseId: selectedCandidate.ResponseId,
+                    selectedResponseStatusCode: selectedCandidate.ResponseStatusCode,
+                    selectionReason: "Semantic fallback selected a candidate, but its response is not configured.");
+            }
+
+            logger?.LogInformation(
+                "Semantic fallback produced a match for '{Path}' {Method}.",
+                path,
+                method.ToUpperInvariant());
+
+            scenarioService.Advance(semanticExplanation.SelectedCandidate.Response.Scenario);
+
+            return CreateMatchedDispatchResult(
+                request,
+                routeId,
+                method,
+                pathPattern,
+                deterministicEvaluations,
+                semanticEvaluationInfo,
+                StubMatchResult.Matched,
+                semanticResponse,
+                matchMode: "semantic",
+                selectedResponseId: selectedCandidate.ResponseId,
+                selectedResponseStatusCode: selectedCandidate.ResponseStatusCode,
+                selectionReason: "Semantic fallback selected the highest-scoring eligible candidate.");
+        }
+
+        if (TryBuildDefaultOperationResponse(operation, out var response))
+        {
+            var defaultResponse = GetDefaultResponse(operation, scenarioSnapshots);
+            return CreateMatchedDispatchResult(
+                request,
+                routeId,
+                method,
+                pathPattern,
+                deterministicEvaluations,
+                semanticEvaluationInfo,
+                StubMatchResult.Matched,
+                response,
+                matchMode: "fallback",
+                selectedResponseId: defaultResponse?.ResponseId,
+                selectedResponseStatusCode: defaultResponse?.StatusCode,
+                selectionReason: "No conditional candidate matched, so the eligible default response was selected.");
+        }
+
+        return CreateMatchedDispatchResult(
+            request,
+            routeId,
+            method,
+            pathPattern,
+            deterministicEvaluations,
+            semanticEvaluationInfo,
+            StubMatchResult.ResponseNotConfigured,
+            response: null,
+            matchMode: null,
+            selectedResponseId: null,
+            selectedResponseStatusCode: null,
+            selectionReason: "The route matched, but no eligible conditional or default response is configured for the current request and scenario state.");
     }
 
     private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)
@@ -322,6 +496,21 @@ public sealed class StubService : IStubService
             .OrderByDescending(entry => GetTemplateSpecificity(entry.Key))
             .ThenBy(entry => entry.Key, StringComparer.Ordinal)
             .Select(entry => entry.Value)
+            .FirstOrDefault();
+    }
+
+    private static (string PathPattern, PathItemDefinition PathItem)? ResolvePath(StubDocument document, string requestPath)
+    {
+        if (document.Paths.TryGetValue(requestPath, out var exactPathItem))
+        {
+            return (requestPath, exactPathItem);
+        }
+
+        return document.Paths
+            .Where(entry => IsTemplateMatch(entry.Key, requestPath))
+            .OrderByDescending(entry => GetTemplateSpecificity(entry.Key))
+            .ThenBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry => ((string PathPattern, PathItemDefinition PathItem)?) (entry.Key, entry.Value))
             .FirstOrDefault();
     }
 
@@ -470,124 +659,247 @@ public sealed class StubService : IStubService
         StubDocument document,
         string method,
         string path,
+        out string pathPattern,
         out PathItemDefinition pathItem,
         out OperationDefinition operation,
         out StubMatchResult failedMatchResult)
     {
+        pathPattern = string.Empty;
         pathItem = null!;
         operation = null!;
         failedMatchResult = StubMatchResult.Matched;
 
-        var resolvedPathItem = ResolvePathItem(document, path);
+        var resolvedPath = ResolvePath(document, path);
 
-        if (resolvedPathItem is null)
+        if (resolvedPath is null)
         {
             failedMatchResult = StubMatchResult.PathNotFound;
             return false;
         }
 
+        var (resolvedPathPattern, resolvedPathItem) = resolvedPath.Value;
         var resolvedOperation = GetOperation(method, resolvedPathItem);
 
         if (resolvedOperation is null)
         {
             failedMatchResult = StubMatchResult.MethodNotAllowed;
+            pathPattern = resolvedPathPattern;
+            pathItem = resolvedPathItem;
             return false;
         }
 
+        pathPattern = resolvedPathPattern;
         pathItem = resolvedPathItem;
         operation = resolvedOperation;
         return true;
     }
 
-    private async Task<(StubMatchResult? Result, StubResponse Response)> TryBuildMatchedConditionalResponseAsync(
-        string method,
-        string path,
-        PathItemDefinition pathItem,
-        OperationDefinition operation,
-        IReadOnlyDictionary<string, StringValues> query,
-        IReadOnlyDictionary<string, string> headers,
-        string? body)
+    private static StubDispatchResult CreateFailedDispatchResult(
+        StubMatchResult result,
+        string selectionReason,
+        bool pathMatched,
+        bool methodMatched)
     {
-        var queryMatchResult = TryBuildMatchedQueryResponse(method, path, pathItem, operation, query, headers, body, out var response);
-
-        if (queryMatchResult == QueryMatchEvaluationResult.Matched)
+        return new StubDispatchResult
         {
-            return (StubMatchResult.Matched, response);
-        }
-
-        if (queryMatchResult == QueryMatchEvaluationResult.MatchedButInvalidResponse)
-        {
-            return (StubMatchResult.ResponseNotConfigured, null!);
-        }
-
-        var (semanticMatchResult, semanticResponse) = await TryBuildSemanticMatchedResponseAsync(method, path, operation, query, headers, body).ConfigureAwait(false);
-
-        if (semanticMatchResult == QueryMatchEvaluationResult.Matched)
-        {
-            logger?.LogInformation(
-                "Semantic fallback produced a match for '{Path}' {Method}.",
-                path,
-                method.ToUpperInvariant());
-            return (StubMatchResult.Matched, semanticResponse);
-        }
-
-        if (semanticMatchResult == QueryMatchEvaluationResult.MatchedButInvalidResponse)
-        {
-            return (StubMatchResult.ResponseNotConfigured, null!);
-        }
-
-        return (null, null!);
+            Result = result,
+            Explanation = new MatchExplanationInfo
+            {
+                PathMatched = pathMatched,
+                MethodMatched = methodMatched,
+                SelectionReason = selectionReason,
+                Result = new MatchSimulationInfo
+                {
+                    Matched = false,
+                    MatchResult = result.ToString(),
+                }
+            }
+        };
     }
 
-    private async Task<(QueryMatchEvaluationResult Result, StubResponse Response)> TryBuildSemanticMatchedResponseAsync(
+    private static StubDispatchResult CreateMatchedDispatchResult(
+        MatchRequestInfo request,
+        string routeId,
+        string method,
+        string pathPattern,
+        IReadOnlyList<MatchCandidateInfo> deterministicCandidates,
+        SemanticMatchInfo? semanticEvaluation,
+        StubMatchResult matchResult,
+        StubResponse? response,
+        string? matchMode,
+        string? selectedResponseId,
+        int? selectedResponseStatusCode,
+        string selectionReason)
+    {
+        return new StubDispatchResult
+        {
+            Result = matchResult,
+            Response = response,
+            Explanation = new MatchExplanationInfo
+            {
+                PathMatched = true,
+                MethodMatched = true,
+                SelectionReason = selectionReason,
+                DeterministicCandidates = deterministicCandidates,
+                SemanticEvaluation = semanticEvaluation,
+                Result = new MatchSimulationInfo
+                {
+                    Matched = matchResult == StubMatchResult.Matched,
+                    MatchResult = matchResult.ToString(),
+                    RouteId = routeId,
+                    Method = method,
+                    PathPattern = pathPattern,
+                    SelectedResponseId = selectedResponseId,
+                    SelectedResponseStatusCode = selectedResponseStatusCode,
+                    MatchMode = matchMode,
+                    Candidates = request.IncludeCandidates ? deterministicCandidates : [],
+                }
+            }
+        };
+    }
+
+    private static MatchRequestInfo CreateInspectionRequest(
         string method,
         string path,
-        OperationDefinition operation,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
-        if (semanticMatcherService is null)
+        return new MatchRequestInfo
         {
-            return (QueryMatchEvaluationResult.NoMatch, null!);
+            Method = method,
+            Path = path,
+            Query = query.ToDictionary(
+                entry => entry.Key,
+                entry => entry.Value.Select(value => value ?? string.Empty).ToArray(),
+                StringComparer.Ordinal),
+            Headers = new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase),
+            Body = body,
+        };
+    }
+
+    private IReadOnlyDictionary<string, ScenarioStateSnapshot> GetScenarioSnapshots(OperationDefinition operation)
+    {
+        var scenarioNames = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var response in operation.Responses.Values)
+        {
+            if (response.Scenario is not null)
+            {
+                scenarioNames.Add(response.Scenario.Name);
+            }
         }
 
-        if (operation.Matches.Count == 0)
+        foreach (var match in operation.Matches)
         {
-            return (QueryMatchEvaluationResult.NoMatch, null!);
+            if (match.Response.Scenario is not null)
+            {
+                scenarioNames.Add(match.Response.Scenario.Name);
+            }
         }
 
-        logger?.LogInformation(
-            "Deterministic conditional match not found for '{Path}' {Method}. Trying semantic fallback.",
-            path,
-            method.ToUpperInvariant());
+        return scenarioNames.ToDictionary(
+            scenarioName => scenarioName,
+            scenarioName => scenarioService.GetSnapshotWithinLock(scenarioName),
+            StringComparer.Ordinal);
+    }
 
-        var matchedCandidate = await semanticMatcherService.FindBestMatchAsync(
-            method,
-            path,
-            query,
-            headers,
-            body,
-            operation.Matches,
-            candidate => scenarioService.IsMatch(candidate.Response.Scenario)).ConfigureAwait(false);
+    private static MatchCandidateInfo CreateCandidateInfo(
+        QueryMatchCandidateEvaluation evaluation,
+        int index,
+        IReadOnlyDictionary<string, ScenarioStateSnapshot> scenarioSnapshots)
+    {
+        int? responseStatusCode = evaluation.Candidate.Response.StatusCode > 0
+            ? evaluation.Candidate.Response.StatusCode
+            : null;
+        var scenarioMatched = IsScenarioMatch(evaluation.Candidate.Response.Scenario, scenarioSnapshots);
+        var responseConfigured = IsConfiguredResponse(evaluation.Candidate.Response);
 
-        if (matchedCandidate is null)
+        return new MatchCandidateInfo
         {
-            logger?.LogDebug(
-                "Semantic fallback did not produce a match for '{Path}' {Method}.",
-                path,
-                method.ToUpperInvariant());
-            return (QueryMatchEvaluationResult.NoMatch, null!);
+            CandidateIndex = index,
+            QueryMatched = evaluation.QueryMatched,
+            HeaderMatched = evaluation.HeaderMatched,
+            BodyMatched = evaluation.BodyMatched,
+            ScenarioMatched = scenarioMatched,
+            ResponseConfigured = responseConfigured,
+            Matched = evaluation.Matched && scenarioMatched,
+            SemanticMatch = evaluation.Candidate.SemanticMatch,
+            ResponseId = responseStatusCode?.ToString(),
+            ResponseStatusCode = responseStatusCode,
+        };
+    }
+
+    private static SemanticMatchInfo CreateSemanticMatchInfo(
+        SemanticMatchExplanation explanation,
+        OperationDefinition operation)
+    {
+        return new SemanticMatchInfo
+        {
+            Attempted = explanation.Attempted,
+            Threshold = explanation.Threshold,
+            RequiredMargin = explanation.RequiredMargin,
+            SelectedScore = explanation.SelectedScore,
+            SecondBestScore = explanation.SecondBestScore,
+            MarginToSecondBest = explanation.MarginToSecondBest,
+            Candidates = [],
+        };
+    }
+
+    private static string GetRouteId(string method, string pathPattern, OperationDefinition operation)
+    {
+        return string.IsNullOrEmpty(operation.OperationId)
+            ? $"{method}:{pathPattern}"
+            : operation.OperationId;
+    }
+
+    private static bool IsConfiguredResponse(QueryMatchResponseDefinition response)
+    {
+        return response.StatusCode > 0 &&
+               (!string.IsNullOrEmpty(response.ResponseFile) || response.Content.Count > 0);
+    }
+
+    private static bool IsConfiguredResponse(ResponseDefinition response)
+    {
+        return !string.IsNullOrEmpty(response.ResponseFile) || response.Content.Count > 0;
+    }
+
+    private static bool IsScenarioMatch(
+        ScenarioDefinition? scenario,
+        IReadOnlyDictionary<string, ScenarioStateSnapshot> scenarioSnapshots)
+    {
+        if (scenario is null)
+        {
+            return true;
         }
 
-        if (!TryBuildStubResponse(matchedCandidate.Response, out var response))
+        var currentState = scenarioSnapshots.TryGetValue(scenario.Name, out var snapshot)
+            ? snapshot.State
+            : "initial";
+
+        return string.Equals(currentState, scenario.State, StringComparison.Ordinal);
+    }
+
+    private static (string ResponseId, int StatusCode)? GetDefaultResponse(
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, ScenarioStateSnapshot> scenarioSnapshots)
+    {
+        foreach (var response in operation.Responses)
         {
-            return (QueryMatchEvaluationResult.MatchedButInvalidResponse, null!);
+            if (!int.TryParse(response.Key, out var statusCode))
+            {
+                continue;
+            }
+
+            if (!IsScenarioMatch(response.Value.Scenario, scenarioSnapshots) || !IsConfiguredResponse(response.Value))
+            {
+                continue;
+            }
+
+            return (response.Key, statusCode);
         }
 
-        scenarioService.Advance(matchedCandidate.Response.Scenario);
-
-        return (QueryMatchEvaluationResult.Matched, response);
+        return null;
     }
 
     private bool TryBuildDefaultOperationResponse(OperationDefinition operation, out StubResponse response)

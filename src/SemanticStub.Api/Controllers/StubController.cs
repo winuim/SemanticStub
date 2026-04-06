@@ -73,18 +73,10 @@ public sealed class StubController : ControllerBase
         var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
         Request.EnableBuffering();
         var requestBody = await ReadRequestBodyAsync();
-        await inspectionService.RecordLastMatchAsync(new MatchRequestInfo
-        {
-            Method = method,
-            Path = requestPath,
-            Query = query.ToDictionary(
-                entry => entry.Key,
-                entry => entry.Value.Select(value => value ?? string.Empty).ToArray(),
-                StringComparer.Ordinal),
-            Headers = new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase),
-            Body = requestBody,
-        }).ConfigureAwait(false);
-        var (matchResult, response) = await stubService.TryGetResponseAsync(method, requestPath, query, headers, requestBody);
+        var dispatch = await stubService.DispatchAsync(method, requestPath, query, headers, requestBody).ConfigureAwait(false);
+        inspectionService.RecordLastMatchExplanation(dispatch.Explanation);
+        var matchResult = dispatch.Result;
+        var response = dispatch.Response;
 
         if (matchResult == StubMatchResult.PathNotFound)
         {
