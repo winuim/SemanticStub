@@ -32,12 +32,13 @@ public sealed class StubInspectionServiceTests
         bool semanticMatchingEnabled = false)
     {
         var loader = new TestStubDefinitionLoader(document, directoryPath);
-        var state = new StubDefinitionState(loader, new ScenarioService(), NullLogger<StubDefinitionState>.Instance);
+        var scenarioService = new ScenarioService();
+        var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
         var settings = Options.Create(new StubSettings
         {
             SemanticMatching = new SemanticMatchingSettings { Enabled = semanticMatchingEnabled },
         });
-        return new StubInspectionService(state, loader, settings);
+        return new StubInspectionService(state, loader, settings, scenarioService);
     }
 
     private static StubDocument EmptyDocument() => new StubDocument
@@ -545,5 +546,164 @@ public sealed class StubInspectionServiceTests
 
         var route = Assert.Single(CreateService(document).GetRoutes());
         Assert.Equal(0, route.ResponseCount);
+    }
+
+    // ---------------------------------------------------------------------------
+    // GetScenarioStates / ResetScenarioStates
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void GetScenarioStates_ReturnsConfiguredScenarios_WithInitialStateByDefault()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/checkout"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["409"] = new()
+                            {
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "checkout-flow",
+                                    State = "initial",
+                                    Next = "confirmed"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var scenario = Assert.Single(CreateService(document).GetScenarioStates());
+
+        Assert.Equal("checkout-flow", scenario.Name);
+        Assert.Equal("initial", scenario.CurrentState);
+        Assert.Null(scenario.LastUpdatedTimestamp);
+    }
+
+    [Fact]
+    public void GetScenarioStates_ReflectsAdvancedScenarioStateAndTimestamp()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/checkout"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["409"] = new()
+                            {
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "checkout-flow",
+                                    State = "initial",
+                                    Next = "confirmed"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        var loader = new TestStubDefinitionLoader(document);
+        var scenarioService = new ScenarioService();
+        var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
+        var settings = Options.Create(new StubSettings());
+        var service = new StubInspectionService(state, loader, settings, scenarioService);
+
+        scenarioService.Advance(new ScenarioDefinition
+        {
+            Name = "checkout-flow",
+            State = "initial",
+            Next = "confirmed"
+        });
+
+        var scenario = Assert.Single(service.GetScenarioStates());
+
+        Assert.Equal("confirmed", scenario.CurrentState);
+        Assert.NotNull(scenario.LastUpdatedTimestamp);
+    }
+
+    [Fact]
+    public void ResetScenarioState_ReturnsFalse_WhenScenarioDoesNotExist()
+    {
+        var service = CreateService(EmptyDocument());
+
+        var reset = service.ResetScenarioState("missing");
+
+        Assert.False(reset);
+    }
+
+    [Fact]
+    public void ResetScenarioStates_ResetsAllConfiguredScenariosWithTimestamp()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/checkout"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["409"] = new()
+                            {
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "checkout-flow",
+                                    State = "initial",
+                                    Next = "confirmed"
+                                }
+                            }
+                        },
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Scenario = new ScenarioDefinition
+                                    {
+                                        Name = "payment-flow",
+                                        State = "initial",
+                                        Next = "authorized"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        };
+        var loader = new TestStubDefinitionLoader(document);
+        var scenarioService = new ScenarioService();
+        var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
+        var settings = Options.Create(new StubSettings());
+        var service = new StubInspectionService(state, loader, settings, scenarioService);
+
+        scenarioService.Advance(new ScenarioDefinition { Name = "checkout-flow", State = "initial", Next = "confirmed" });
+        scenarioService.Advance(new ScenarioDefinition { Name = "payment-flow", State = "initial", Next = "authorized" });
+
+        service.ResetScenarioStates();
+
+        var scenarios = service.GetScenarioStates();
+
+        Assert.Equal(2, scenarios.Count);
+        Assert.All(scenarios, scenario =>
+        {
+            Assert.Equal("initial", scenario.CurrentState);
+            Assert.NotNull(scenario.LastUpdatedTimestamp);
+        });
     }
 }
