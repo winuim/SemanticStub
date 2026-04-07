@@ -280,6 +280,32 @@ public sealed class StubControllerTests
     }
 
     [Fact]
+    public async Task Get_RecordsRuntimeMetrics_WhenDelayIsCancelled()
+    {
+        var stubService = new RecordingStubService(
+            StubMatchResult.Matched,
+            new StubResponse
+            {
+                StatusCode = StatusCodes.Status202Accepted,
+                ContentType = "application/json",
+                Body = "{}",
+                DelayMilliseconds = 1000
+            });
+        var inspectionService = new RecordingInspectionService();
+        var controller = CreateController(stubService, inspectionService);
+        using var cancellationSource = new CancellationTokenSource();
+        cancellationSource.Cancel();
+        controller.HttpContext.RequestAborted = cancellationSource.Token;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => controller.Get("users"));
+
+        Assert.Equal(1, inspectionService.RecordRequestMetricsCallCount);
+        Assert.Equal(StatusCodes.Status202Accepted, inspectionService.LastRecordedStatusCode);
+        Assert.NotNull(inspectionService.LastRecordedMetricsExplanation);
+        Assert.Equal("Matched", inspectionService.LastRecordedMetricsExplanation!.Result.MatchResult);
+    }
+
+    [Fact]
     public async Task Get_DoesNotOverwriteLastMatchExplanation_WhenRequestDoesNotMatch()
     {
         var stubService = new RecordingStubService(StubMatchResult.PathNotFound, new StubResponse());

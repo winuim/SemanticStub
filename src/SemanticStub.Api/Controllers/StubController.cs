@@ -78,78 +78,84 @@ public sealed class StubController : ControllerBase
         var dispatch = await stubService.DispatchAsync(method, requestPath, query, headers, requestBody).ConfigureAwait(false);
         var matchResult = dispatch.Result;
         var response = dispatch.Response;
+        int? statusCode = null;
 
-        if (matchResult == StubMatchResult.Matched)
+        try
         {
-            inspectionService.RecordLastMatchExplanation(dispatch.Explanation);
-        }
-
-        if (matchResult == StubMatchResult.PathNotFound)
-        {
-            return CompleteRequest(NotFound(), StatusCodes.Status404NotFound);
-        }
-
-        if (matchResult == StubMatchResult.MethodNotAllowed)
-        {
-            var allowedMethods = stubService.GetAllowedMethods(requestPath);
-
-            if (allowedMethods.Count > 0)
+            if (matchResult == StubMatchResult.Matched)
             {
-                Response.Headers.Allow = string.Join(", ", allowedMethods);
+                inspectionService.RecordLastMatchExplanation(dispatch.Explanation);
             }
 
-            return CompleteRequest(
-                StatusCode(StatusCodes.Status405MethodNotAllowed),
-                StatusCodes.Status405MethodNotAllowed);
-        }
-
-        if (matchResult == StubMatchResult.ResponseNotConfigured)
-        {
-            return CompleteRequest(
-                StatusCode(StatusCodes.Status500InternalServerError),
-                StatusCodes.Status500InternalServerError);
-        }
-
-        if (response is null)
-        {
-            return CompleteRequest(
-                StatusCode(StatusCodes.Status500InternalServerError),
-                StatusCodes.Status500InternalServerError);
-        }
-
-        if (response.DelayMilliseconds is > 0)
-        {
-            await Task.Delay(response.DelayMilliseconds.Value, HttpContext.RequestAborted);
-        }
-
-        foreach (var header in response.Headers)
-        {
-            if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+            if (matchResult == StubMatchResult.PathNotFound)
             {
-                continue;
+                statusCode = StatusCodes.Status404NotFound;
+                return NotFound();
             }
 
-            Response.Headers[header.Key] = header.Value;
+            if (matchResult == StubMatchResult.MethodNotAllowed)
+            {
+                var allowedMethods = stubService.GetAllowedMethods(requestPath);
+
+                if (allowedMethods.Count > 0)
+                {
+                    Response.Headers.Allow = string.Join(", ", allowedMethods);
+                }
+
+                statusCode = StatusCodes.Status405MethodNotAllowed;
+                return StatusCode(StatusCodes.Status405MethodNotAllowed);
+            }
+
+            if (matchResult == StubMatchResult.ResponseNotConfigured)
+            {
+                statusCode = StatusCodes.Status500InternalServerError;
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
+
+            if (response is null)
+            {
+                statusCode = StatusCodes.Status500InternalServerError;
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
+
+            statusCode = response.StatusCode;
+
+            if (response.DelayMilliseconds is > 0)
+            {
+                await Task.Delay(response.DelayMilliseconds.Value, HttpContext.RequestAborted);
+            }
+
+            foreach (var header in response.Headers)
+            {
+                if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                Response.Headers[header.Key] = header.Value;
+            }
+
+            if (!string.IsNullOrEmpty(response.FilePath))
+            {
+                Response.StatusCode = response.StatusCode;
+                return PhysicalFile(response.FilePath, response.ContentType);
+            }
+
+            return new ContentResult
+            {
+                StatusCode = response.StatusCode,
+                ContentType = response.ContentType,
+                Content = response.Body
+            };
         }
-
-        if (!string.IsNullOrEmpty(response.FilePath))
-        {
-            Response.StatusCode = response.StatusCode;
-            return CompleteRequest(PhysicalFile(response.FilePath, response.ContentType), response.StatusCode);
-        }
-
-        return CompleteRequest(new ContentResult
-        {
-            StatusCode = response.StatusCode,
-            ContentType = response.ContentType,
-            Content = response.Body
-        }, response.StatusCode);
-
-        IActionResult CompleteRequest(IActionResult result, int statusCode)
+        finally
         {
             stopwatch.Stop();
-            inspectionService.RecordRequestMetrics(dispatch.Explanation, statusCode, stopwatch.Elapsed);
-            return result;
+
+            if (statusCode.HasValue)
+            {
+                inspectionService.RecordRequestMetrics(dispatch.Explanation, statusCode.Value, stopwatch.Elapsed);
+            }
         }
     }
 
