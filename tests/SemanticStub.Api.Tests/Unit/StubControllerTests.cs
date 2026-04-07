@@ -241,6 +241,71 @@ public sealed class StubControllerTests
     }
 
     [Fact]
+    public async Task Get_RecordsRuntimeMetrics_ForMatchedRequest()
+    {
+        var stubService = new RecordingStubService(
+            StubMatchResult.Matched,
+            new StubResponse
+            {
+                StatusCode = StatusCodes.Status201Created,
+                ContentType = "application/json",
+                Body = "{}"
+            });
+        var inspectionService = new RecordingInspectionService();
+        var controller = CreateController(stubService, inspectionService);
+
+        await controller.Get("users");
+
+        Assert.Equal(1, inspectionService.RecordRequestMetricsCallCount);
+        Assert.Equal(StatusCodes.Status201Created, inspectionService.LastRecordedStatusCode);
+        Assert.NotNull(inspectionService.LastRecordedElapsed);
+        Assert.True(inspectionService.LastRecordedElapsed.Value >= TimeSpan.Zero);
+        Assert.NotNull(inspectionService.LastRecordedMetricsExplanation);
+        Assert.Equal("Matched", inspectionService.LastRecordedMetricsExplanation!.Result.MatchResult);
+    }
+
+    [Fact]
+    public async Task Get_RecordsRuntimeMetrics_ForPathNotFound()
+    {
+        var stubService = new RecordingStubService(StubMatchResult.PathNotFound, new StubResponse());
+        var inspectionService = new RecordingInspectionService();
+        var controller = CreateController(stubService, inspectionService);
+
+        await controller.Get("missing");
+
+        Assert.Equal(1, inspectionService.RecordRequestMetricsCallCount);
+        Assert.Equal(StatusCodes.Status404NotFound, inspectionService.LastRecordedStatusCode);
+        Assert.NotNull(inspectionService.LastRecordedMetricsExplanation);
+        Assert.Equal("PathNotFound", inspectionService.LastRecordedMetricsExplanation!.Result.MatchResult);
+    }
+
+    [Fact]
+    public async Task Get_RecordsRuntimeMetrics_WhenDelayIsCancelled()
+    {
+        var stubService = new RecordingStubService(
+            StubMatchResult.Matched,
+            new StubResponse
+            {
+                StatusCode = StatusCodes.Status202Accepted,
+                ContentType = "application/json",
+                Body = "{}",
+                DelayMilliseconds = 1000
+            });
+        var inspectionService = new RecordingInspectionService();
+        var controller = CreateController(stubService, inspectionService);
+        using var cancellationSource = new CancellationTokenSource();
+        cancellationSource.Cancel();
+        controller.HttpContext.RequestAborted = cancellationSource.Token;
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => controller.Get("users"));
+
+        Assert.Equal(1, inspectionService.RecordRequestMetricsCallCount);
+        Assert.Equal(StatusCodes.Status202Accepted, inspectionService.LastRecordedStatusCode);
+        Assert.NotNull(inspectionService.LastRecordedMetricsExplanation);
+        Assert.Equal("Matched", inspectionService.LastRecordedMetricsExplanation!.Result.MatchResult);
+    }
+
+    [Fact]
     public async Task Get_DoesNotOverwriteLastMatchExplanation_WhenRequestDoesNotMatch()
     {
         var stubService = new RecordingStubService(StubMatchResult.PathNotFound, new StubResponse());
@@ -268,6 +333,9 @@ public sealed class StubControllerTests
     private static StubController CreateController(IStubService stubService, IStubInspectionService? inspectionService = null)
     {
         controllerInspectionService.LastRecordedExplanation = null;
+        controllerInspectionService.RecordRequestMetricsCallCount = 0;
+        controllerInspectionService.LastRecordedMetricsExplanation = null;
+        controllerInspectionService.LastRecordedElapsed = null;
 
         return new StubController(stubService, inspectionService ?? controllerInspectionService)
         {
@@ -282,6 +350,14 @@ public sealed class StubControllerTests
     {
         public MatchExplanationInfo? LastRecordedExplanation { get; set; }
 
+        public MatchExplanationInfo? LastRecordedMetricsExplanation { get; set; }
+
+        public int LastRecordedStatusCode { get; set; }
+
+        public TimeSpan? LastRecordedElapsed { get; set; }
+
+        public int RecordRequestMetricsCallCount { get; set; }
+
         public StubConfigSnapshot GetConfigSnapshot() => throw new NotSupportedException();
 
         public IReadOnlyList<StubRouteInfo> GetRoutes() => throw new NotSupportedException();
@@ -289,6 +365,8 @@ public sealed class StubControllerTests
         public StubRouteDetailInfo? GetRoute(string routeId) => throw new NotSupportedException();
 
         public IReadOnlyList<ScenarioStateInfo> GetScenarioStates() => throw new NotSupportedException();
+
+        public RuntimeMetricsSummaryInfo GetRuntimeMetrics() => throw new NotSupportedException();
 
         public Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request) => throw new NotSupportedException();
 
@@ -299,6 +377,14 @@ public sealed class StubControllerTests
         public void RecordLastMatchExplanation(MatchExplanationInfo explanation)
         {
             LastRecordedExplanation = explanation;
+        }
+
+        public void RecordRequestMetrics(MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
+        {
+            LastRecordedMetricsExplanation = explanation;
+            LastRecordedStatusCode = statusCode;
+            LastRecordedElapsed = elapsed;
+            RecordRequestMetricsCallCount++;
         }
 
         public void ResetScenarioStates() => throw new NotSupportedException();

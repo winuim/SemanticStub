@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SemanticStub.Api.Inspection;
@@ -90,6 +91,24 @@ public sealed class StubInspectionServiceTests
                 },
             },
         };
+
+    private static MatchExplanationInfo CreateRecordedExplanation(
+        bool matched,
+        string matchResult,
+        string? routeId = null,
+        string? matchMode = null)
+    {
+        return new MatchExplanationInfo
+        {
+            Result = new MatchSimulationInfo
+            {
+                Matched = matched,
+                MatchResult = matchResult,
+                RouteId = routeId,
+                MatchMode = matchMode,
+            }
+        };
+    }
 
     private sealed class NoOpSemanticMatcherService : ISemanticMatcherService
     {
@@ -217,6 +236,127 @@ public sealed class StubInspectionServiceTests
         var service = CreateService(EmptyDocument(), semanticMatchingEnabled: false);
 
         Assert.False(service.GetConfigSnapshot().SemanticMatchingEnabled);
+    }
+
+    // ---------------------------------------------------------------------------
+    // GetRuntimeMetrics
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void GetRuntimeMetrics_ReturnsZeroValues_BeforeRequestsAreRecorded()
+    {
+        var service = CreateService(EmptyDocument());
+
+        var metrics = service.GetRuntimeMetrics();
+
+        Assert.Equal(0, metrics.TotalRequestCount);
+        Assert.Equal(0, metrics.MatchedRequestCount);
+        Assert.Equal(0, metrics.UnmatchedRequestCount);
+        Assert.Equal(0, metrics.FallbackResponseCount);
+        Assert.Equal(0, metrics.SemanticMatchCount);
+        Assert.Equal(0, metrics.AverageLatencyMilliseconds);
+        Assert.Empty(metrics.StatusCodes);
+        Assert.Empty(metrics.TopRoutes);
+    }
+
+    [Fact]
+    public void RecordRequestMetrics_UpdatesMatchedCounts_StatusCodes_AndRoutes()
+    {
+        var service = CreateService(EmptyDocument());
+
+        service.RecordRequestMetrics(
+            CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "listUsers", matchMode: "fallback"),
+            StatusCodes.Status200OK,
+            TimeSpan.FromMilliseconds(25));
+
+        var metrics = service.GetRuntimeMetrics();
+
+        Assert.Equal(1, metrics.TotalRequestCount);
+        Assert.Equal(1, metrics.MatchedRequestCount);
+        Assert.Equal(0, metrics.UnmatchedRequestCount);
+        Assert.Equal(1, metrics.FallbackResponseCount);
+        Assert.Equal(0, metrics.SemanticMatchCount);
+        Assert.Equal(25, metrics.AverageLatencyMilliseconds);
+        Assert.Collection(metrics.StatusCodes, entry =>
+        {
+            Assert.Equal(StatusCodes.Status200OK, entry.StatusCode);
+            Assert.Equal(1, entry.RequestCount);
+        });
+        Assert.Collection(metrics.TopRoutes, entry =>
+        {
+            Assert.Equal("listUsers", entry.RouteId);
+            Assert.Equal(1, entry.RequestCount);
+        });
+    }
+
+    [Fact]
+    public void RecordRequestMetrics_UpdatesUnmatchedAndSemanticCounts()
+    {
+        var service = CreateService(EmptyDocument());
+
+        service.RecordRequestMetrics(
+            CreateRecordedExplanation(matched: false, matchResult: "PathNotFound"),
+            StatusCodes.Status404NotFound,
+            TimeSpan.FromMilliseconds(10));
+        service.RecordRequestMetrics(
+            CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "searchUsers", matchMode: "semantic"),
+            StatusCodes.Status200OK,
+            TimeSpan.FromMilliseconds(30));
+
+        var metrics = service.GetRuntimeMetrics();
+
+        Assert.Equal(2, metrics.TotalRequestCount);
+        Assert.Equal(1, metrics.MatchedRequestCount);
+        Assert.Equal(1, metrics.UnmatchedRequestCount);
+        Assert.Equal(0, metrics.FallbackResponseCount);
+        Assert.Equal(1, metrics.SemanticMatchCount);
+        Assert.Equal(20, metrics.AverageLatencyMilliseconds);
+    }
+
+    [Fact]
+    public void GetRuntimeMetrics_OrdersStatusCodesAndRoutes_ByUsage()
+    {
+        var service = CreateService(EmptyDocument());
+
+        service.RecordRequestMetrics(
+            CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "b-route"),
+            StatusCodes.Status200OK,
+            TimeSpan.FromMilliseconds(10));
+        service.RecordRequestMetrics(
+            CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "a-route"),
+            StatusCodes.Status404NotFound,
+            TimeSpan.FromMilliseconds(20));
+        service.RecordRequestMetrics(
+            CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "a-route"),
+            StatusCodes.Status404NotFound,
+            TimeSpan.FromMilliseconds(30));
+
+        var metrics = service.GetRuntimeMetrics();
+
+        Assert.Collection(
+            metrics.StatusCodes,
+            first =>
+            {
+                Assert.Equal(StatusCodes.Status404NotFound, first.StatusCode);
+                Assert.Equal(2, first.RequestCount);
+            },
+            second =>
+            {
+                Assert.Equal(StatusCodes.Status200OK, second.StatusCode);
+                Assert.Equal(1, second.RequestCount);
+            });
+        Assert.Collection(
+            metrics.TopRoutes,
+            first =>
+            {
+                Assert.Equal("a-route", first.RouteId);
+                Assert.Equal(2, first.RequestCount);
+            },
+            second =>
+            {
+                Assert.Equal("b-route", second.RouteId);
+                Assert.Equal(1, second.RequestCount);
+            });
     }
 
     // ---------------------------------------------------------------------------
