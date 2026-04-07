@@ -286,6 +286,8 @@ public sealed class StubControllerTests
 
         public IReadOnlyList<StubRouteInfo> GetRoutes() => throw new NotSupportedException();
 
+        public StubRouteDetailInfo? GetRoute(string routeId) => throw new NotSupportedException();
+
         public IReadOnlyList<ScenarioStateInfo> GetScenarioStates() => throw new NotSupportedException();
 
         public Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request) => throw new NotSupportedException();

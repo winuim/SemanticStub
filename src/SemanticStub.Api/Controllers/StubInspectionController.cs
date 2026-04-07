@@ -31,6 +31,14 @@ public sealed class StubInspectionController : ControllerBase
     [HttpGet("routes")]
     public IActionResult GetRoutes() => Ok(inspectionService.GetRoutes());
 
+    /// <summary>Returns the effective runtime details for a single active route.</summary>
+    [HttpGet("routes/{**routeId}")]
+    public IActionResult GetRoute(string routeId)
+    {
+        var route = inspectionService.GetRoute(routeId);
+        return route is null ? NotFound() : Ok(route);
+    }
+
     /// <summary>Returns the current runtime state for all configured scenarios.</summary>
     [HttpGet("scenarios")]
     public IActionResult GetScenarios() => Ok(inspectionService.GetScenarioStates());

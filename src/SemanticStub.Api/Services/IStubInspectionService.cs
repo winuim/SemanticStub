@@ -18,6 +18,12 @@ public interface IStubInspectionService
     IReadOnlyList<StubRouteInfo> GetRoutes();
 
     /// <summary>
+    /// Returns the effective runtime details for a single active route when it exists.
+    /// </summary>
+    /// <param name="routeId">The stable route identifier.</param>
+    StubRouteDetailInfo? GetRoute(string routeId);
+
+    /// <summary>
     /// Returns the current runtime state for all configured scenarios.
     /// </summary>
     IReadOnlyList<ScenarioStateInfo> GetScenarioStates();
