@@ -258,6 +258,8 @@ prefix `/_semanticstub/runtime`.
 - `GET /_semanticstub/runtime/routes` returns the active normalized route list.
 - `GET /_semanticstub/runtime/routes/{routeId}` returns the effective runtime details for one active route.
 - `GET /_semanticstub/runtime/scenarios` returns the current scenario state snapshot.
+- `GET /_semanticstub/runtime/metrics` returns aggregate runtime metrics for real requests handled by the current process.
+- `GET /_semanticstub/runtime/requests?limit=20` returns a bounded recent request history for real requests handled by the current process.
 - `POST /_semanticstub/runtime/test-match` evaluates a virtual request without executing a real response or mutating scenario state.
 - `POST /_semanticstub/runtime/explain` returns structured match details for a virtual request, including deterministic and semantic evaluation when applicable.
 - `GET /_semanticstub/runtime/explain/last` returns the latest explanation captured from a real matched request in the current process.
@@ -269,6 +271,8 @@ Inspection notes:
 - `/_semanticstub/runtime/routes` returns one item per active path and HTTP method with stable external fields such as route id, normalized path pattern, semantic matching usage, scenario usage, and response count.
 - `/_semanticstub/runtime/routes/{routeId}` expands a single route into a stable detail view with top-level responses and normalized conditional match metadata.
 - `/_semanticstub/runtime/scenarios` returns one item per known scenario with its current state and whether it is active.
+- `/_semanticstub/runtime/metrics` is process-local and currently returns total request count, matched and unmatched counts, fallback and semantic counts, average latency, status-code summaries, and top routes.
+- `/_semanticstub/runtime/requests` is process-local and currently returns up to 100 recent real requests in newest-first order. Each item includes timestamp, method, path, resolved route id when available, status code, elapsed time, match mode, and failure reason for unmatched requests. The `limit` query parameter defaults to `20`.
 - `/_semanticstub/runtime/test-match` and `/_semanticstub/runtime/explain` accept a virtual request payload with method, path, optional query/header/body values, and optional candidate-detail flags.
 - `/_semanticstub/runtime/explain/last` is process-local and only updates after a real request produces a matched stub response.
 - These endpoints do not expose raw YAML, internal domain objects, or full response payload bodies.
@@ -323,6 +327,23 @@ Example response body for `GET /_semanticstub/runtime/routes/listUsers`:
     }
   ]
 }
+```
+
+Example response body for `GET /_semanticstub/runtime/requests?limit=1`:
+
+```json
+[
+  {
+    "timestamp": "2026-04-08T00:00:00Z",
+    "method": "GET",
+    "path": "/users",
+    "routeId": "listUsers",
+    "statusCode": 200,
+    "elapsedMilliseconds": 12.3,
+    "matchMode": "exact",
+    "failureReason": null
+  }
+]
 ```
 
 ## Development
