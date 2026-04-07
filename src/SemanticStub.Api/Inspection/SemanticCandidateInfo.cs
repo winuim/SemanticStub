@@ -11,11 +11,6 @@ public sealed class SemanticCandidateInfo
     public int CandidateIndex { get; init; }
 
     /// <summary>
-    /// Gets the configured semantic prompt text.
-    /// </summary>
-    public string SemanticMatch { get; init; } = string.Empty;
-
-    /// <summary>
     /// Gets whether the candidate was eligible for semantic evaluation.
     /// </summary>
     public bool Eligible { get; init; }
