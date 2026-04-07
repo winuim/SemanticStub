@@ -47,6 +47,10 @@ public sealed class StubInspectionController : ControllerBase
     [HttpGet("metrics")]
     public IActionResult GetMetrics() => Ok(inspectionService.GetRuntimeMetrics());
 
+    /// <summary>Returns the bounded recent request history for real requests handled by the current process.</summary>
+    [HttpGet("requests")]
+    public IActionResult GetRecentRequests([FromQuery] int limit = 20) => Ok(inspectionService.GetRecentRequests(limit));
+
     /// <summary>Simulates how the runtime would match a virtual request without executing a response.</summary>
     [HttpPost("test-match")]
     public async Task<IActionResult> TestMatch([FromBody] MatchRequestInfo request)

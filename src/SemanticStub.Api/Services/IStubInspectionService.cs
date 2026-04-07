@@ -34,6 +34,12 @@ public interface IStubInspectionService
     RuntimeMetricsSummaryInfo GetRuntimeMetrics();
 
     /// <summary>
+    /// Returns the bounded recent request history captured for real requests handled by the current process.
+    /// </summary>
+    /// <param name="limit">The maximum number of recent requests to return.</param>
+    IReadOnlyList<RecentRequestInfo> GetRecentRequests(int limit);
+
+    /// <summary>
     /// Simulates how the runtime would match the supplied virtual request without executing a response or mutating scenario state.
     /// </summary>
     /// <param name="request">The virtual request to evaluate.</param>
@@ -63,6 +69,17 @@ public interface IStubInspectionService
     /// <param name="statusCode">The final HTTP status code returned to the caller.</param>
     /// <param name="elapsed">The end-to-end elapsed time observed by the controller for the request.</param>
     void RecordRequestMetrics(MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed);
+
+    /// <summary>
+    /// Records one recent real request handled by the active runtime pipeline.
+    /// </summary>
+    /// <param name="timestamp">The time when the request observation was recorded.</param>
+    /// <param name="method">The HTTP method used by the request.</param>
+    /// <param name="path">The request path handled by the runtime.</param>
+    /// <param name="explanation">The explanation captured from the same dispatch evaluation.</param>
+    /// <param name="statusCode">The final HTTP status code returned to the caller.</param>
+    /// <param name="elapsed">The end-to-end elapsed time observed by the controller for the request.</param>
+    void RecordRecentRequest(DateTimeOffset timestamp, string method, string path, MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed);
 
     /// <summary>
     /// Resets all configured scenarios back to their initial state.
