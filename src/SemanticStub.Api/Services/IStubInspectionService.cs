@@ -29,6 +29,11 @@ public interface IStubInspectionService
     IReadOnlyList<ScenarioStateInfo> GetScenarioStates();
 
     /// <summary>
+    /// Returns the aggregate runtime metrics captured for real requests handled by the current process.
+    /// </summary>
+    RuntimeMetricsSummaryInfo GetRuntimeMetrics();
+
+    /// <summary>
     /// Simulates how the runtime would match the supplied virtual request without executing a response or mutating scenario state.
     /// </summary>
     /// <param name="request">The virtual request to evaluate.</param>
@@ -50,6 +55,14 @@ public interface IStubInspectionService
     /// </summary>
     /// <param name="explanation">The explanation captured from the real request dispatch.</param>
     void RecordLastMatchExplanation(MatchExplanationInfo explanation);
+
+    /// <summary>
+    /// Records aggregate runtime metrics for one real request handled by the active runtime pipeline.
+    /// </summary>
+    /// <param name="explanation">The explanation captured from the same dispatch evaluation.</param>
+    /// <param name="statusCode">The final HTTP status code returned to the caller.</param>
+    /// <param name="elapsed">The end-to-end elapsed time observed by the controller for the request.</param>
+    void RecordRequestMetrics(MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed);
 
     /// <summary>
     /// Resets all configured scenarios back to their initial state.

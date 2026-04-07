@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
+using System.Diagnostics;
 
 namespace SemanticStub.Api.Controllers;
 
@@ -68,6 +69,7 @@ public sealed class StubController : ControllerBase
 
     private async Task<IActionResult> HandleRequest(string method, string? path)
     {
+        var stopwatch = Stopwatch.StartNew();
         var requestPath = string.IsNullOrEmpty(path) ? "/" : "/" + path;
         var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
         var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
@@ -84,7 +86,7 @@ public sealed class StubController : ControllerBase
 
         if (matchResult == StubMatchResult.PathNotFound)
         {
-            return NotFound();
+            return CompleteRequest(NotFound(), StatusCodes.Status404NotFound);
         }
 
         if (matchResult == StubMatchResult.MethodNotAllowed)
@@ -96,17 +98,23 @@ public sealed class StubController : ControllerBase
                 Response.Headers.Allow = string.Join(", ", allowedMethods);
             }
 
-            return StatusCode(StatusCodes.Status405MethodNotAllowed);
+            return CompleteRequest(
+                StatusCode(StatusCodes.Status405MethodNotAllowed),
+                StatusCodes.Status405MethodNotAllowed);
         }
 
         if (matchResult == StubMatchResult.ResponseNotConfigured)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            return CompleteRequest(
+                StatusCode(StatusCodes.Status500InternalServerError),
+                StatusCodes.Status500InternalServerError);
         }
 
         if (response is null)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            return CompleteRequest(
+                StatusCode(StatusCodes.Status500InternalServerError),
+                StatusCodes.Status500InternalServerError);
         }
 
         if (response.DelayMilliseconds is > 0)
@@ -127,15 +135,22 @@ public sealed class StubController : ControllerBase
         if (!string.IsNullOrEmpty(response.FilePath))
         {
             Response.StatusCode = response.StatusCode;
-            return PhysicalFile(response.FilePath, response.ContentType);
+            return CompleteRequest(PhysicalFile(response.FilePath, response.ContentType), response.StatusCode);
         }
 
-        return new ContentResult
+        return CompleteRequest(new ContentResult
         {
             StatusCode = response.StatusCode,
             ContentType = response.ContentType,
             Content = response.Body
-        };
+        }, response.StatusCode);
+
+        IActionResult CompleteRequest(IActionResult result, int statusCode)
+        {
+            stopwatch.Stop();
+            inspectionService.RecordRequestMetrics(dispatch.Explanation, statusCode, stopwatch.Elapsed);
+            return result;
+        }
     }
 
     private async Task<string?> ReadRequestBodyAsync()
