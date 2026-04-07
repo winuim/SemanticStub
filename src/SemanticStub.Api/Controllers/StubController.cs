@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
+using System.Diagnostics;
 
 namespace SemanticStub.Api.Controllers;
 
@@ -68,6 +69,7 @@ public sealed class StubController : ControllerBase
 
     private async Task<IActionResult> HandleRequest(string method, string? path)
     {
+        var stopwatch = Stopwatch.StartNew();
         var requestPath = string.IsNullOrEmpty(path) ? "/" : "/" + path;
         var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
         var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
@@ -76,66 +78,85 @@ public sealed class StubController : ControllerBase
         var dispatch = await stubService.DispatchAsync(method, requestPath, query, headers, requestBody).ConfigureAwait(false);
         var matchResult = dispatch.Result;
         var response = dispatch.Response;
+        int? statusCode = null;
 
-        if (matchResult == StubMatchResult.Matched)
+        try
         {
-            inspectionService.RecordLastMatchExplanation(dispatch.Explanation);
-        }
-
-        if (matchResult == StubMatchResult.PathNotFound)
-        {
-            return NotFound();
-        }
-
-        if (matchResult == StubMatchResult.MethodNotAllowed)
-        {
-            var allowedMethods = stubService.GetAllowedMethods(requestPath);
-
-            if (allowedMethods.Count > 0)
+            if (matchResult == StubMatchResult.Matched)
             {
-                Response.Headers.Allow = string.Join(", ", allowedMethods);
+                inspectionService.RecordLastMatchExplanation(dispatch.Explanation);
             }
 
-            return StatusCode(StatusCodes.Status405MethodNotAllowed);
-        }
-
-        if (matchResult == StubMatchResult.ResponseNotConfigured)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError);
-        }
-
-        if (response is null)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError);
-        }
-
-        if (response.DelayMilliseconds is > 0)
-        {
-            await Task.Delay(response.DelayMilliseconds.Value, HttpContext.RequestAborted);
-        }
-
-        foreach (var header in response.Headers)
-        {
-            if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+            if (matchResult == StubMatchResult.PathNotFound)
             {
-                continue;
+                statusCode = StatusCodes.Status404NotFound;
+                return NotFound();
             }
 
-            Response.Headers[header.Key] = header.Value;
-        }
+            if (matchResult == StubMatchResult.MethodNotAllowed)
+            {
+                var allowedMethods = stubService.GetAllowedMethods(requestPath);
 
-        if (!string.IsNullOrEmpty(response.FilePath))
-        {
-            Response.StatusCode = response.StatusCode;
-            return PhysicalFile(response.FilePath, response.ContentType);
-        }
+                if (allowedMethods.Count > 0)
+                {
+                    Response.Headers.Allow = string.Join(", ", allowedMethods);
+                }
 
-        return new ContentResult
+                statusCode = StatusCodes.Status405MethodNotAllowed;
+                return StatusCode(StatusCodes.Status405MethodNotAllowed);
+            }
+
+            if (matchResult == StubMatchResult.ResponseNotConfigured)
+            {
+                statusCode = StatusCodes.Status500InternalServerError;
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
+
+            if (response is null)
+            {
+                statusCode = StatusCodes.Status500InternalServerError;
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
+
+            statusCode = response.StatusCode;
+
+            if (response.DelayMilliseconds is > 0)
+            {
+                await Task.Delay(response.DelayMilliseconds.Value, HttpContext.RequestAborted);
+            }
+
+            foreach (var header in response.Headers)
+            {
+                if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                Response.Headers[header.Key] = header.Value;
+            }
+
+            if (!string.IsNullOrEmpty(response.FilePath))
+            {
+                Response.StatusCode = response.StatusCode;
+                return PhysicalFile(response.FilePath, response.ContentType);
+            }
+
+            return new ContentResult
+            {
+                StatusCode = response.StatusCode,
+                ContentType = response.ContentType,
+                Content = response.Body
+            };
+        }
+        finally
         {
-            StatusCode = response.StatusCode,
-            ContentType = response.ContentType,
-            Content = response.Body
-        };
+            stopwatch.Stop();
+
+            if (statusCode.HasValue)
+            {
+                inspectionService.RecordRequestMetrics(dispatch.Explanation, statusCode.Value, stopwatch.Elapsed);
+            }
+        }
     }
 
     private async Task<string?> ReadRequestBodyAsync()

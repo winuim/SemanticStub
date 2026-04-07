@@ -43,6 +43,10 @@ public sealed class StubInspectionController : ControllerBase
     [HttpGet("scenarios")]
     public IActionResult GetScenarios() => Ok(inspectionService.GetScenarioStates());
 
+    /// <summary>Returns aggregate runtime metrics for real requests handled by the current process.</summary>
+    [HttpGet("metrics")]
+    public IActionResult GetMetrics() => Ok(inspectionService.GetRuntimeMetrics());
+
     /// <summary>Simulates how the runtime would match a virtual request without executing a response.</summary>
     [HttpPost("test-match")]
     public async Task<IActionResult> TestMatch([FromBody] MatchRequestInfo request)

@@ -161,6 +161,53 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
     }
 
     [Fact]
+    public async Task GetMetrics_ReturnsOk()
+    {
+        var response = await client.GetAsync("/_semanticstub/runtime/metrics");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetMetrics_ResponseDeserializesToRuntimeMetricsSummaryInfo()
+    {
+        var response = await client.GetAsync("/_semanticstub/runtime/metrics");
+        response.EnsureSuccessStatusCode();
+
+        var metrics = await response.Content.ReadFromJsonAsync<RuntimeMetricsSummaryInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(metrics);
+        Assert.True(metrics!.TotalRequestCount >= 0);
+        Assert.True(metrics.MatchedRequestCount >= 0);
+        Assert.True(metrics.UnmatchedRequestCount >= 0);
+    }
+
+    [Fact]
+    public async Task GetMetrics_ReflectsRealRequestsHandledByStubController()
+    {
+        var beforeResponse = await client.GetAsync("/_semanticstub/runtime/metrics");
+        beforeResponse.EnsureSuccessStatusCode();
+        var before = await beforeResponse.Content.ReadFromJsonAsync<RuntimeMetricsSummaryInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        var routedResponse = await client.GetAsync("/hello");
+        routedResponse.EnsureSuccessStatusCode();
+
+        var afterResponse = await client.GetAsync("/_semanticstub/runtime/metrics");
+        afterResponse.EnsureSuccessStatusCode();
+        var after = await afterResponse.Content.ReadFromJsonAsync<RuntimeMetricsSummaryInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(before);
+        Assert.NotNull(after);
+        Assert.Equal(before!.TotalRequestCount + 1, after!.TotalRequestCount);
+        Assert.True(after.MatchedRequestCount >= before.MatchedRequestCount + 1);
+        Assert.Contains(after.StatusCodes, entry => entry.StatusCode == (int)HttpStatusCode.OK);
+        Assert.Contains(after.TopRoutes, entry => entry.RouteId == "getHello");
+    }
+
+    [Fact]
     public async Task ResetScenarios_ReturnsNoContent()
     {
         var response = await client.PostAsync("/_semanticstub/runtime/scenarios/reset", content: null);

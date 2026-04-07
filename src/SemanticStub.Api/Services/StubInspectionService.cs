@@ -16,7 +16,16 @@ internal sealed class StubInspectionService : IStubInspectionService
     private readonly ScenarioService scenarioService;
     private readonly IStubService stubService;
     private readonly object lastMatchSyncRoot = new();
+    private readonly object metricsSyncRoot = new();
+    private readonly Dictionary<int, long> statusCodeCounts = [];
+    private readonly Dictionary<string, long> routeRequestCounts = new(StringComparer.Ordinal);
     private MatchExplanationInfo? lastMatchExplanation;
+    private long totalRequestCount;
+    private long matchedRequestCount;
+    private long unmatchedRequestCount;
+    private long fallbackResponseCount;
+    private long semanticMatchCount;
+    private double totalLatencyMilliseconds;
 
     public StubInspectionService(
         StubDefinitionState state,
@@ -88,6 +97,43 @@ internal sealed class StubInspectionService : IStubInspectionService
     }
 
     /// <inheritdoc/>
+    public RuntimeMetricsSummaryInfo GetRuntimeMetrics()
+    {
+        lock (metricsSyncRoot)
+        {
+            return new RuntimeMetricsSummaryInfo
+            {
+                TotalRequestCount = totalRequestCount,
+                MatchedRequestCount = matchedRequestCount,
+                UnmatchedRequestCount = unmatchedRequestCount,
+                FallbackResponseCount = fallbackResponseCount,
+                SemanticMatchCount = semanticMatchCount,
+                AverageLatencyMilliseconds = totalRequestCount == 0
+                    ? 0
+                    : totalLatencyMilliseconds / totalRequestCount,
+                StatusCodes = statusCodeCounts
+                    .OrderByDescending(entry => entry.Value)
+                    .ThenBy(entry => entry.Key)
+                    .Select(entry => new RuntimeStatusCodeMetricInfo
+                    {
+                        StatusCode = entry.Key,
+                        RequestCount = entry.Value,
+                    })
+                    .ToList(),
+                TopRoutes = routeRequestCounts
+                    .OrderByDescending(entry => entry.Value)
+                    .ThenBy(entry => entry.Key, StringComparer.Ordinal)
+                    .Select(entry => new RouteUsageMetricInfo
+                    {
+                        RouteId = entry.Key,
+                        RequestCount = entry.Value,
+                    })
+                    .ToList(),
+            };
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request)
     {
         return (await stubService.ExplainMatchAsync(request).ConfigureAwait(false)).Result;
@@ -114,6 +160,45 @@ internal sealed class StubInspectionService : IStubInspectionService
         lock (lastMatchSyncRoot)
         {
             lastMatchExplanation = explanation;
+        }
+    }
+
+    /// <inheritdoc/>
+    public void RecordRequestMetrics(MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
+    {
+        ArgumentNullException.ThrowIfNull(explanation);
+
+        lock (metricsSyncRoot)
+        {
+            totalRequestCount++;
+
+            if (explanation.Result.Matched)
+            {
+                matchedRequestCount++;
+            }
+            else
+            {
+                unmatchedRequestCount++;
+            }
+
+            if (string.Equals(explanation.Result.MatchMode, "fallback", StringComparison.Ordinal))
+            {
+                fallbackResponseCount++;
+            }
+
+            if (string.Equals(explanation.Result.MatchMode, "semantic", StringComparison.Ordinal))
+            {
+                semanticMatchCount++;
+            }
+
+            totalLatencyMilliseconds += Math.Max(0, elapsed.TotalMilliseconds);
+
+            statusCodeCounts[statusCode] = statusCodeCounts.GetValueOrDefault(statusCode) + 1;
+
+            if (!string.IsNullOrEmpty(explanation.Result.RouteId))
+            {
+                routeRequestCounts[explanation.Result.RouteId] = routeRequestCounts.GetValueOrDefault(explanation.Result.RouteId) + 1;
+            }
         }
     }
 
