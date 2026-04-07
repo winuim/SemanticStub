@@ -761,7 +761,6 @@ public sealed class StubInspectionServiceTests
                 Assert.Equal(["X-Env"], candidate.HeaderKeys);
                 Assert.True(candidate.HasBody);
                 Assert.False(candidate.UsesSemanticMatching);
-                Assert.Null(candidate.SemanticMatch);
                 Assert.Equal(202, candidate.ResponseStatusCode);
                 Assert.True(candidate.UsesScenario);
                 Assert.NotNull(candidate.Scenario);
@@ -781,7 +780,6 @@ public sealed class StubInspectionServiceTests
                 Assert.Empty(candidate.HeaderKeys);
                 Assert.False(candidate.HasBody);
                 Assert.True(candidate.UsesSemanticMatching);
-                Assert.Equal("find administrator user accounts", candidate.SemanticMatch);
                 Assert.Equal(200, candidate.ResponseStatusCode);
                 Assert.False(candidate.UsesScenario);
                 Assert.Null(candidate.Scenario);

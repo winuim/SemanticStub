@@ -35,9 +35,6 @@ public sealed class StubRouteConditionInfo
     /// <summary>Gets whether the candidate uses semantic matching.</summary>
     public bool UsesSemanticMatching { get; init; }
 
-    /// <summary>Gets the configured semantic prompt when present.</summary>
-    public string? SemanticMatch { get; init; }
-
     /// <summary>Gets the response status code selected by the candidate.</summary>
     public int ResponseStatusCode { get; init; }
 
