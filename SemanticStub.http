@@ -20,6 +20,18 @@ Accept: application/json
 GET {{host}}/_semanticstub/runtime/scenarios
 Accept: application/json
 
+### Runtime inspection metrics summary
+GET {{host}}/_semanticstub/runtime/metrics
+Accept: application/json
+
+### Runtime inspection recent requests
+GET {{host}}/_semanticstub/runtime/requests
+Accept: application/json
+
+### Runtime inspection recent requests with limit
+GET {{host}}/_semanticstub/runtime/requests?limit=5
+Accept: application/json
+
 ### Runtime inspection test-match
 POST {{host}}/_semanticstub/runtime/test-match
 Content-Type: application/json
@@ -50,6 +62,18 @@ Accept: application/json
 
 ### Runtime inspection explain last real request
 GET {{host}}/_semanticstub/runtime/explain/last
+Accept: application/json
+
+### Runtime observability walkthrough: trigger a real request
+GET {{host}}/users?role=admin
+Accept: application/json
+
+### Runtime observability walkthrough: inspect metrics
+GET {{host}}/_semanticstub/runtime/metrics
+Accept: application/json
+
+### Runtime observability walkthrough: inspect recent requests
+GET {{host}}/_semanticstub/runtime/requests?limit=3
 Accept: application/json
 
 ### Hello world stub
