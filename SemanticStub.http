@@ -48,6 +48,11 @@ Accept: application/json
 GET {{host}}/hello
 Accept: application/json
 
+### Hello world stub with gzip response compression
+GET {{host}}/hello
+Accept: application/json
+Accept-Encoding: gzip
+
 ### Users stub from x-response-file
 GET {{host}}/users
 Accept: application/json
@@ -74,6 +79,10 @@ Accept: application/json
 
 ### Search stub falls back when repeated query value order differs
 GET {{host}}/search?tag=beta&tag=alpha
+Accept: application/json
+
+### Regex users stub filtered by x-query-regex
+GET {{host}}/regex-users?role=admin-123
 Accept: application/json
 
 ### Environment users stub filtered by request header
@@ -132,12 +141,24 @@ Accept: application/json
 DELETE {{host}}/profile
 Accept: application/json
 
+### Checkout enters the confirmation state
+POST {{host}}/checkout
+Accept: application/json
+
+### Checkout completes after the scenario advances
+POST {{host}}/checkout
+Accept: application/json
+
 ### Template path order route
 GET {{host}}/orders/123
 Accept: application/json
 
 ### Exact path order route
 GET {{host}}/orders/special
+Accept: application/json
+
+### Download file response
+GET {{host}}/download
 Accept: application/json
 
 ### Unknown route returns 404
