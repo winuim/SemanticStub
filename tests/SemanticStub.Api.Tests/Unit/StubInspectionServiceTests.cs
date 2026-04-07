@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SemanticStub.Api.Inspection;
@@ -761,7 +762,6 @@ public sealed class StubInspectionServiceTests
                 Assert.Equal(["X-Env"], candidate.HeaderKeys);
                 Assert.True(candidate.HasBody);
                 Assert.False(candidate.UsesSemanticMatching);
-                Assert.Null(candidate.SemanticMatch);
                 Assert.Equal(202, candidate.ResponseStatusCode);
                 Assert.True(candidate.UsesScenario);
                 Assert.NotNull(candidate.Scenario);
@@ -781,7 +781,6 @@ public sealed class StubInspectionServiceTests
                 Assert.Empty(candidate.HeaderKeys);
                 Assert.False(candidate.HasBody);
                 Assert.True(candidate.UsesSemanticMatching);
-                Assert.Equal("find administrator user accounts", candidate.SemanticMatch);
                 Assert.Equal(200, candidate.ResponseStatusCode);
                 Assert.False(candidate.UsesScenario);
                 Assert.Null(candidate.Scenario);
@@ -1153,6 +1152,70 @@ public sealed class StubInspectionServiceTests
     }
 
     [Fact]
+    public async Task ExplainMatchAsync_DoesNotExposeSemanticPromptInDeterministicCandidates()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        OperationId = "listUsers",
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                                {
+                                    ["role"] = "admin"
+                                },
+                                SemanticMatch = "find admin users",
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new() { Example = new Dictionary<object, object> { ["role"] = "admin" } }
+                                    }
+                                }
+                            }
+                        ],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["role"] = "default" } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = CreateService(document);
+
+        var explanation = await service.ExplainMatchAsync(new MatchRequestInfo
+        {
+            Method = "GET",
+            Path = "/users",
+            Query = new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                ["role"] = ["admin"]
+            },
+            IncludeCandidates = true
+        });
+
+        var json = JsonSerializer.Serialize(explanation);
+
+        Assert.DoesNotContain("\"semanticMatch\"", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ExplainMatchAsync_ReturnsSemanticEvaluationDetailsWhenRequested()
     {
         var semanticCandidate = new QueryMatchDefinition
@@ -1245,6 +1308,76 @@ public sealed class StubInspectionServiceTests
         Assert.Equal(0.97d, explanation.SemanticEvaluation!.SelectedScore);
         Assert.Equal(0.8d, explanation.SemanticEvaluation.Threshold);
         Assert.Equal(2, explanation.SemanticEvaluation.Candidates.Count);
+    }
+
+    [Fact]
+    public async Task ExplainMatchAsync_DoesNotExposeSemanticPromptInSemanticCandidates()
+    {
+        var semanticCandidate = new QueryMatchDefinition
+        {
+            SemanticMatch = "find administrator user accounts",
+            Response = new QueryMatchResponseDefinition
+            {
+                StatusCode = 200,
+                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                {
+                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["result"] = "admin-user" } }
+                }
+            }
+        };
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/semantic-search"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Matches = [semanticCandidate],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["404"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["message"] = "no match" } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        var semanticMatcher = new StubSemanticMatcherService(new SemanticMatchExplanation
+        {
+            Attempted = true,
+            SelectedCandidate = semanticCandidate,
+            SelectedScore = 0.97d,
+            Threshold = 0.8d,
+            CandidateScores =
+            [
+                new SemanticCandidateScore
+                {
+                    Candidate = semanticCandidate,
+                    Eligible = true,
+                    Score = 0.97d,
+                    AboveThreshold = true
+                }
+            ]
+        });
+        var service = CreateService(document, semanticMatchingEnabled: true, semanticMatcherService: semanticMatcher);
+
+        var explanation = await service.ExplainMatchAsync(new MatchRequestInfo
+        {
+            Method = "POST",
+            Path = "/semantic-search",
+            Body = "find admin users by email",
+            IncludeSemanticCandidates = true
+        });
+
+        var json = JsonSerializer.Serialize(explanation);
+
+        Assert.DoesNotContain("\"semanticMatch\"", json, StringComparison.Ordinal);
     }
 
     [Fact]

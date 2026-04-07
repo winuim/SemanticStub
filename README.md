@@ -317,7 +317,6 @@ Example response body for `GET /_semanticstub/runtime/routes/listUsers`:
       "headerKeys": [],
       "hasBody": false,
       "usesSemanticMatching": false,
-      "semanticMatch": null,
       "responseStatusCode": 200,
       "usesScenario": false,
       "scenario": null

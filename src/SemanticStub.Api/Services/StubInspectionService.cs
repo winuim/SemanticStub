@@ -235,7 +235,6 @@ internal sealed class StubInspectionService : IStubInspectionService
                 HeaderKeys = OrderKeys(match.Headers.Keys),
                 HasBody = match.Body is not null,
                 UsesSemanticMatching = match.SemanticMatch is not null,
-                SemanticMatch = match.SemanticMatch,
                 ResponseStatusCode = match.Response.StatusCode,
                 UsesScenario = match.Response.Scenario is not null,
                 Scenario = BuildScenario(match.Response.Scenario),

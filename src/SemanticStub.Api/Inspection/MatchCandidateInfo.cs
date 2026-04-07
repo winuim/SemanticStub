@@ -41,11 +41,6 @@ public sealed class MatchCandidateInfo
     public bool Matched { get; init; }
 
     /// <summary>
-    /// Gets the configured semantic prompt for the candidate when present.
-    /// </summary>
-    public string? SemanticMatch { get; init; }
-
-    /// <summary>
     /// Gets the selected response identifier for the candidate when available.
     /// </summary>
     public string? ResponseId { get; init; }

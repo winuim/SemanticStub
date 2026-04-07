@@ -882,7 +882,6 @@ public sealed class StubService : IStubService
             ScenarioMatched = scenarioMatched,
             ResponseConfigured = responseConfigured,
             Matched = evaluation.Matched && scenarioMatched,
-            SemanticMatch = evaluation.Candidate.SemanticMatch,
             ResponseId = responseStatusCode?.ToString(),
             ResponseStatusCode = responseStatusCode,
         };
@@ -906,7 +905,6 @@ public sealed class StubService : IStubService
                     .Select(score => new SemanticCandidateInfo
                     {
                         CandidateIndex = operation.Matches.FindIndex(candidate => ReferenceEquals(candidate, score.Candidate)),
-                        SemanticMatch = score.Candidate.SemanticMatch ?? string.Empty,
                         Eligible = score.Eligible,
                         Score = score.Score,
                         AboveThreshold = score.AboveThreshold,
