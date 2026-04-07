@@ -262,6 +262,9 @@ public sealed class StubControllerTests
         Assert.True(inspectionService.LastRecordedElapsed.Value >= TimeSpan.Zero);
         Assert.NotNull(inspectionService.LastRecordedMetricsExplanation);
         Assert.Equal("Matched", inspectionService.LastRecordedMetricsExplanation!.Result.MatchResult);
+        Assert.Equal(1, inspectionService.RecordRecentRequestCallCount);
+        Assert.Equal(HttpMethods.Get, inspectionService.LastRecentRequestMethod);
+        Assert.Equal("/users", inspectionService.LastRecentRequestPath);
     }
 
     [Fact]
@@ -303,6 +306,8 @@ public sealed class StubControllerTests
         Assert.Equal(StatusCodes.Status202Accepted, inspectionService.LastRecordedStatusCode);
         Assert.NotNull(inspectionService.LastRecordedMetricsExplanation);
         Assert.Equal("Matched", inspectionService.LastRecordedMetricsExplanation!.Result.MatchResult);
+        Assert.Equal(1, inspectionService.RecordRecentRequestCallCount);
+        Assert.Equal("/users", inspectionService.LastRecentRequestPath);
     }
 
     [Fact]
@@ -336,6 +341,10 @@ public sealed class StubControllerTests
         controllerInspectionService.RecordRequestMetricsCallCount = 0;
         controllerInspectionService.LastRecordedMetricsExplanation = null;
         controllerInspectionService.LastRecordedElapsed = null;
+        controllerInspectionService.RecordRecentRequestCallCount = 0;
+        controllerInspectionService.LastRecentRequest = null;
+        controllerInspectionService.LastRecentRequestMethod = null;
+        controllerInspectionService.LastRecentRequestPath = null;
 
         return new StubController(stubService, inspectionService ?? controllerInspectionService)
         {
@@ -358,6 +367,14 @@ public sealed class StubControllerTests
 
         public int RecordRequestMetricsCallCount { get; set; }
 
+        public int RecordRecentRequestCallCount { get; set; }
+
+        public RecentRequestInfo? LastRecentRequest { get; set; }
+
+        public string? LastRecentRequestMethod { get; set; }
+
+        public string? LastRecentRequestPath { get; set; }
+
         public StubConfigSnapshot GetConfigSnapshot() => throw new NotSupportedException();
 
         public IReadOnlyList<StubRouteInfo> GetRoutes() => throw new NotSupportedException();
@@ -367,6 +384,8 @@ public sealed class StubControllerTests
         public IReadOnlyList<ScenarioStateInfo> GetScenarioStates() => throw new NotSupportedException();
 
         public RuntimeMetricsSummaryInfo GetRuntimeMetrics() => throw new NotSupportedException();
+
+        public IReadOnlyList<RecentRequestInfo> GetRecentRequests(int limit) => throw new NotSupportedException();
 
         public Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request) => throw new NotSupportedException();
 
@@ -385,6 +404,24 @@ public sealed class StubControllerTests
             LastRecordedStatusCode = statusCode;
             LastRecordedElapsed = elapsed;
             RecordRequestMetricsCallCount++;
+        }
+
+        public void RecordRecentRequest(DateTimeOffset timestamp, string method, string path, MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
+        {
+            LastRecentRequestMethod = method;
+            LastRecentRequestPath = path;
+            LastRecentRequest = new RecentRequestInfo
+            {
+                Timestamp = timestamp,
+                Method = method,
+                Path = path,
+                RouteId = explanation.Result.RouteId,
+                StatusCode = statusCode,
+                ElapsedMilliseconds = elapsed.TotalMilliseconds,
+                MatchMode = explanation.Result.MatchMode,
+                FailureReason = explanation.SelectionReason,
+            };
+            RecordRecentRequestCallCount++;
         }
 
         public void ResetScenarioStates() => throw new NotSupportedException();

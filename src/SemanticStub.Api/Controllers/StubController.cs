@@ -155,6 +155,13 @@ public sealed class StubController : ControllerBase
             if (statusCode.HasValue)
             {
                 inspectionService.RecordRequestMetrics(dispatch.Explanation, statusCode.Value, stopwatch.Elapsed);
+                inspectionService.RecordRecentRequest(
+                    DateTimeOffset.UtcNow,
+                    method,
+                    requestPath,
+                    dispatch.Explanation,
+                    statusCode.Value,
+                    stopwatch.Elapsed);
             }
         }
     }
