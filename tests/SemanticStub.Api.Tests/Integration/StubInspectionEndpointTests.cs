@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using SemanticStub.Api.Inspection;
 using Xunit;
@@ -205,6 +206,46 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
         Assert.True(after.MatchedRequestCount >= before.MatchedRequestCount + 1);
         Assert.Contains(after.StatusCodes, entry => entry.StatusCode == (int)HttpStatusCode.OK);
         Assert.Contains(after.TopRoutes, entry => entry.RouteId == "getHello");
+    }
+
+    [Fact]
+    public async Task GetRecentRequests_ReturnsOk()
+    {
+        var response = await client.GetAsync("/_semanticstub/runtime/requests");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetRecentRequests_ResponseDeserializesToRecentRequestInfoArray()
+    {
+        var response = await client.GetAsync("/_semanticstub/runtime/requests");
+        response.EnsureSuccessStatusCode();
+
+        var requests = await response.Content.ReadFromJsonAsync<RecentRequestInfo[]>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(requests);
+    }
+
+    [Fact]
+    public async Task GetRecentRequests_ReflectsNewestRealRequest_AndRespectsLimit()
+    {
+        var routedResponse = await client.GetAsync("/users?role=admin");
+        routedResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync("/_semanticstub/runtime/requests?limit=1");
+        response.EnsureSuccessStatusCode();
+
+        var requests = await response.Content.ReadFromJsonAsync<RecentRequestInfo[]>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(requests);
+        var request = Assert.Single(requests!);
+        Assert.Equal(HttpMethods.Get, request.Method);
+        Assert.Equal("/users", request.Path);
+        Assert.Equal("listUsers", request.RouteId);
+        Assert.Equal((int)HttpStatusCode.OK, request.StatusCode);
     }
 
     [Fact]

@@ -360,6 +360,86 @@ public sealed class StubInspectionServiceTests
     }
 
     // ---------------------------------------------------------------------------
+    // GetRecentRequests
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void GetRecentRequests_ReturnsEmpty_WhenNothingHasBeenRecorded()
+    {
+        var service = CreateService(EmptyDocument());
+
+        var requests = service.GetRecentRequests(20);
+
+        Assert.Empty(requests);
+    }
+
+    [Fact]
+    public void RecordRecentRequest_ReturnsNewestFirst_AndCapturesFailureReason()
+    {
+        var service = CreateService(EmptyDocument());
+
+        service.RecordRecentRequest(
+            DateTimeOffset.Parse("2026-04-07T00:00:00Z"),
+            HttpMethods.Get,
+            "/users",
+            new MatchExplanationInfo
+            {
+                SelectionReason = "No configured route matched the supplied request path.",
+                Result = new MatchSimulationInfo
+                {
+                    Matched = false,
+                    MatchResult = "PathNotFound",
+                }
+            },
+            StatusCodes.Status404NotFound,
+            TimeSpan.FromMilliseconds(15));
+        service.RecordRecentRequest(
+            DateTimeOffset.Parse("2026-04-07T00:00:01Z"),
+            HttpMethods.Post,
+            "/orders",
+            CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "createOrder", matchMode: "fallback"),
+            StatusCodes.Status201Created,
+            TimeSpan.FromMilliseconds(25));
+
+        var requests = service.GetRecentRequests(20);
+
+        Assert.Equal(2, requests.Count);
+        Assert.Equal("/orders", requests[0].Path);
+        Assert.Equal("createOrder", requests[0].RouteId);
+        Assert.Equal("fallback", requests[0].MatchMode);
+        Assert.Null(requests[0].FailureReason);
+        Assert.Equal("/users", requests[1].Path);
+        Assert.Equal("No configured route matched the supplied request path.", requests[1].FailureReason);
+    }
+
+    [Fact]
+    public void GetRecentRequests_RespectsLimit_AndRetentionBound()
+    {
+        var service = CreateService(EmptyDocument());
+
+        for (var index = 0; index < 105; index++)
+        {
+            service.RecordRecentRequest(
+                DateTimeOffset.UtcNow.AddSeconds(index),
+                HttpMethods.Get,
+                $"/requests/{index}",
+                CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: $"route-{index}"),
+                StatusCodes.Status200OK,
+                TimeSpan.FromMilliseconds(index));
+        }
+
+        var limited = service.GetRecentRequests(3);
+        var all = service.GetRecentRequests(200);
+
+        Assert.Equal(3, limited.Count);
+        Assert.Equal("/requests/104", limited[0].Path);
+        Assert.Equal("/requests/102", limited[2].Path);
+        Assert.Equal(100, all.Count);
+        Assert.Equal("/requests/104", all[0].Path);
+        Assert.Equal("/requests/5", all[^1].Path);
+    }
+
+    // ---------------------------------------------------------------------------
     // GetConfigSnapshot — snapshot timestamp
     // ---------------------------------------------------------------------------
 

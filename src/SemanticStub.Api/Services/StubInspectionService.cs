@@ -10,6 +10,7 @@ namespace SemanticStub.Api.Services;
 
 internal sealed class StubInspectionService : IStubInspectionService
 {
+    private const int MaxRecentRequestCount = 100;
     private readonly StubDefinitionState state;
     private readonly IStubDefinitionLoader loader;
     private readonly IOptions<StubSettings> settings;
@@ -19,6 +20,7 @@ internal sealed class StubInspectionService : IStubInspectionService
     private readonly object metricsSyncRoot = new();
     private readonly Dictionary<int, long> statusCodeCounts = [];
     private readonly Dictionary<string, long> routeRequestCounts = new(StringComparer.Ordinal);
+    private readonly Queue<RecentRequestInfo> recentRequests = [];
     private MatchExplanationInfo? lastMatchExplanation;
     private long totalRequestCount;
     private long matchedRequestCount;
@@ -134,6 +136,25 @@ internal sealed class StubInspectionService : IStubInspectionService
     }
 
     /// <inheritdoc/>
+    public IReadOnlyList<RecentRequestInfo> GetRecentRequests(int limit)
+    {
+        lock (metricsSyncRoot)
+        {
+            var normalizedLimit = Math.Clamp(limit, 0, MaxRecentRequestCount);
+
+            if (normalizedLimit == 0)
+            {
+                return [];
+            }
+
+            return recentRequests
+                .Reverse()
+                .Take(normalizedLimit)
+                .ToList();
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request)
     {
         return (await stubService.ExplainMatchAsync(request).ConfigureAwait(false)).Result;
@@ -199,6 +220,36 @@ internal sealed class StubInspectionService : IStubInspectionService
             {
                 routeRequestCounts[explanation.Result.RouteId] = routeRequestCounts.GetValueOrDefault(explanation.Result.RouteId) + 1;
             }
+        }
+    }
+
+    /// <inheritdoc/>
+    public void RecordRecentRequest(DateTimeOffset timestamp, string method, string path, MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(method);
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        ArgumentNullException.ThrowIfNull(explanation);
+
+        lock (metricsSyncRoot)
+        {
+            if (recentRequests.Count >= MaxRecentRequestCount)
+            {
+                recentRequests.Dequeue();
+            }
+
+            recentRequests.Enqueue(new RecentRequestInfo
+            {
+                Timestamp = timestamp,
+                Method = method,
+                Path = path,
+                RouteId = explanation.Result.RouteId,
+                StatusCode = statusCode,
+                ElapsedMilliseconds = Math.Max(0, elapsed.TotalMilliseconds),
+                MatchMode = explanation.Result.MatchMode,
+                FailureReason = explanation.Result.Matched || string.IsNullOrWhiteSpace(explanation.SelectionReason)
+                    ? null
+                    : explanation.SelectionReason,
+            });
         }
     }
 
