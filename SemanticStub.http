@@ -8,6 +8,14 @@ Accept: application/json
 GET {{host}}/_semanticstub/runtime/routes
 Accept: application/json
 
+### Runtime inspection route detail by operationId
+GET {{host}}/_semanticstub/runtime/routes/listUsers
+Accept: application/json
+
+### Runtime inspection route detail with scenario metadata
+GET {{host}}/_semanticstub/runtime/routes/checkout
+Accept: application/json
+
 ### Runtime inspection scenario state
 GET {{host}}/_semanticstub/runtime/scenarios
 Accept: application/json

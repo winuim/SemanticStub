@@ -21,6 +21,17 @@ public sealed class StubInspectionServiceTests
         public string LoadResponseFileContent(string fileName) => throw new InvalidOperationException("Not used in inspection tests");
     }
 
+    private sealed class ReloadingStubDefinitionLoader(StubDocument document, string directoryPath = "/test/definitions") : IStubDefinitionLoader
+    {
+        public StubDocument CurrentDocument { get; set; } = document;
+
+        public string GetDefinitionsDirectoryPath() => directoryPath;
+
+        public StubDocument LoadDefaultDefinition() => CurrentDocument;
+
+        public string LoadResponseFileContent(string fileName) => throw new InvalidOperationException("Not used in inspection tests");
+    }
+
     private static StubDefinitionState CreateState(StubDocument document, string directoryPath = "/test/definitions")
     {
         var loader = new TestStubDefinitionLoader(document, directoryPath);
@@ -616,6 +627,221 @@ public sealed class StubInspectionServiceTests
 
         var route = Assert.Single(CreateService(document).GetRoutes());
         Assert.Equal(0, route.ResponseCount);
+    }
+
+    // ---------------------------------------------------------------------------
+    // GetRoute — detail lookup
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void GetRoute_ReturnsNull_WhenRouteIdDoesNotExist()
+    {
+        var service = CreateService(SingleGetDocument());
+
+        var route = service.GetRoute("does-not-exist");
+
+        Assert.Null(route);
+    }
+
+    [Fact]
+    public void GetRoute_ReturnsDetailedRouteSnapshot()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        OperationId = "listUsers",
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                                {
+                                    ["role"] = "admin",
+                                },
+                                PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                                {
+                                    ["view"] = "summary",
+                                },
+                                RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                                {
+                                    ["region"] = "^ap-.*$",
+                                },
+                                Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                                {
+                                    ["X-Env"] = "staging",
+                                },
+                                Body = new { enabled = true },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 202,
+                                    Scenario = new ScenarioDefinition
+                                    {
+                                        Name = "checkout",
+                                        State = "pending",
+                                        Next = "complete",
+                                    },
+                                },
+                            },
+                            new QueryMatchDefinition
+                            {
+                                SemanticMatch = "find administrator user accounts",
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                },
+                            },
+                        ],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Description = "Default users",
+                            },
+                            ["409"] = new()
+                            {
+                                Description = "Pending approval",
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "checkout",
+                                    State = "initial",
+                                    Next = "pending",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        var route = CreateService(document).GetRoute("listUsers");
+
+        Assert.NotNull(route);
+        Assert.Equal("listUsers", route!.RouteId);
+        Assert.Equal("GET", route.Method);
+        Assert.Equal("/users", route.PathPattern);
+        Assert.True(route.UsesSemanticMatching);
+        Assert.True(route.UsesScenario);
+        Assert.Equal(2, route.ResponseCount);
+        Assert.True(route.HasConditionalMatches);
+
+        Assert.Collection(
+            route.Responses,
+            response =>
+            {
+                Assert.Equal("200", response.ResponseId);
+                Assert.False(response.UsesScenario);
+                Assert.Null(response.Scenario);
+            },
+            response =>
+            {
+                Assert.Equal("409", response.ResponseId);
+                Assert.True(response.UsesScenario);
+                Assert.NotNull(response.Scenario);
+                Assert.Equal("checkout", response.Scenario!.Name);
+                Assert.Equal("initial", response.Scenario.State);
+                Assert.Equal("pending", response.Scenario.Next);
+            });
+
+        Assert.Collection(
+            route.ConditionalMatches,
+            candidate =>
+            {
+                Assert.Equal(0, candidate.CandidateIndex);
+                Assert.True(candidate.HasExactQuery);
+                Assert.Equal(["role"], candidate.ExactQueryKeys);
+                Assert.True(candidate.HasPartialQuery);
+                Assert.Equal(["view"], candidate.PartialQueryKeys);
+                Assert.True(candidate.HasRegexQuery);
+                Assert.Equal(["region"], candidate.RegexQueryKeys);
+                Assert.Equal(["X-Env"], candidate.HeaderKeys);
+                Assert.True(candidate.HasBody);
+                Assert.False(candidate.UsesSemanticMatching);
+                Assert.Null(candidate.SemanticMatch);
+                Assert.Equal(202, candidate.ResponseStatusCode);
+                Assert.True(candidate.UsesScenario);
+                Assert.NotNull(candidate.Scenario);
+                Assert.Equal("checkout", candidate.Scenario!.Name);
+                Assert.Equal("pending", candidate.Scenario.State);
+                Assert.Equal("complete", candidate.Scenario.Next);
+            },
+            candidate =>
+            {
+                Assert.Equal(1, candidate.CandidateIndex);
+                Assert.False(candidate.HasExactQuery);
+                Assert.Empty(candidate.ExactQueryKeys);
+                Assert.False(candidate.HasPartialQuery);
+                Assert.Empty(candidate.PartialQueryKeys);
+                Assert.False(candidate.HasRegexQuery);
+                Assert.Empty(candidate.RegexQueryKeys);
+                Assert.Empty(candidate.HeaderKeys);
+                Assert.False(candidate.HasBody);
+                Assert.True(candidate.UsesSemanticMatching);
+                Assert.Equal("find administrator user accounts", candidate.SemanticMatch);
+                Assert.Equal(200, candidate.ResponseStatusCode);
+                Assert.False(candidate.UsesScenario);
+                Assert.Null(candidate.Scenario);
+            });
+    }
+
+    [Fact]
+    public void GetRoute_UsesMethodColonPath_WhenOperationIdIsEmpty()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        OperationId = string.Empty,
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new(),
+                        },
+                    },
+                },
+            },
+        };
+
+        var route = CreateService(document).GetRoute("GET:/users");
+
+        Assert.NotNull(route);
+        Assert.Equal("GET:/users", route!.RouteId);
+    }
+
+    [Fact]
+    public void GetRoute_ReflectsReloadedActiveDocument()
+    {
+        var initialDocument = SingleGetDocument("/initial", operationId: "initialRoute");
+        var reloadedDocument = SingleGetDocument("/reloaded", operationId: "reloadedRoute");
+        var loader = new ReloadingStubDefinitionLoader(initialDocument);
+        var scenarioService = new ScenarioService();
+        var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
+        var settings = Options.Create(new StubSettings());
+        var stubService = new StubService(
+            initialDocument,
+            _ => throw new InvalidOperationException("Not used in inspection tests"),
+            new MatcherService(),
+            scenarioService,
+            new NoOpSemanticMatcherService());
+        var service = new StubInspectionService(state, loader, settings, scenarioService, stubService);
+
+        Assert.NotNull(service.GetRoute("initialRoute"));
+        Assert.Null(service.GetRoute("reloadedRoute"));
+
+        loader.CurrentDocument = reloadedDocument;
+        Assert.True(state.TryReload());
+
+        Assert.Null(service.GetRoute("initialRoute"));
+        var route = service.GetRoute("reloadedRoute");
+        Assert.NotNull(route);
+        Assert.Equal("/reloaded", route!.PathPattern);
     }
 
     // ---------------------------------------------------------------------------

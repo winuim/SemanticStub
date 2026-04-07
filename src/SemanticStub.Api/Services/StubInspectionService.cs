@@ -56,6 +56,15 @@ internal sealed class StubInspectionService : IStubInspectionService
     }
 
     /// <inheritdoc/>
+    public StubRouteDetailInfo? GetRoute(string routeId)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(routeId);
+
+        var document = state.GetCurrentDocument();
+        return FindRoute(document, routeId);
+    }
+
+    /// <inheritdoc/>
     public IReadOnlyList<ScenarioStateInfo> GetScenarioStates()
     {
         return scenarioService.ExecuteLocked(() =>
@@ -143,14 +152,7 @@ internal sealed class StubInspectionService : IStubInspectionService
 
         foreach (var (path, pathItem) in document.Paths)
         {
-            var operations = new (string Method, OperationDefinition? Op)[]
-            {
-                ("GET", pathItem.Get),
-                ("POST", pathItem.Post),
-                ("PUT", pathItem.Put),
-                ("PATCH", pathItem.Patch),
-                ("DELETE", pathItem.Delete),
-            };
+            var operations = EnumerateOperations(pathItem);
 
             foreach (var (method, op) in operations)
             {
@@ -158,9 +160,7 @@ internal sealed class StubInspectionService : IStubInspectionService
 
                 routes.Add(new StubRouteInfo
                 {
-                    RouteId = string.IsNullOrEmpty(op.OperationId)
-                        ? $"{method}:{path}"
-                        : op.OperationId,
+                    RouteId = GetRouteId(method, path, op),
                     Method = method,
                     PathPattern = path,
                     UsesSemanticMatching = HasSemanticMatch(op),
@@ -171,6 +171,108 @@ internal sealed class StubInspectionService : IStubInspectionService
         }
 
         return routes;
+    }
+
+    private static StubRouteDetailInfo? FindRoute(StubDocument document, string routeId)
+    {
+        foreach (var (path, pathItem) in document.Paths)
+        {
+            foreach (var (method, op) in EnumerateOperations(pathItem))
+            {
+                if (op is null)
+                {
+                    continue;
+                }
+
+                if (!string.Equals(GetRouteId(method, path, op), routeId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                return new StubRouteDetailInfo
+                {
+                    RouteId = routeId,
+                    Method = method,
+                    PathPattern = path,
+                    UsesSemanticMatching = HasSemanticMatch(op),
+                    UsesScenario = HasScenario(op),
+                    ResponseCount = op.Responses.Count,
+                    HasConditionalMatches = op.Matches.Count > 0,
+                    Responses = BuildResponses(op),
+                    ConditionalMatches = BuildConditionalMatches(op),
+                };
+            }
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyList<StubRouteResponseInfo> BuildResponses(OperationDefinition operation)
+    {
+        return operation.Responses
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry => new StubRouteResponseInfo
+            {
+                ResponseId = entry.Key,
+                UsesScenario = entry.Value.Scenario is not null,
+                Scenario = BuildScenario(entry.Value.Scenario),
+            })
+            .ToList();
+    }
+
+    private static IReadOnlyList<StubRouteConditionInfo> BuildConditionalMatches(OperationDefinition operation)
+    {
+        return operation.Matches
+            .Select((match, index) => new StubRouteConditionInfo
+            {
+                CandidateIndex = index,
+                HasExactQuery = match.Query.Count > 0,
+                ExactQueryKeys = OrderKeys(match.Query.Keys),
+                HasPartialQuery = match.PartialQuery.Count > 0,
+                PartialQueryKeys = OrderKeys(match.PartialQuery.Keys),
+                HasRegexQuery = match.RegexQuery.Count > 0,
+                RegexQueryKeys = OrderKeys(match.RegexQuery.Keys),
+                HeaderKeys = OrderKeys(match.Headers.Keys),
+                HasBody = match.Body is not null,
+                UsesSemanticMatching = match.SemanticMatch is not null,
+                SemanticMatch = match.SemanticMatch,
+                ResponseStatusCode = match.Response.StatusCode,
+                UsesScenario = match.Response.Scenario is not null,
+                Scenario = BuildScenario(match.Response.Scenario),
+            })
+            .ToList();
+    }
+
+    private static StubRouteScenarioInfo? BuildScenario(ScenarioDefinition? scenario)
+    {
+        return scenario is null
+            ? null
+            : new StubRouteScenarioInfo
+            {
+                Name = scenario.Name,
+                State = scenario.State,
+                Next = scenario.Next,
+            };
+    }
+
+    private static IReadOnlyList<string> OrderKeys(IEnumerable<string> keys)
+        => keys.OrderBy(key => key, StringComparer.Ordinal).ToList();
+
+    private static string GetRouteId(string method, string path, OperationDefinition operation)
+        => string.IsNullOrEmpty(operation.OperationId)
+            ? $"{method}:{path}"
+            : operation.OperationId;
+
+    private static (string Method, OperationDefinition? Op)[] EnumerateOperations(PathItemDefinition pathItem)
+    {
+        return
+        [
+            ("GET", pathItem.Get),
+            ("POST", pathItem.Post),
+            ("PUT", pathItem.Put),
+            ("PATCH", pathItem.Patch),
+            ("DELETE", pathItem.Delete),
+        ];
     }
 
     private static bool HasSemanticMatch(OperationDefinition op)
@@ -242,16 +344,7 @@ internal sealed class StubInspectionService : IStubInspectionService
 
     private static IEnumerable<object> GetOperationSummaries(PathItemDefinition pathItem)
     {
-        var methods = new (string Method, OperationDefinition? Op)[]
-        {
-            ("GET", pathItem.Get),
-            ("POST", pathItem.Post),
-            ("PUT", pathItem.Put),
-            ("PATCH", pathItem.Patch),
-            ("DELETE", pathItem.Delete),
-        };
-
-        foreach (var (method, op) in methods)
+        foreach (var (method, op) in EnumerateOperations(pathItem))
         {
             if (op is null) continue;
 

@@ -91,6 +91,56 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
     }
 
     [Fact]
+    public async Task GetRoute_ReturnsDetailedRoutePayload()
+    {
+        var response = await client.GetAsync("/_semanticstub/runtime/routes/listUsers");
+        response.EnsureSuccessStatusCode();
+
+        var route = await response.Content.ReadFromJsonAsync<StubRouteDetailInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(route);
+        Assert.Equal("listUsers", route!.RouteId);
+        Assert.Equal("GET", route.Method);
+        Assert.Equal("/users", route.PathPattern);
+        Assert.True(route.HasConditionalMatches);
+        Assert.True(route.ResponseCount >= 1);
+        Assert.Contains(route.Responses, response => response.ResponseId == "200");
+        Assert.Contains(route.ConditionalMatches, candidate => candidate.HasExactQuery);
+        Assert.Contains(route.ConditionalMatches, candidate => candidate.HasPartialQuery);
+    }
+
+    [Fact]
+    public async Task GetRoute_ReturnsScenarioMetadata_WhenConfigured()
+    {
+        var response = await client.GetAsync("/_semanticstub/runtime/routes/checkout");
+        response.EnsureSuccessStatusCode();
+
+        var route = await response.Content.ReadFromJsonAsync<StubRouteDetailInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(route);
+        Assert.Equal("checkout", route!.RouteId);
+        Assert.True(route.UsesScenario);
+        Assert.False(route.HasConditionalMatches);
+        Assert.Contains(route.Responses, response =>
+            response.ResponseId == "409"
+            && response.UsesScenario
+            && response.Scenario is not null
+            && response.Scenario.Name == "checkout-flow"
+            && response.Scenario.State == "initial"
+            && response.Scenario.Next == "confirmed");
+    }
+
+    [Fact]
+    public async Task GetRoute_ReturnsNotFound_WhenRouteDoesNotExist()
+    {
+        var response = await client.GetAsync("/_semanticstub/runtime/routes/does-not-exist");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetScenarios_ReturnsOk()
     {
         var response = await client.GetAsync("/_semanticstub/runtime/scenarios");
