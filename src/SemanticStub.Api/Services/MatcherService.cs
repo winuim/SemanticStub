@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -18,6 +17,7 @@ public sealed class MatcherService : IMatcherService
     private static readonly QueryMatchSpecificityComparer MatchSpecificityComparer = QueryMatchSpecificityComparer.Instance;
     private readonly ILogger<MatcherService>? logger;
     private readonly JsonBodyMatcher jsonBodyMatcher;
+    private readonly QueryValueMatcher queryValueMatcher;
 
     /// <summary>
     /// Creates a matcher with no logging. Invalid regex patterns will silently produce non-matches.
@@ -25,12 +25,14 @@ public sealed class MatcherService : IMatcherService
     public MatcherService()
     {
         jsonBodyMatcher = new JsonBodyMatcher();
+        queryValueMatcher = new QueryValueMatcher();
     }
 
     internal MatcherService(JsonBodyMatcher jsonBodyMatcher, ILogger<MatcherService> logger)
     {
         this.logger = logger;
         this.jsonBodyMatcher = jsonBodyMatcher;
+        queryValueMatcher = new QueryValueMatcher();
     }
 
     /// <summary>
@@ -220,31 +222,14 @@ public sealed class MatcherService : IMatcherService
                jsonBodyMatcher.IsMatch(candidate.Body, requestBody);
     }
 
-    private static bool IsExactQueryMatch(
-        IReadOnlyDictionary<string, object?> expected,
-        IReadOnlyDictionary<string, StringValues> actual,
-        IReadOnlyDictionary<string, string> queryParameterTypes)
-    {
-        foreach (var pair in expected)
-        {
-            if (!actual.TryGetValue(pair.Key, out var value) ||
-                !IsTypedQueryValueMatch(pair.Value, value, queryParameterTypes.GetValueOrDefault(pair.Key)))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     private bool IsQueryMatch(
         QueryMatchDefinition match,
         IReadOnlyDictionary<string, StringValues> actual,
         IReadOnlyDictionary<string, string> queryParameterTypes)
     {
-        return IsExactQueryMatch(match.Query, actual, queryParameterTypes) &&
+        return queryValueMatcher.IsExactMatch(match.Query, actual, queryParameterTypes) &&
                IsRegexQueryMatch(match.RegexQuery, actual) &&
-               IsPartialQueryMatch(match.PartialQuery, actual, queryParameterTypes);
+               queryValueMatcher.IsPartialMatch(match.PartialQuery, actual, queryParameterTypes);
     }
 
     private bool IsRegexQueryMatch(
@@ -260,47 +245,6 @@ public sealed class MatcherService : IMatcherService
         }
 
         return true;
-    }
-
-    private static bool IsPartialQueryMatch(
-        IReadOnlyDictionary<string, object?> expected,
-        IReadOnlyDictionary<string, StringValues> actual,
-        IReadOnlyDictionary<string, string> queryParameterTypes)
-    {
-        foreach (var pair in expected)
-        {
-            if (!actual.TryGetValue(pair.Key, out var value) ||
-                !IsTypedPartialQueryValueMatch(pair.Value, value, queryParameterTypes.GetValueOrDefault(pair.Key)))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool IsTypedQueryValueMatch(object? expected, StringValues actual, string? parameterType)
-    {
-        if (expected is IEnumerable expectedSequence && expected is not string)
-        {
-            return IsTypedQuerySequenceMatch(expectedSequence, actual, parameterType);
-        }
-
-        return actual.Count == 1 &&
-               actual[0] is not null &&
-               IsTypedSingleQueryValueMatch(expected, actual[0]!, parameterType);
-    }
-
-    private static bool IsTypedPartialQueryValueMatch(object? expected, StringValues actual, string? parameterType)
-    {
-        if (expected is IEnumerable expectedSequence && expected is not string)
-        {
-            return IsTypedPartialQuerySequenceMatch(expectedSequence, actual, parameterType);
-        }
-
-        return actual.Any(actualValue =>
-            actualValue is not null &&
-            IsTypedSinglePartialQueryValueMatch(expected, actualValue!, parameterType));
     }
 
     private bool IsRegexQueryValueMatch(object? expected, StringValues actual)
@@ -360,198 +304,12 @@ public sealed class MatcherService : IMatcherService
         }
     }
 
-    private static bool IsTypedQuerySequenceMatch(IEnumerable expectedSequence, StringValues actual, string? parameterType)
-    {
-        var expectedValues = expectedSequence.Cast<object?>().ToArray();
-        var actualValues = actual.ToArray();
-
-        if (expectedValues.Length != actualValues.Length)
-        {
-            return false;
-        }
-
-        for (var index = 0; index < expectedValues.Length; index++)
-        {
-            if (actualValues[index] is null ||
-                !IsTypedSingleQueryValueMatch(expectedValues[index], actualValues[index]!, parameterType))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool IsTypedPartialQuerySequenceMatch(IEnumerable expectedSequence, StringValues actual, string? parameterType)
-    {
-        var expectedValues = expectedSequence.Cast<object?>().ToArray();
-        var actualValues = actual.ToArray();
-
-        if (expectedValues.Length == 0)
-        {
-            return true;
-        }
-
-        var actualIndex = 0;
-
-        foreach (var expectedValue in expectedValues)
-        {
-            var matched = false;
-
-            while (actualIndex < actualValues.Length)
-            {
-                var actualValue = actualValues[actualIndex++];
-
-                if (actualValue is not null &&
-                    IsTypedSinglePartialQueryValueMatch(expectedValue, actualValue!, parameterType))
-                {
-                    matched = true;
-                    break;
-                }
-            }
-
-            if (!matched)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool IsTypedSingleQueryValueMatch(object? expected, string actual, string? parameterType)
-    {
-        if (string.Equals(parameterType, "integer", StringComparison.OrdinalIgnoreCase))
-        {
-            return TryConvertInteger(expected, out var expectedInteger) &&
-                   TryConvertInteger(actual, out var actualInteger) &&
-                   expectedInteger == actualInteger;
-        }
-
-        if (string.Equals(parameterType, "number", StringComparison.OrdinalIgnoreCase))
-        {
-            return TryConvertNumber(expected, out var expectedNumber) &&
-                   TryConvertNumber(actual, out var actualNumber) &&
-                   expectedNumber == actualNumber;
-        }
-
-        if (string.Equals(parameterType, "boolean", StringComparison.OrdinalIgnoreCase))
-        {
-            return TryConvertBoolean(expected, out var expectedBoolean) &&
-                   TryConvertBoolean(actual, out var actualBoolean) &&
-                   expectedBoolean == actualBoolean;
-        }
-
-        return string.Equals(ConvertQueryValueToString(expected), actual, StringComparison.Ordinal);
-    }
-
-    private static bool IsTypedSinglePartialQueryValueMatch(object? expected, string actual, string? parameterType)
-    {
-        if (string.Equals(parameterType, "integer", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(parameterType, "number", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(parameterType, "boolean", StringComparison.OrdinalIgnoreCase))
-        {
-            return IsTypedSingleQueryValueMatch(expected, actual, parameterType);
-        }
-
-        var expectedText = ConvertQueryValueToString(expected);
-
-        if (expectedText.Length == 0)
-        {
-            return string.Equals(expectedText, actual, StringComparison.Ordinal);
-        }
-
-        return actual.Contains(expectedText, StringComparison.Ordinal);
-    }
-
     private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)
     {
         return query.ToDictionary(
             entry => entry.Key,
             entry => new StringValues(entry.Value),
             StringComparer.Ordinal);
-    }
-
-    private static bool TryConvertInteger(object? value, out decimal integer)
-    {
-        if (TryConvertNumber(value, out integer))
-        {
-            return decimal.Truncate(integer) == integer;
-        }
-
-        integer = default;
-        return false;
-    }
-
-    private static bool TryConvertNumber(object? value, out decimal number)
-    {
-        switch (value)
-        {
-            case byte byteValue:
-                number = byteValue;
-                return true;
-            case sbyte sbyteValue:
-                number = sbyteValue;
-                return true;
-            case short shortValue:
-                number = shortValue;
-                return true;
-            case ushort ushortValue:
-                number = ushortValue;
-                return true;
-            case int intValue:
-                number = intValue;
-                return true;
-            case uint uintValue:
-                number = uintValue;
-                return true;
-            case long longValue:
-                number = longValue;
-                return true;
-            case ulong ulongValue:
-                return decimal.TryParse(ulongValue.ToString(CultureInfo.InvariantCulture), NumberStyles.Integer, CultureInfo.InvariantCulture, out number);
-            case float floatValue:
-                return decimal.TryParse(floatValue.ToString(CultureInfo.InvariantCulture), NumberStyles.Float, CultureInfo.InvariantCulture, out number);
-            case double doubleValue:
-                return decimal.TryParse(doubleValue.ToString(CultureInfo.InvariantCulture), NumberStyles.Float, CultureInfo.InvariantCulture, out number);
-            case decimal decimalValue:
-                number = decimalValue;
-                return true;
-            case string text:
-                return decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out number);
-            default:
-                number = default;
-                return false;
-        }
-    }
-
-    private static bool TryConvertBoolean(object? value, out bool boolean)
-    {
-        switch (value)
-        {
-            case bool boolValue:
-                boolean = boolValue;
-                return true;
-            case string text:
-                return bool.TryParse(text, out boolean);
-            default:
-                boolean = default;
-                return false;
-        }
-    }
-
-    private static string ConvertQueryValueToString(object? value)
-    {
-        return value switch
-        {
-            null => string.Empty,
-            string text => text,
-            bool boolean => boolean ? "true" : "false",
-            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal
-                => Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty,
-            IFormattable formattable => formattable.ToString(format: null, CultureInfo.InvariantCulture),
-            _ => value.ToString() ?? string.Empty
-        };
     }
 
     private static bool IsExactHeaderMatch(IReadOnlyDictionary<string, string> expected, IReadOnlyDictionary<string, string> actual)
