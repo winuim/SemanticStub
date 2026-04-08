@@ -33,6 +33,33 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
+    public async Task ExplainMatchAsync_ReturnsUnattemptedExplanationWhenNoSemanticCandidatesAreEligible()
+    {
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei"
+                }
+            },
+            (_, _) => throw new InvalidOperationException("The HTTP client should not be called when there are no semantic candidates."));
+
+        var explanation = await service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [new QueryMatchDefinition()]);
+
+        Assert.False(explanation.Attempted);
+        Assert.Null(explanation.SelectedCandidate);
+        Assert.Empty(explanation.CandidateScores);
+    }
+
+    [Fact]
     public async Task FindBestMatchAsync_ReturnsHighestScoringCandidateAboveThreshold()
     {
         var service = CreateService(
@@ -88,6 +115,37 @@ public sealed class SemanticMatcherServiceTests
             [CreateCandidate("find admin users")]);
 
         Assert.Null(match);
+    }
+
+    [Fact]
+    public async Task ExplainMatchAsync_ReturnsAttemptedNonMatchWhenEmbeddingCallFails()
+    {
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei",
+                    Threshold = 0.8d,
+                    TopScoreMargin = 0.03d
+                }
+            },
+            (_, _) => throw new HttpRequestException("boom"));
+
+        var explanation = await service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [CreateCandidate("find admin users")]);
+
+        Assert.True(explanation.Attempted);
+        Assert.Null(explanation.SelectedCandidate);
+        Assert.Equal(0.8d, explanation.Threshold);
+        Assert.Equal(0.03d, explanation.RequiredMargin);
+        Assert.Empty(explanation.CandidateScores);
     }
 
     [Fact]

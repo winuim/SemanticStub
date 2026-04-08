@@ -80,12 +80,9 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             return new SemanticMatchExplanation();
         }
 
-        var semanticCandidates = candidates
-            .Where(candidate => candidateFilter is null || candidateFilter(candidate))
-            .Where(candidate => !string.IsNullOrWhiteSpace(candidate.SemanticMatch))
-            .ToArray();
+        var semanticCandidates = GetSemanticCandidates(candidates, candidateFilter);
 
-        if (semanticCandidates.Length == 0)
+        if (semanticCandidates.Count == 0)
         {
             logger.LogDebug(
                 "Semantic matching skipped for '{Path}' {Method}: no eligible candidates define x-semantic-match.",
@@ -96,7 +93,6 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
         try
         {
-            var requestText = SemanticRequestTextBuilder.Build(method, path, query, headers, body);
             var endpoint = SemanticEmbeddingClient.NormalizeEndpoint(semanticSettings.Endpoint!);
 
             logger.LogInformation(
@@ -106,62 +102,24 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 endpoint,
                 semanticSettings.Threshold,
                 semanticSettings.TopScoreMargin,
-                semanticCandidates.Length);
+                semanticCandidates.Count);
 
-            var allTexts = new List<string>(semanticCandidates.Length + 1) { requestText };
-            allTexts.AddRange(semanticCandidates.Select(c => c.SemanticMatch!));
+            var allEmbeddings = await GetEmbeddingsAsync(
+                method,
+                path,
+                query,
+                headers,
+                body,
+                semanticCandidates).ConfigureAwait(false);
 
-            var allEmbeddings = await embeddingClient.GetEmbeddingsAsync(allTexts).ConfigureAwait(false);
-            var scoringResult = SemanticCandidateScorer.ScoreCandidates(
-                semanticCandidates,
-                allEmbeddings[0],
-                allEmbeddings.Skip(1).ToArray(),
-                semanticSettings.Threshold,
-                includeCandidateScores,
-                (candidate, score) =>
-                {
-                    logger.LogDebug(
-                        "Semantic candidate scored for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}, Threshold={Threshold}.",
-                        path,
-                        normalizedMethod,
-                        candidate.SemanticMatch,
-                        score,
-                        semanticSettings.Threshold);
-                });
-
-            var explanation = SemanticMatchSelector.Select(
-                scoringResult,
-                semanticSettings.Threshold,
-                semanticSettings.TopScoreMargin);
-
-            if (explanation.SelectedCandidate is null && explanation.SelectedScore is null)
-            {
-                logger.LogDebug(
-                    "Semantic matching did not select a candidate for '{Path}' {Method}. Best score stayed below the threshold.",
-                    path,
-                    normalizedMethod);
-                return explanation;
-            }
-
-            if (explanation.SelectedCandidate is null && explanation.SelectedScore is not null)
-            {
-                logger.LogDebug(
-                    "Semantic matching did not select a candidate for '{Path}' {Method}. Top score margin {Margin} was below the required {RequiredMargin}.",
-                    path,
-                    normalizedMethod,
-                    explanation.MarginToSecondBest,
-                    semanticSettings.TopScoreMargin);
-                return explanation;
-            }
-
-            logger.LogInformation(
-                "Semantic matching selected candidate for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}.",
+            return ScoreAndLogExplanation(
                 path,
                 normalizedMethod,
-                explanation.SelectedCandidate!.SemanticMatch,
-                explanation.SelectedScore!.Value);
-
-            return explanation;
+                semanticCandidates,
+                allEmbeddings,
+                semanticSettings.Threshold,
+                semanticSettings.TopScoreMargin,
+                includeCandidateScores);
         }
         catch (HttpRequestException ex)
         {
@@ -170,12 +128,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request failed. Treating the request as a non-match.",
                 path,
                 normalizedMethod);
-            return new SemanticMatchExplanation
-            {
-                Attempted = true,
-                Threshold = semanticSettings.Threshold,
-                RequiredMargin = semanticSettings.TopScoreMargin,
-            };
+            return CreateFailedExplanation(semanticSettings);
         }
         catch (TaskCanceledException ex)
         {
@@ -184,12 +137,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request timed out. Treating the request as a non-match.",
                 path,
                 normalizedMethod);
-            return new SemanticMatchExplanation
-            {
-                Attempted = true,
-                Threshold = semanticSettings.Threshold,
-                RequiredMargin = semanticSettings.TopScoreMargin,
-            };
+            return CreateFailedExplanation(semanticSettings);
         }
         catch (Exception ex)
         {
@@ -198,12 +146,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 "Semantic matching encountered an unexpected error for '{Path}' {Method}. Treating the request as a non-match.",
                 path,
                 normalizedMethod);
-            return new SemanticMatchExplanation
-            {
-                Attempted = true,
-                Threshold = semanticSettings.Threshold,
-                RequiredMargin = semanticSettings.TopScoreMargin,
-            };
+            return CreateFailedExplanation(semanticSettings);
         }
     }
 
@@ -225,5 +168,100 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
         reason = string.Empty;
         return true;
+    }
+
+    private static IReadOnlyList<QueryMatchDefinition> GetSemanticCandidates(
+        IReadOnlyCollection<QueryMatchDefinition> candidates,
+        Func<QueryMatchDefinition, bool>? candidateFilter)
+    {
+        return candidates
+            .Where(candidate => candidateFilter is null || candidateFilter(candidate))
+            .Where(candidate => !string.IsNullOrWhiteSpace(candidate.SemanticMatch))
+            .ToArray();
+    }
+
+    private async Task<IReadOnlyList<float[]>> GetEmbeddingsAsync(
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body,
+        IReadOnlyList<QueryMatchDefinition> semanticCandidates)
+    {
+        var allTexts = new List<string>(semanticCandidates.Count + 1)
+        {
+            SemanticRequestTextBuilder.Build(method, path, query, headers, body)
+        };
+
+        allTexts.AddRange(semanticCandidates.Select(candidate => candidate.SemanticMatch!));
+        return await embeddingClient.GetEmbeddingsAsync(allTexts).ConfigureAwait(false);
+    }
+
+    private SemanticMatchExplanation ScoreAndLogExplanation(
+        string path,
+        string normalizedMethod,
+        IReadOnlyList<QueryMatchDefinition> semanticCandidates,
+        IReadOnlyList<float[]> allEmbeddings,
+        double threshold,
+        double requiredMargin,
+        bool includeCandidateScores)
+    {
+        var scoringResult = SemanticCandidateScorer.ScoreCandidates(
+            semanticCandidates,
+            allEmbeddings[0],
+            allEmbeddings.Skip(1).ToArray(),
+            threshold,
+            includeCandidateScores,
+            (candidate, score) =>
+            {
+                logger.LogDebug(
+                    "Semantic candidate scored for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}, Threshold={Threshold}.",
+                    path,
+                    normalizedMethod,
+                    candidate.SemanticMatch,
+                    score,
+                    threshold);
+            });
+
+        var explanation = SemanticMatchSelector.Select(scoringResult, threshold, requiredMargin);
+
+        if (explanation.SelectedCandidate is null && explanation.SelectedScore is null)
+        {
+            logger.LogDebug(
+                "Semantic matching did not select a candidate for '{Path}' {Method}. Best score stayed below the threshold.",
+                path,
+                normalizedMethod);
+            return explanation;
+        }
+
+        if (explanation.SelectedCandidate is null && explanation.SelectedScore is not null)
+        {
+            logger.LogDebug(
+                "Semantic matching did not select a candidate for '{Path}' {Method}. Top score margin {Margin} was below the required {RequiredMargin}.",
+                path,
+                normalizedMethod,
+                explanation.MarginToSecondBest,
+                requiredMargin);
+            return explanation;
+        }
+
+        logger.LogInformation(
+            "Semantic matching selected candidate for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}.",
+            path,
+            normalizedMethod,
+            explanation.SelectedCandidate!.SemanticMatch,
+            explanation.SelectedScore!.Value);
+
+        return explanation;
+    }
+
+    private static SemanticMatchExplanation CreateFailedExplanation(SemanticMatchingSettings semanticSettings)
+    {
+        return new SemanticMatchExplanation
+        {
+            Attempted = true,
+            Threshold = semanticSettings.Threshold,
+            RequiredMargin = semanticSettings.TopScoreMargin,
+        };
     }
 }
