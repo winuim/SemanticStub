@@ -49,7 +49,8 @@ public sealed class MatcherServiceTests
             ["view"] = "summary"
         };
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             query,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
@@ -80,7 +81,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
@@ -108,7 +110,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
@@ -136,43 +139,14 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             "{\"value\":42}");
 
         Assert.Null(match);
-    }
-
-    [Fact]
-    public void FindBestMatch_OldOverloadRemainsCompatible()
-    {
-        var operation = new OperationDefinition
-        {
-            Matches =
-            [
-                new QueryMatchDefinition
-                {
-                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
-                    {
-                        ["role"] = "admin"
-                    }
-                }
-            ]
-        };
-
-        var matcher = new MatcherService();
-
-        var match = matcher.FindBestMatch(
-            operation,
-            new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["role"] = "admin"
-            },
-            body: null);
-
-        Assert.NotNull(match);
     }
 
     [Fact]
@@ -367,7 +341,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -410,7 +385,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -453,7 +429,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -496,7 +473,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -539,7 +517,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -612,7 +591,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, StringValues>(StringComparer.Ordinal)
             {
@@ -643,7 +623,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, StringValues>(StringComparer.Ordinal)
             {
@@ -674,7 +655,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, StringValues>(StringComparer.Ordinal)
             {
@@ -713,7 +695,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -746,7 +729,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -785,7 +769,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -818,7 +803,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, StringValues>(StringComparer.Ordinal)
             {
@@ -849,7 +835,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -880,7 +867,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -911,7 +899,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -943,7 +932,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -980,7 +970,8 @@ public sealed class MatcherServiceTests
 
         var stopwatch = Stopwatch.StartNew();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             query,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
@@ -1022,7 +1013,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -1066,7 +1058,8 @@ public sealed class MatcherServiceTests
 
         var matcher = new MatcherService();
 
-        var match = matcher.FindBestMatch(
+        var match = FindBestMatch(
+            matcher,
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -1078,5 +1071,38 @@ public sealed class MatcherServiceTests
         Assert.NotNull(match);
         Assert.Equal("^admin-[0-9]+$", match.RegexQuery["role"]);
         Assert.Empty(match.PartialQuery);
+    }
+
+    private static QueryMatchDefinition? FindBestMatch(
+        MatcherService matcher,
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, string> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
+    {
+        return matcher.FindBestMatch(
+            operation.Parameters,
+            operation,
+            query.ToDictionary(
+                entry => entry.Key,
+                entry => new StringValues(entry.Value),
+                StringComparer.Ordinal),
+            headers,
+            body);
+    }
+
+    private static QueryMatchDefinition? FindBestMatch(
+        MatcherService matcher,
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
+    {
+        return matcher.FindBestMatch(
+            operation.Parameters,
+            operation,
+            query,
+            headers,
+            body);
     }
 }

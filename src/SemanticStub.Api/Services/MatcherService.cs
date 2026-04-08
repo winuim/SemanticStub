@@ -9,7 +9,6 @@ namespace SemanticStub.Api.Services;
 /// </summary>
 public sealed class MatcherService : IMatcherService
 {
-    private static readonly IReadOnlyDictionary<string, string> EmptyHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private static readonly QueryMatchSpecificityComparer MatchSpecificityComparer = QueryMatchSpecificityComparer.Instance;
     private readonly JsonBodyMatcher jsonBodyMatcher;
     private readonly QueryValueMatcher queryValueMatcher;
@@ -30,77 +29,6 @@ public sealed class MatcherService : IMatcherService
         this.jsonBodyMatcher = jsonBodyMatcher;
         queryValueMatcher = new QueryValueMatcher();
         this.regexQueryMatcher = regexQueryMatcher;
-    }
-
-    /// <summary>
-    /// Evaluates conditional matches using operation-level query definitions and no request headers.
-    /// </summary>
-    /// <param name="operation">The operation whose <c>x-match</c> candidates should be evaluated.</param>
-    /// <param name="query">Single-value query parameters keyed by parameter name.</param>
-    /// <param name="body">The request body used for JSON body matching. <see langword="null"/> means no structured body is available.</param>
-    /// <returns>The best matching candidate, or <see langword="null"/> when no candidate matches.</returns>
-    public QueryMatchDefinition? FindBestMatch(
-        OperationDefinition operation,
-        IReadOnlyDictionary<string, string> query,
-        string? body)
-    {
-        return FindBestMatch(
-            operation,
-            ConvertQueryValues(query),
-            body);
-    }
-
-    /// <summary>
-    /// Evaluates conditional matches using operation-level query definitions and no request headers.
-    /// </summary>
-    /// <param name="operation">The operation whose <c>x-match</c> candidates should be evaluated.</param>
-    /// <param name="query">Query parameters keyed by parameter name, including repeated values in request order.</param>
-    /// <param name="body">The request body used for JSON body matching. <see langword="null"/> means no structured body is available.</param>
-    /// <returns>The best matching candidate, or <see langword="null"/> when no candidate matches.</returns>
-    public QueryMatchDefinition? FindBestMatch(
-        OperationDefinition operation,
-        IReadOnlyDictionary<string, StringValues> query,
-        string? body)
-    {
-        return FindBestMatchWithOperationParameters(operation, query, EmptyHeaders, body);
-    }
-
-    /// <summary>
-    /// Evaluates conditional matches using the operation's query parameter definitions and the supplied request headers.
-    /// </summary>
-    /// <param name="operation">The operation whose <c>x-match</c> candidates should be evaluated.</param>
-    /// <param name="query">Single-value query parameters keyed by parameter name.</param>
-    /// <param name="headers">Request headers keyed by header name. Supply a case-insensitive dictionary for HTTP semantics.</param>
-    /// <param name="body">The request body used for JSON body matching. Invalid JSON is treated as "no structured body" instead of causing an exception.</param>
-    /// <returns>The best matching conditional definition, or <see langword="null"/> when none satisfy the request.</returns>
-    public QueryMatchDefinition? FindBestMatch(
-        OperationDefinition operation,
-        IReadOnlyDictionary<string, string> query,
-        IReadOnlyDictionary<string, string> headers,
-        string? body)
-    {
-        return FindBestMatch(
-            operation,
-            ConvertQueryValues(query),
-            headers,
-            body);
-    }
-
-    /// <summary>
-    /// Evaluates conditional matches using the operation's query parameter definitions and the supplied request headers.
-    /// </summary>
-    /// <param name="operation">The operation whose <c>x-match</c> candidates should be evaluated.</param>
-    /// <param name="query">Query parameters keyed by parameter name, including repeated values in request order.</param>
-    /// <param name="headers">Request headers keyed by header name. Supply a case-insensitive dictionary for HTTP semantics.</param>
-    /// <param name="body">The request body used for JSON body matching. Invalid JSON is treated as "no structured body" instead of causing an exception.</param>
-    /// <returns>The best matching conditional definition, or <see langword="null"/> when none satisfy the request.</returns>
-    public QueryMatchDefinition? FindBestMatch(
-        OperationDefinition operation,
-        IReadOnlyDictionary<string, StringValues> query,
-        IReadOnlyDictionary<string, string> headers,
-        string? body)
-    {
-        return FindBestMatchWithOperationParameters(operation, query, headers, body);
     }
 
     /// <summary>
@@ -166,20 +94,6 @@ public sealed class MatcherService : IMatcherService
         return evaluations;
     }
 
-    private QueryMatchDefinition? FindBestMatchWithOperationParameters(
-        OperationDefinition operation,
-        IReadOnlyDictionary<string, StringValues> query,
-        IReadOnlyDictionary<string, string> headers,
-        string? body)
-    {
-        return FindBestMatch(
-            operation.Parameters,
-            operation,
-            query,
-            headers,
-            body);
-    }
-
     private IEnumerable<QueryMatchDefinition> GetCandidatesMatchingRequest(
         IReadOnlyCollection<QueryMatchDefinition> candidates,
         MatchEvaluationContext matchContext,
@@ -227,14 +141,6 @@ public sealed class MatcherService : IMatcherService
         var queryParameterTypes = QueryParameterTypeMapBuilder.Build(pathParameters, operation.Parameters);
         var bodyDocument = jsonBodyMatcher.ParseRequestBody(body);
         return new MatchEvaluationContext(query, headers, queryParameterTypes, bodyDocument);
-    }
-
-    private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)
-    {
-        return query.ToDictionary(
-            entry => entry.Key,
-            entry => new StringValues(entry.Value),
-            StringComparer.Ordinal);
     }
 
     private static bool IsExactHeaderMatch(IReadOnlyDictionary<string, string> expected, IReadOnlyDictionary<string, string> actual)
