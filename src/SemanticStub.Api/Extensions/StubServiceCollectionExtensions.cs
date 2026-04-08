@@ -28,9 +28,11 @@ public static class StubServiceCollectionExtensions
         services.AddHostedService<StubDefinitionWatcher>();
         services.AddSingleton(serviceProvider => new JsonBodyMatcher(
             serviceProvider.GetRequiredService<ILogger<JsonBodyMatcher>>()));
+        services.AddSingleton(serviceProvider => new RegexQueryMatcher(
+            serviceProvider.GetRequiredService<ILogger<RegexQueryMatcher>>()));
         services.AddSingleton<IMatcherService>(serviceProvider => new MatcherService(
             serviceProvider.GetRequiredService<JsonBodyMatcher>(),
-            serviceProvider.GetRequiredService<ILogger<MatcherService>>()));
+            serviceProvider.GetRequiredService<RegexQueryMatcher>()));
         services.AddSingleton<ScenarioService>();
         services.AddSingleton<IStubService>(serviceProvider => new StubService(
             serviceProvider.GetRequiredService<StubDefinitionState>(),
