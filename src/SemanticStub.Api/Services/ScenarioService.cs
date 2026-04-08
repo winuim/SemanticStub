@@ -1,5 +1,4 @@
 using SemanticStub.Api.Models;
-using System.Collections.Concurrent;
 
 namespace SemanticStub.Api.Services;
 
@@ -8,8 +7,7 @@ namespace SemanticStub.Api.Services;
 /// </summary>
 public sealed class ScenarioService
 {
-    private const string InitialState = "initial";
-    private readonly ConcurrentDictionary<string, ScenarioStateSnapshot> currentStates = new(StringComparer.Ordinal);
+    private readonly ScenarioStateStore stateStore = new();
     private readonly SemaphoreSlim semaphore = new(1, 1);
 
     /// <summary>
@@ -23,11 +21,7 @@ public sealed class ScenarioService
             return true;
         }
 
-        var currentState = currentStates.TryGetValue(scenario.Name, out var snapshot)
-            ? snapshot.State
-            : InitialState;
-
-        return string.Equals(currentState, scenario.State, StringComparison.Ordinal);
+        return stateStore.IsMatch(scenario);
     }
 
     /// <summary>
@@ -36,12 +30,7 @@ public sealed class ScenarioService
     /// <param name="scenario">The scenario definition attached to the selected response.</param>
     public void Advance(ScenarioDefinition? scenario)
     {
-        if (scenario is null || string.IsNullOrWhiteSpace(scenario.Next))
-        {
-            return;
-        }
-
-        currentStates[scenario.Name] = new ScenarioStateSnapshot(scenario.Next, DateTimeOffset.UtcNow);
+        stateStore.Advance(scenario, DateTimeOffset.UtcNow);
     }
 
     /// <summary>
@@ -58,7 +47,7 @@ public sealed class ScenarioService
 
     internal void ResetWithinLock()
     {
-        currentStates.Clear();
+        stateStore.Clear();
     }
 
     /// <summary>
@@ -117,26 +106,17 @@ public sealed class ScenarioService
 
     internal ScenarioStateSnapshot GetSnapshotWithinLock(string scenarioName)
     {
-        return currentStates.TryGetValue(scenarioName, out var snapshot)
-            ? snapshot
-            : new ScenarioStateSnapshot(InitialState, null);
+        return stateStore.GetSnapshot(scenarioName);
     }
 
     internal void ResetScenarioWithinLock(string scenarioName, DateTimeOffset timestamp)
     {
-        currentStates[scenarioName] = new ScenarioStateSnapshot(InitialState, timestamp);
+        stateStore.ResetScenario(scenarioName, timestamp);
     }
 
     internal void ResetScenariosWithinLock(IEnumerable<string> scenarioNames, DateTimeOffset timestamp)
     {
-        var scenarioNameSet = new HashSet<string>(scenarioNames, StringComparer.Ordinal);
-
-        currentStates.Clear();
-
-        foreach (var scenarioName in scenarioNameSet)
-        {
-            currentStates[scenarioName] = new ScenarioStateSnapshot(InitialState, timestamp);
-        }
+        stateStore.ResetScenarios(scenarioNames, timestamp);
     }
 
     /// <summary>
