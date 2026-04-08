@@ -1,0 +1,94 @@
+using System.Net.Http.Json;
+using System.Text.Json;
+using SemanticStub.Api.Infrastructure.Yaml;
+
+namespace SemanticStub.Api.Services;
+
+/// <summary>
+/// Calls the configured embedding endpoint and validates the returned embedding payloads.
+/// </summary>
+internal sealed class SemanticEmbeddingClient
+{
+    private readonly HttpClient httpClient;
+    private readonly SemanticMatchingSettings settings;
+
+    /// <summary>
+    /// Creates a client over the configured embedding endpoint settings.
+    /// </summary>
+    /// <param name="httpClient">The HTTP client used to call the configured embedding endpoint.</param>
+    /// <param name="settings">The semantic matching settings that provide the endpoint configuration.</param>
+    public SemanticEmbeddingClient(HttpClient httpClient, SemanticMatchingSettings settings)
+    {
+        this.httpClient = httpClient;
+        this.settings = settings;
+    }
+
+    /// <summary>
+    /// Gets embeddings for the supplied inputs from the configured embedding endpoint.
+    /// </summary>
+    /// <param name="inputs">The request and candidate texts to embed.</param>
+    /// <returns>The returned embedding vectors in request order.</returns>
+    /// <exception cref="HttpRequestException">Thrown when the embedding endpoint request fails.</exception>
+    /// <exception cref="TaskCanceledException">Thrown when the embedding endpoint request times out.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the response shape is invalid.</exception>
+    public async Task<IReadOnlyList<float[]>> GetEmbeddingsAsync(IReadOnlyList<string> inputs)
+    {
+        var endpoint = NormalizeEndpoint(settings.Endpoint!);
+        var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs)).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        using var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        using var document = await JsonDocument.ParseAsync(responseStream).ConfigureAwait(false);
+
+        if (TryReadEmbeddings(document.RootElement, inputs.Count, out var embeddings))
+        {
+            return embeddings;
+        }
+
+        throw new InvalidOperationException("The embedding endpoint returned an unexpected response shape.");
+    }
+
+    internal static string NormalizeEndpoint(string endpoint)
+    {
+        var normalized = endpoint.TrimEnd('/');
+        return normalized.EndsWith("/embed", StringComparison.OrdinalIgnoreCase)
+            ? normalized
+            : normalized + "/embed";
+    }
+
+    private static bool TryReadEmbeddings(JsonElement root, int expectedCount, out IReadOnlyList<float[]> embeddings)
+    {
+        embeddings = [];
+
+        if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() != expectedCount)
+        {
+            return false;
+        }
+
+        var result = new float[expectedCount][];
+
+        for (var i = 0; i < expectedCount; i++)
+        {
+            var element = root[i];
+
+            if (element.ValueKind != JsonValueKind.Array)
+            {
+                return false;
+            }
+
+            result[i] = element.EnumerateArray()
+                .Select(v => v.GetSingle())
+                .ToArray();
+
+            if (result[i].Length == 0)
+            {
+                return false;
+            }
+        }
+
+        embeddings = result;
+        return true;
+    }
+
+    private sealed record EmbedRequest(IReadOnlyList<string> Inputs);
+}

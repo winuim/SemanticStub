@@ -1,6 +1,3 @@
-using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
@@ -14,7 +11,7 @@ namespace SemanticStub.Api.Services;
 /// </summary>
 public sealed class SemanticMatcherService : ISemanticMatcherService
 {
-    private readonly HttpClient httpClient;
+    private readonly SemanticEmbeddingClient embeddingClient;
     private readonly StubSettings settings;
     private readonly ILogger<SemanticMatcherService> logger;
 
@@ -29,8 +26,8 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         IOptions<StubSettings> settings,
         ILogger<SemanticMatcherService> logger)
     {
-        this.httpClient = httpClient;
         this.settings = settings.Value;
+        embeddingClient = new SemanticEmbeddingClient(httpClient, this.settings.SemanticMatching);
         this.logger = logger;
     }
 
@@ -99,8 +96,8 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
         try
         {
-            var requestText = BuildRequestText(method, path, query, headers, body);
-            var endpoint = NormalizeEndpoint(semanticSettings.Endpoint!);
+            var requestText = SemanticRequestTextBuilder.Build(method, path, query, headers, body);
+            var endpoint = SemanticEmbeddingClient.NormalizeEndpoint(semanticSettings.Endpoint!);
 
             logger.LogInformation(
                 "Semantic matching started for '{Path}' {Method}. Endpoint={Endpoint}, Threshold={Threshold}, TopScoreMargin={TopScoreMargin}, Candidates={CandidateCount}.",
@@ -114,7 +111,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             var allTexts = new List<string>(semanticCandidates.Length + 1) { requestText };
             allTexts.AddRange(semanticCandidates.Select(c => c.SemanticMatch!));
 
-            var allEmbeddings = await GetEmbeddingsAsync(allTexts).ConfigureAwait(false);
+            var allEmbeddings = await embeddingClient.GetEmbeddingsAsync(allTexts).ConfigureAwait(false);
             var requestEmbedding = allEmbeddings[0];
             var candidateScores = includeCandidateScores
                 ? new List<SemanticCandidateScore>(semanticCandidates.Length)
@@ -287,111 +284,6 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         return true;
     }
 
-    private async Task<IReadOnlyList<float[]>> GetEmbeddingsAsync(IReadOnlyList<string> inputs)
-    {
-        var endpoint = NormalizeEndpoint(settings.SemanticMatching.Endpoint!);
-        var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs)).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        using var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-        using var document = await JsonDocument.ParseAsync(responseStream).ConfigureAwait(false);
-
-        if (TryReadEmbeddings(document.RootElement, inputs.Count, out var embeddings))
-        {
-            return embeddings;
-        }
-
-        throw new InvalidOperationException("The embedding endpoint returned an unexpected response shape.");
-    }
-
-    private static string NormalizeEndpoint(string endpoint)
-    {
-        var normalized = endpoint.TrimEnd('/');
-        return normalized.EndsWith("/embed", StringComparison.OrdinalIgnoreCase)
-            ? normalized
-            : normalized + "/embed";
-    }
-
-    private static bool TryReadEmbeddings(JsonElement root, int expectedCount, out IReadOnlyList<float[]> embeddings)
-    {
-        embeddings = [];
-
-        if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() != expectedCount)
-        {
-            return false;
-        }
-
-        var result = new float[expectedCount][];
-
-        for (var i = 0; i < expectedCount; i++)
-        {
-            var element = root[i];
-
-            if (element.ValueKind != JsonValueKind.Array)
-            {
-                return false;
-            }
-
-            result[i] = element.EnumerateArray()
-                .Select(v => v.GetSingle())
-                .ToArray();
-
-            if (result[i].Length == 0)
-            {
-                return false;
-            }
-        }
-
-        embeddings = result;
-        return true;
-    }
-
-    private static string BuildRequestText(
-        string method,
-        string path,
-        IReadOnlyDictionary<string, StringValues> query,
-        IReadOnlyDictionary<string, string> headers,
-        string? body)
-    {
-        var builder = new StringBuilder();
-        builder.Append("method: ").Append(method.ToUpperInvariant()).AppendLine();
-        builder.Append("path: ").Append(path).AppendLine();
-
-        if (query.Count > 0)
-        {
-            builder.AppendLine("query:");
-
-            foreach (var pair in query.OrderBy(pair => pair.Key, StringComparer.Ordinal))
-            {
-                builder.Append("  ")
-                    .Append(pair.Key)
-                    .Append(": ")
-                    .AppendLine(string.Join(", ", pair.Value.Select(value => value ?? string.Empty)));
-            }
-        }
-
-        if (headers.Count > 0)
-        {
-            builder.AppendLine("headers:");
-
-            foreach (var pair in headers.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
-            {
-                builder.Append("  ")
-                    .Append(pair.Key)
-                    .Append(": ")
-                    .AppendLine(pair.Value);
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(body))
-        {
-            builder.AppendLine("body:");
-            builder.Append(body.Trim());
-        }
-
-        return builder.ToString();
-    }
-
     private static double CosineSimilarity(IReadOnlyList<float> left, IReadOnlyList<float> right)
     {
         if (left.Count == 0 || right.Count == 0 || left.Count != right.Count)
@@ -420,6 +312,4 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
         return dot / (Math.Sqrt(leftMagnitude) * Math.Sqrt(rightMagnitude));
     }
-
-    private sealed record EmbedRequest(IReadOnlyList<string> Inputs);
 }

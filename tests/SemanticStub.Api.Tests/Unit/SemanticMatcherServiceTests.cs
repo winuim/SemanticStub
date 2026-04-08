@@ -227,6 +227,117 @@ public sealed class SemanticMatcherServiceTests
         Assert.Contains(explanation.CandidateScores, score => ReferenceEquals(score.Candidate, adminCandidate) && score.AboveThreshold);
     }
 
+    [Theory]
+    [InlineData("http://tei", "http://tei/embed")]
+    [InlineData("http://tei/", "http://tei/embed")]
+    [InlineData("http://tei/embed", "http://tei/embed")]
+    [InlineData("http://tei/embed/", "http://tei/embed")]
+    public async Task FindBestMatchAsync_NormalizesEmbeddingEndpointWithoutChangingBehavior(string configuredEndpoint, string expectedEndpoint)
+    {
+        Uri? actualRequestUri = null;
+
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = configuredEndpoint
+                }
+            },
+            (request, _) =>
+            {
+                actualRequestUri = request.RequestUri;
+                return CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1]]");
+            });
+
+        var candidate = CreateCandidate("find admin users");
+
+        var match = await service.FindBestMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [candidate]);
+
+        Assert.Same(candidate, match);
+        Assert.Equal(expectedEndpoint, actualRequestUri?.ToString());
+    }
+
+    [Fact]
+    public async Task FindBestMatchAsync_BuildsRequestTextFromMethodPathQueryHeadersAndTrimmedBody()
+    {
+        string? capturedRequestText = null;
+
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei"
+                }
+            },
+            (request, _) =>
+            {
+                using var document = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+                capturedRequestText = document.RootElement.GetProperty("inputs")[0].GetString();
+                return CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1]]");
+            });
+
+        var candidate = CreateCandidate("find admin users");
+
+        var match = await service.FindBestMatchAsync(
+            "post",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal)
+            {
+                ["z"] = new StringValues(["last", "value"]),
+                ["a"] = new StringValues("first")
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["x-tenant"] = "tenant-a",
+                ["Accept"] = "application/json"
+            },
+            "  admin search  ",
+            [candidate]);
+
+        Assert.Same(candidate, match);
+        Assert.Equal(
+            "method: POST\npath: /search\nquery:\n  a: first\n  z: last, value\nheaders:\n  Accept: application/json\n  x-tenant: tenant-a\nbody:\nadmin search",
+            capturedRequestText);
+    }
+
+    [Fact]
+    public async Task FindBestMatchAsync_ReturnsNullWhenEmbeddingResponseShapeIsUnexpected()
+    {
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei"
+                }
+            },
+            (_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"embeddings\":[[1.0,0.0]]}", Encoding.UTF8, "application/json")
+            });
+
+        var match = await service.FindBestMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [CreateCandidate("find admin users")]);
+
+        Assert.Null(match);
+    }
+
     private static QueryMatchDefinition CreateCandidate(string semanticMatch)
     {
         return new QueryMatchDefinition
@@ -288,6 +399,14 @@ public sealed class SemanticMatcherServiceTests
             {
                 Content = new StringContent($"[{string.Join(",", results)}]", Encoding.UTF8, "application/json")
             };
+        };
+    }
+
+    private static HttpResponseMessage CreateEmbeddingResponse(string json)
+    {
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
     }
 
