@@ -1328,6 +1328,65 @@ public sealed class StubInspectionServiceTests
     }
 
     [Fact]
+    public void StubInspectionScenarioCoordinator_ResetScenarioState_ReturnsFalse_WhenScenarioDoesNotExist()
+    {
+        var loader = new TestStubDefinitionLoader(EmptyDocument());
+        var scenarioService = new ScenarioService();
+        var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
+        var coordinator = new StubInspectionScenarioCoordinator(state, scenarioService);
+
+        var reset = coordinator.ResetScenarioState("missing");
+
+        Assert.False(reset);
+    }
+
+    [Fact]
+    public void StubInspectionScenarioCoordinator_GetScenarioStates_ReflectsAdvancedScenarioState()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/checkout"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["409"] = new()
+                            {
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "checkout-flow",
+                                    State = "initial",
+                                    Next = "confirmed",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+        var loader = new TestStubDefinitionLoader(document);
+        var scenarioService = new ScenarioService();
+        var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
+        var coordinator = new StubInspectionScenarioCoordinator(state, scenarioService);
+
+        scenarioService.Advance(new ScenarioDefinition
+        {
+            Name = "checkout-flow",
+            State = "initial",
+            Next = "confirmed",
+        });
+
+        var scenario = Assert.Single(coordinator.GetScenarioStates());
+
+        Assert.Equal("checkout-flow", scenario.Name);
+        Assert.Equal("confirmed", scenario.CurrentState);
+        Assert.NotNull(scenario.LastUpdatedTimestamp);
+    }
+
+    [Fact]
     public void GetLastMatchExplanation_ReturnsNull_WhenNothingHasBeenRecorded()
     {
         var service = CreateService(EmptyDocument());

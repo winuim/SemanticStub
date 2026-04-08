@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Infrastructure.Yaml;
+using SemanticStub.Api.Models;
 
 namespace SemanticStub.Api.Services;
 
@@ -9,9 +10,9 @@ internal sealed class StubInspectionService : IStubInspectionService
     private readonly StubDefinitionState state;
     private readonly IStubDefinitionLoader loader;
     private readonly IOptions<StubSettings> settings;
-    private readonly ScenarioService scenarioService;
     private readonly IStubService stubService;
     private readonly StubInspectionRuntimeStore runtimeStore = new();
+    private readonly StubInspectionScenarioCoordinator scenarioCoordinator;
 
     public StubInspectionService(
         StubDefinitionState state,
@@ -23,14 +24,14 @@ internal sealed class StubInspectionService : IStubInspectionService
         this.state = state;
         this.loader = loader;
         this.settings = settings;
-        this.scenarioService = scenarioService;
         this.stubService = stubService;
+        scenarioCoordinator = new StubInspectionScenarioCoordinator(state, scenarioService);
     }
 
     /// <inheritdoc/>
     public StubConfigSnapshot GetConfigSnapshot()
     {
-        var document = state.GetCurrentDocument();
+        var document = GetCurrentDocument();
         var routes = StubInspectionDocumentProjector.BuildRoutes(document);
 
         return new StubConfigSnapshot
@@ -46,8 +47,7 @@ internal sealed class StubInspectionService : IStubInspectionService
     /// <inheritdoc/>
     public IReadOnlyList<StubRouteInfo> GetRoutes()
     {
-        var document = state.GetCurrentDocument();
-        return StubInspectionDocumentProjector.BuildRoutes(document);
+        return StubInspectionDocumentProjector.BuildRoutes(GetCurrentDocument());
     }
 
     /// <inheritdoc/>
@@ -55,31 +55,13 @@ internal sealed class StubInspectionService : IStubInspectionService
     {
         ArgumentException.ThrowIfNullOrEmpty(routeId);
 
-        var document = state.GetCurrentDocument();
-        return StubInspectionDocumentProjector.FindRoute(document, routeId);
+        return StubInspectionDocumentProjector.FindRoute(GetCurrentDocument(), routeId);
     }
 
     /// <inheritdoc/>
     public IReadOnlyList<ScenarioStateInfo> GetScenarioStates()
     {
-        return scenarioService.ExecuteLocked(() =>
-        {
-            var document = state.GetCurrentDocument();
-            var scenarioNames = StubInspectionDocumentProjector.GetScenarioNames(document);
-
-            return scenarioNames
-                .Select(name =>
-                {
-                    var snapshot = scenarioService.GetSnapshotWithinLock(name);
-                    return new ScenarioStateInfo
-                    {
-                        Name = name,
-                        CurrentState = snapshot.State,
-                        LastUpdatedTimestamp = snapshot.LastUpdatedTimestamp,
-                    };
-                })
-                .ToList();
-        });
+        return scenarioCoordinator.GetScenarioStates();
     }
 
     /// <inheritdoc/>
@@ -97,7 +79,8 @@ internal sealed class StubInspectionService : IStubInspectionService
     /// <inheritdoc/>
     public async Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request)
     {
-        return (await stubService.ExplainMatchAsync(request).ConfigureAwait(false)).Result;
+        var explanation = await stubService.ExplainMatchAsync(request).ConfigureAwait(false);
+        return explanation.Result;
     }
 
     /// <inheritdoc/>
@@ -133,29 +116,17 @@ internal sealed class StubInspectionService : IStubInspectionService
     /// <inheritdoc/>
     public void ResetScenarioStates()
     {
-        scenarioService.ExecuteLocked(() =>
-        {
-            var document = state.GetCurrentDocument();
-            scenarioService.ResetScenariosWithinLock(StubInspectionDocumentProjector.GetScenarioNames(document), DateTimeOffset.UtcNow);
-            return 0;
-        });
+        scenarioCoordinator.ResetScenarioStates();
     }
 
     /// <inheritdoc/>
     public bool ResetScenarioState(string scenarioName)
     {
-        return scenarioService.ExecuteLocked(() =>
-        {
-            var document = state.GetCurrentDocument();
-            var scenarioNames = StubInspectionDocumentProjector.GetScenarioNames(document);
+        return scenarioCoordinator.ResetScenarioState(scenarioName);
+    }
 
-            if (!scenarioNames.Contains(scenarioName, StringComparer.Ordinal))
-            {
-                return false;
-            }
-
-            scenarioService.ResetScenarioWithinLock(scenarioName, DateTimeOffset.UtcNow);
-            return true;
-        });
+    private StubDocument GetCurrentDocument()
+    {
+        return state.GetCurrentDocument();
     }
 }
