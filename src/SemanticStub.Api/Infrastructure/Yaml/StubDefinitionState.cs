@@ -39,7 +39,9 @@ internal sealed class StubDefinitionState
                 scenarioService.ExecuteLocked(() =>
                 {
                     Volatile.Write(ref currentDocument, reloadedDocument);
-                    scenarioService.ResetScenariosWithinLock(GetScenarioNames(reloadedDocument), DateTimeOffset.UtcNow);
+                    scenarioService.ResetScenariosWithinLock(
+                        StubScenarioNameCollector.Collect(reloadedDocument),
+                        DateTimeOffset.UtcNow);
                     return 0;
                 });
                 logger.LogInformation("Reloaded stub definitions from disk.");
@@ -49,46 +51,6 @@ internal sealed class StubDefinitionState
             {
                 logger.LogError(ex, "Failed to reload stub definitions. Continuing with the last successfully loaded definitions.");
                 return false;
-            }
-        }
-    }
-
-    private static IReadOnlyList<string> GetScenarioNames(StubDocument document)
-    {
-        var scenarioNames = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var pathItem in document.Paths.Values)
-        {
-            AddScenarioNames(pathItem.Get, scenarioNames);
-            AddScenarioNames(pathItem.Post, scenarioNames);
-            AddScenarioNames(pathItem.Put, scenarioNames);
-            AddScenarioNames(pathItem.Patch, scenarioNames);
-            AddScenarioNames(pathItem.Delete, scenarioNames);
-        }
-
-        return scenarioNames.ToList();
-    }
-
-    private static void AddScenarioNames(OperationDefinition? operation, ISet<string> scenarioNames)
-    {
-        if (operation is null)
-        {
-            return;
-        }
-
-        foreach (var response in operation.Responses.Values)
-        {
-            if (response.Scenario is not null)
-            {
-                scenarioNames.Add(response.Scenario.Name);
-            }
-        }
-
-        foreach (var match in operation.Matches)
-        {
-            if (match.Response.Scenario is not null)
-            {
-                scenarioNames.Add(match.Response.Scenario.Name);
             }
         }
     }
