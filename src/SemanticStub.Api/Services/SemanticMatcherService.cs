@@ -112,113 +112,56 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             allTexts.AddRange(semanticCandidates.Select(c => c.SemanticMatch!));
 
             var allEmbeddings = await embeddingClient.GetEmbeddingsAsync(allTexts).ConfigureAwait(false);
-            var requestEmbedding = allEmbeddings[0];
-            var candidateScores = includeCandidateScores
-                ? new List<SemanticCandidateScore>(semanticCandidates.Length)
-                : null;
-
-            QueryMatchDefinition? bestCandidate = null;
-            double? bestScore = null;
-            double? secondBestScore = null;
-
-            for (var i = 0; i < semanticCandidates.Length; i++)
-            {
-                var candidate = semanticCandidates[i];
-                var candidateText = candidate.SemanticMatch!;
-                var candidateEmbedding = allEmbeddings[i + 1];
-                var score = CosineSimilarity(requestEmbedding, candidateEmbedding);
-
-                logger.LogDebug(
-                    "Semantic candidate scored for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}, Threshold={Threshold}.",
-                    path,
-                    normalizedMethod,
-                    candidateText,
-                    score,
-                    semanticSettings.Threshold);
-
-                candidateScores?.Add(new SemanticCandidateScore
+            var scoringResult = SemanticCandidateScorer.ScoreCandidates(
+                semanticCandidates,
+                allEmbeddings[0],
+                allEmbeddings.Skip(1).ToArray(),
+                semanticSettings.Threshold,
+                includeCandidateScores,
+                (candidate, score) =>
                 {
-                    Candidate = candidate,
-                    Eligible = true,
-                    Score = score,
-                    AboveThreshold = score >= semanticSettings.Threshold,
+                    logger.LogDebug(
+                        "Semantic candidate scored for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}, Threshold={Threshold}.",
+                        path,
+                        normalizedMethod,
+                        candidate.SemanticMatch,
+                        score,
+                        semanticSettings.Threshold);
                 });
 
-                if (score < semanticSettings.Threshold)
-                {
-                    continue;
-                }
+            var explanation = SemanticMatchSelector.Select(
+                scoringResult,
+                semanticSettings.Threshold,
+                semanticSettings.TopScoreMargin);
 
-                if (bestScore is null || score > bestScore.Value)
-                {
-                    secondBestScore = bestScore;
-                    bestScore = score;
-                    bestCandidate = candidate;
-                }
-                else if (secondBestScore is null || score > secondBestScore.Value)
-                {
-                    secondBestScore = score;
-                }
-            }
-
-            if (bestCandidate is null || bestScore is null)
+            if (explanation.SelectedCandidate is null && explanation.SelectedScore is null)
             {
                 logger.LogDebug(
                     "Semantic matching did not select a candidate for '{Path}' {Method}. Best score stayed below the threshold.",
                     path,
                     normalizedMethod);
-                return new SemanticMatchExplanation
-                {
-                    Attempted = true,
-                    Threshold = semanticSettings.Threshold,
-                    RequiredMargin = semanticSettings.TopScoreMargin,
-                    CandidateScores = candidateScores ?? [],
-                };
+                return explanation;
             }
 
-            double? marginToSecondBest = secondBestScore.HasValue
-                ? bestScore.Value - secondBestScore.Value
-                : null;
-
-            if (secondBestScore is not null &&
-                marginToSecondBest < semanticSettings.TopScoreMargin)
+            if (explanation.SelectedCandidate is null && explanation.SelectedScore is not null)
             {
                 logger.LogDebug(
                     "Semantic matching did not select a candidate for '{Path}' {Method}. Top score margin {Margin} was below the required {RequiredMargin}.",
                     path,
                     normalizedMethod,
-                    marginToSecondBest,
+                    explanation.MarginToSecondBest,
                     semanticSettings.TopScoreMargin);
-                return new SemanticMatchExplanation
-                {
-                    Attempted = true,
-                    Threshold = semanticSettings.Threshold,
-                    RequiredMargin = semanticSettings.TopScoreMargin,
-                    SelectedScore = bestScore,
-                    SecondBestScore = secondBestScore,
-                    MarginToSecondBest = marginToSecondBest,
-                    CandidateScores = candidateScores ?? [],
-                };
+                return explanation;
             }
 
             logger.LogInformation(
                 "Semantic matching selected candidate for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}.",
                 path,
                 normalizedMethod,
-                bestCandidate.SemanticMatch,
-                bestScore.Value);
+                explanation.SelectedCandidate!.SemanticMatch,
+                explanation.SelectedScore!.Value);
 
-            return new SemanticMatchExplanation
-            {
-                Attempted = true,
-                SelectedCandidate = bestCandidate,
-                SelectedScore = bestScore,
-                Threshold = semanticSettings.Threshold,
-                RequiredMargin = semanticSettings.TopScoreMargin,
-                SecondBestScore = secondBestScore,
-                MarginToSecondBest = marginToSecondBest,
-                CandidateScores = candidateScores ?? [],
-            };
+            return explanation;
         }
         catch (HttpRequestException ex)
         {
@@ -282,34 +225,5 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
         reason = string.Empty;
         return true;
-    }
-
-    private static double CosineSimilarity(IReadOnlyList<float> left, IReadOnlyList<float> right)
-    {
-        if (left.Count == 0 || right.Count == 0 || left.Count != right.Count)
-        {
-            throw new InvalidOperationException("Embedding vectors must be non-empty and have the same dimension.");
-        }
-
-        double dot = 0d;
-        double leftMagnitude = 0d;
-        double rightMagnitude = 0d;
-
-        for (var index = 0; index < left.Count; index++)
-        {
-            var leftValue = left[index];
-            var rightValue = right[index];
-
-            dot += leftValue * rightValue;
-            leftMagnitude += leftValue * leftValue;
-            rightMagnitude += rightValue * rightValue;
-        }
-
-        if (leftMagnitude == 0d || rightMagnitude == 0d)
-        {
-            throw new InvalidOperationException("Embedding vectors must not have zero magnitude.");
-        }
-
-        return dot / (Math.Sqrt(leftMagnitude) * Math.Sqrt(rightMagnitude));
     }
 }
