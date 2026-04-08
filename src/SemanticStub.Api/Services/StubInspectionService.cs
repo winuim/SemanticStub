@@ -6,24 +6,12 @@ namespace SemanticStub.Api.Services;
 
 internal sealed class StubInspectionService : IStubInspectionService
 {
-    private const int MaxRecentRequestCount = 100;
     private readonly StubDefinitionState state;
     private readonly IStubDefinitionLoader loader;
     private readonly IOptions<StubSettings> settings;
     private readonly ScenarioService scenarioService;
     private readonly IStubService stubService;
-    private readonly object lastMatchSyncRoot = new();
-    private readonly object metricsSyncRoot = new();
-    private readonly Dictionary<int, long> statusCodeCounts = [];
-    private readonly Dictionary<string, long> routeRequestCounts = new(StringComparer.Ordinal);
-    private readonly Queue<RecentRequestInfo> recentRequests = [];
-    private MatchExplanationInfo? lastMatchExplanation;
-    private long totalRequestCount;
-    private long matchedRequestCount;
-    private long unmatchedRequestCount;
-    private long fallbackResponseCount;
-    private long semanticMatchCount;
-    private double totalLatencyMilliseconds;
+    private readonly StubInspectionRuntimeStore runtimeStore = new();
 
     public StubInspectionService(
         StubDefinitionState state,
@@ -97,57 +85,13 @@ internal sealed class StubInspectionService : IStubInspectionService
     /// <inheritdoc/>
     public RuntimeMetricsSummaryInfo GetRuntimeMetrics()
     {
-        lock (metricsSyncRoot)
-        {
-            return new RuntimeMetricsSummaryInfo
-            {
-                TotalRequestCount = totalRequestCount,
-                MatchedRequestCount = matchedRequestCount,
-                UnmatchedRequestCount = unmatchedRequestCount,
-                FallbackResponseCount = fallbackResponseCount,
-                SemanticMatchCount = semanticMatchCount,
-                AverageLatencyMilliseconds = totalRequestCount == 0
-                    ? 0
-                    : totalLatencyMilliseconds / totalRequestCount,
-                StatusCodes = statusCodeCounts
-                    .OrderByDescending(entry => entry.Value)
-                    .ThenBy(entry => entry.Key)
-                    .Select(entry => new RuntimeStatusCodeMetricInfo
-                    {
-                        StatusCode = entry.Key,
-                        RequestCount = entry.Value,
-                    })
-                    .ToList(),
-                TopRoutes = routeRequestCounts
-                    .OrderByDescending(entry => entry.Value)
-                    .ThenBy(entry => entry.Key, StringComparer.Ordinal)
-                    .Select(entry => new RouteUsageMetricInfo
-                    {
-                        RouteId = entry.Key,
-                        RequestCount = entry.Value,
-                    })
-                    .ToList(),
-            };
-        }
+        return runtimeStore.GetRuntimeMetrics();
     }
 
     /// <inheritdoc/>
     public IReadOnlyList<RecentRequestInfo> GetRecentRequests(int limit)
     {
-        lock (metricsSyncRoot)
-        {
-            var normalizedLimit = Math.Clamp(limit, 0, MaxRecentRequestCount);
-
-            if (normalizedLimit == 0)
-            {
-                return [];
-            }
-
-            return recentRequests
-                .Reverse()
-                .Take(normalizedLimit)
-                .ToList();
-        }
+        return runtimeStore.GetRecentRequests(limit);
     }
 
     /// <inheritdoc/>
@@ -165,88 +109,25 @@ internal sealed class StubInspectionService : IStubInspectionService
     /// <inheritdoc/>
     public MatchExplanationInfo? GetLastMatchExplanation()
     {
-        lock (lastMatchSyncRoot)
-        {
-            return lastMatchExplanation;
-        }
+        return runtimeStore.GetLastMatchExplanation();
     }
 
     /// <inheritdoc/>
     public void RecordLastMatchExplanation(MatchExplanationInfo explanation)
     {
-        lock (lastMatchSyncRoot)
-        {
-            lastMatchExplanation = explanation;
-        }
+        runtimeStore.RecordLastMatchExplanation(explanation);
     }
 
     /// <inheritdoc/>
     public void RecordRequestMetrics(MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
     {
-        ArgumentNullException.ThrowIfNull(explanation);
-
-        lock (metricsSyncRoot)
-        {
-            totalRequestCount++;
-
-            if (explanation.Result.Matched)
-            {
-                matchedRequestCount++;
-            }
-            else
-            {
-                unmatchedRequestCount++;
-            }
-
-            if (string.Equals(explanation.Result.MatchMode, "fallback", StringComparison.Ordinal))
-            {
-                fallbackResponseCount++;
-            }
-
-            if (string.Equals(explanation.Result.MatchMode, "semantic", StringComparison.Ordinal))
-            {
-                semanticMatchCount++;
-            }
-
-            totalLatencyMilliseconds += Math.Max(0, elapsed.TotalMilliseconds);
-
-            statusCodeCounts[statusCode] = statusCodeCounts.GetValueOrDefault(statusCode) + 1;
-
-            if (!string.IsNullOrEmpty(explanation.Result.RouteId))
-            {
-                routeRequestCounts[explanation.Result.RouteId] = routeRequestCounts.GetValueOrDefault(explanation.Result.RouteId) + 1;
-            }
-        }
+        runtimeStore.RecordRequestMetrics(explanation, statusCode, elapsed);
     }
 
     /// <inheritdoc/>
     public void RecordRecentRequest(DateTimeOffset timestamp, string method, string path, MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
     {
-        ArgumentException.ThrowIfNullOrEmpty(method);
-        ArgumentException.ThrowIfNullOrEmpty(path);
-        ArgumentNullException.ThrowIfNull(explanation);
-
-        lock (metricsSyncRoot)
-        {
-            if (recentRequests.Count >= MaxRecentRequestCount)
-            {
-                recentRequests.Dequeue();
-            }
-
-            recentRequests.Enqueue(new RecentRequestInfo
-            {
-                Timestamp = timestamp,
-                Method = method,
-                Path = path,
-                RouteId = explanation.Result.RouteId,
-                StatusCode = statusCode,
-                ElapsedMilliseconds = Math.Max(0, elapsed.TotalMilliseconds),
-                MatchMode = explanation.Result.MatchMode,
-                FailureReason = explanation.Result.Matched || string.IsNullOrWhiteSpace(explanation.SelectionReason)
-                    ? null
-                    : explanation.SelectionReason,
-            });
-        }
+        runtimeStore.RecordRecentRequest(timestamp, method, path, explanation, statusCode, elapsed);
     }
 
     /// <inheritdoc/>

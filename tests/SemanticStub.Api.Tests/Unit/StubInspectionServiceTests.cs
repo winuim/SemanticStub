@@ -359,6 +359,22 @@ public sealed class StubInspectionServiceTests
             });
     }
 
+    [Fact]
+    public void StubInspectionRuntimeStore_RecordRequestMetrics_ClampsNegativeLatency()
+    {
+        var store = new StubInspectionRuntimeStore();
+
+        store.RecordRequestMetrics(
+            CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "listUsers"),
+            StatusCodes.Status200OK,
+            TimeSpan.FromMilliseconds(-10));
+
+        var metrics = store.GetRuntimeMetrics();
+
+        Assert.Equal(0, metrics.AverageLatencyMilliseconds);
+        Assert.Collection(metrics.TopRoutes, route => Assert.Equal("listUsers", route.RouteId));
+    }
+
     // ---------------------------------------------------------------------------
     // GetRecentRequests
     // ---------------------------------------------------------------------------
@@ -437,6 +453,23 @@ public sealed class StubInspectionServiceTests
         Assert.Equal(100, all.Count);
         Assert.Equal("/requests/104", all[0].Path);
         Assert.Equal("/requests/5", all[^1].Path);
+    }
+
+    [Fact]
+    public void StubInspectionRuntimeStore_GetRecentRequests_ReturnsEmpty_WhenLimitIsZeroOrNegative()
+    {
+        var store = new StubInspectionRuntimeStore();
+
+        store.RecordRecentRequest(
+            DateTimeOffset.Parse("2026-04-07T00:00:00Z"),
+            HttpMethods.Get,
+            "/users",
+            CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "listUsers"),
+            StatusCodes.Status200OK,
+            TimeSpan.FromMilliseconds(15));
+
+        Assert.Empty(store.GetRecentRequests(0));
+        Assert.Empty(store.GetRecentRequests(-1));
     }
 
     // ---------------------------------------------------------------------------
@@ -1711,5 +1744,16 @@ public sealed class StubInspectionServiceTests
         Assert.True(explanation!.Result.Matched);
         Assert.Equal("fallback", explanation.Result.MatchMode);
         Assert.Equal("listUsers", explanation.Result.RouteId);
+    }
+
+    [Fact]
+    public void StubInspectionRuntimeStore_GetLastMatchExplanation_ReturnsRecordedInstance()
+    {
+        var store = new StubInspectionRuntimeStore();
+        var explanation = CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "listUsers");
+
+        store.RecordLastMatchExplanation(explanation);
+
+        Assert.Same(explanation, store.GetLastMatchExplanation());
     }
 }
