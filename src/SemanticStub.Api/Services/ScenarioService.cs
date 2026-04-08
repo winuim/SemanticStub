@@ -38,11 +38,7 @@ public sealed class ScenarioService
     /// </summary>
     public void Reset()
     {
-        ExecuteLocked(() =>
-        {
-            ResetWithinLock();
-            return 0;
-        });
+        ExecuteLocked(ResetWithinLock);
     }
 
     internal void ResetWithinLock()
@@ -84,11 +80,7 @@ public sealed class ScenarioService
     /// <param name="scenarioName">The scenario name defined in YAML.</param>
     public void ResetScenario(string scenarioName)
     {
-        ExecuteLocked(() =>
-        {
-            ResetScenarioWithinLock(scenarioName, DateTimeOffset.UtcNow);
-            return 0;
-        });
+        ExecuteLockedWithTimestamp(timestamp => ResetScenarioWithinLock(scenarioName, timestamp));
     }
 
     /// <summary>
@@ -97,11 +89,7 @@ public sealed class ScenarioService
     /// <param name="scenarioNames">The scenario names defined in YAML.</param>
     public void ResetScenarios(IEnumerable<string> scenarioNames)
     {
-        ExecuteLocked(() =>
-        {
-            ResetScenariosWithinLock(scenarioNames, DateTimeOffset.UtcNow);
-            return 0;
-        });
+        ExecuteLockedWithTimestamp(timestamp => ResetScenariosWithinLock(scenarioNames, timestamp));
     }
 
     internal ScenarioStateSnapshot GetSnapshotWithinLock(string scenarioName)
@@ -117,6 +105,19 @@ public sealed class ScenarioService
     internal void ResetScenariosWithinLock(IEnumerable<string> scenarioNames, DateTimeOffset timestamp)
     {
         stateStore.ResetScenarios(scenarioNames, timestamp);
+    }
+
+    /// <summary>
+    /// Executes scenario-sensitive selection and transition logic under one lock so state checks and advances stay atomic across concurrent requests.
+    /// </summary>
+    /// <param name="action">The scenario-aware operation to run atomically.</param>
+    public void ExecuteLocked(Action action)
+    {
+        ExecuteLocked(() =>
+        {
+            action();
+            return 0;
+        });
     }
 
     /// <summary>
@@ -151,6 +152,11 @@ public sealed class ScenarioService
         {
             semaphore.Release();
         }
+    }
+
+    private void ExecuteLockedWithTimestamp(Action<DateTimeOffset> action)
+    {
+        ExecuteLocked(() => action(DateTimeOffset.UtcNow));
     }
 }
 
