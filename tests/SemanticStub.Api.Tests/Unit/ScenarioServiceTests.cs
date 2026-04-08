@@ -63,6 +63,21 @@ public sealed class ScenarioServiceTests
     }
 
     [Fact]
+    public void GetSnapshots_ReturnsCurrentSnapshotForEachRequestedScenario()
+    {
+        var service = new ScenarioService();
+        service.Advance(new ScenarioDefinition { Name = "checkout-flow", State = "initial", Next = "confirmed" });
+
+        var snapshots = service.GetSnapshots(["checkout-flow", "payment-flow"]);
+
+        Assert.Equal(2, snapshots.Count);
+        Assert.Equal("confirmed", snapshots["checkout-flow"].State);
+        Assert.NotNull(snapshots["checkout-flow"].LastUpdatedTimestamp);
+        Assert.Equal("initial", snapshots["payment-flow"].State);
+        Assert.Null(snapshots["payment-flow"].LastUpdatedTimestamp);
+    }
+
+    [Fact]
     public void Advance_StoresCurrentStateTimestamp()
     {
         var service = new ScenarioService();
@@ -139,7 +154,6 @@ public sealed class ScenarioServiceTests
         service.ExecuteLocked(() =>
         {
             service.ResetWithinLock();
-            return 0;
         });
 
         Assert.True(service.IsMatch(scenario));
