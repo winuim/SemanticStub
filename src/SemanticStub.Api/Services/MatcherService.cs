@@ -224,8 +224,8 @@ public sealed class MatcherService : IMatcherService
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
-        var bodyDocument = jsonBodyMatcher.ParseRequestBody(body);
         var queryParameterTypes = QueryParameterTypeMapBuilder.Build(pathParameters, operation.Parameters);
+        var bodyDocument = jsonBodyMatcher.ParseRequestBody(body);
         return new MatchEvaluationContext(query, headers, queryParameterTypes, bodyDocument);
     }
 
