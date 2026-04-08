@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
@@ -545,11 +546,17 @@ public sealed class SemanticMatcherServiceTests
         StubSettings settings,
         Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> handler)
     {
-        var httpClient = new HttpClient(new DelegatingTestHandler(handler));
-        return new SemanticMatcherService(
-            httpClient,
-            Options.Create(settings),
-            LoggerFactory.Create(_ => { }).CreateLogger<SemanticMatcherService>());
+        var services = new ServiceCollection();
+        services.AddSingleton(Options.Create(settings));
+        services.AddLogging();
+        services.AddSingleton<IHttpClientFactory>(_ => new TestHttpClientFactory(new HttpClient(new DelegatingTestHandler(handler))));
+        services.AddSingleton<SemanticEmbeddingClient>();
+        services.AddSingleton<ISemanticMatcherService>(serviceProvider => new SemanticMatcherService(
+            serviceProvider.GetRequiredService<SemanticEmbeddingClient>(),
+            serviceProvider.GetRequiredService<IOptions<StubSettings>>(),
+            serviceProvider.GetRequiredService<ILogger<SemanticMatcherService>>()));
+
+        return (SemanticMatcherService)services.BuildServiceProvider().GetRequiredService<ISemanticMatcherService>();
     }
 
     private static Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> CreateEmbeddingHandler(
@@ -597,6 +604,14 @@ public sealed class SemanticMatcherServiceTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             return Task.FromResult(handler(request, cancellationToken));
+        }
+    }
+
+    private sealed class TestHttpClientFactory(HttpClient client) : IHttpClientFactory
+    {
+        public HttpClient CreateClient(string name)
+        {
+            return client;
         }
     }
 }

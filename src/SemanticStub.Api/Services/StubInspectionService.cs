@@ -11,7 +11,7 @@ internal sealed class StubInspectionService : IStubInspectionService
     private readonly IStubDefinitionLoader loader;
     private readonly IOptions<StubSettings> settings;
     private readonly IStubService stubService;
-    private readonly StubInspectionRuntimeStore runtimeStore = new();
+    private readonly StubInspectionRuntimeStore runtimeStore;
     private readonly StubInspectionScenarioCoordinator scenarioCoordinator;
 
     public StubInspectionService(
@@ -20,12 +20,30 @@ internal sealed class StubInspectionService : IStubInspectionService
         IOptions<StubSettings> settings,
         ScenarioService scenarioService,
         IStubService stubService)
+        : this(
+            state,
+            loader,
+            settings,
+            stubService,
+            new StubInspectionRuntimeStore(),
+            new StubInspectionScenarioCoordinator(state, scenarioService))
+    {
+    }
+
+    internal StubInspectionService(
+        StubDefinitionState state,
+        IStubDefinitionLoader loader,
+        IOptions<StubSettings> settings,
+        IStubService stubService,
+        StubInspectionRuntimeStore runtimeStore,
+        StubInspectionScenarioCoordinator scenarioCoordinator)
     {
         this.state = state;
         this.loader = loader;
         this.settings = settings;
         this.stubService = stubService;
-        scenarioCoordinator = new StubInspectionScenarioCoordinator(state, scenarioService);
+        this.runtimeStore = runtimeStore;
+        this.scenarioCoordinator = scenarioCoordinator;
     }
 
     /// <inheritdoc/>

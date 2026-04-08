@@ -15,19 +15,13 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
     private readonly StubSettings settings;
     private readonly ILogger<SemanticMatcherService> logger;
 
-    /// <summary>
-    /// Creates a semantic matcher over the configured Text Embeddings Inference endpoint.
-    /// </summary>
-    /// <param name="httpClient">The HTTP client used to call the configured embedding endpoint.</param>
-    /// <param name="settings">The stub runtime settings, including semantic matching configuration.</param>
-    /// <param name="logger">The logger used to record semantic matching scores and failures.</param>
-    public SemanticMatcherService(
-        HttpClient httpClient,
+    internal SemanticMatcherService(
+        SemanticEmbeddingClient embeddingClient,
         IOptions<StubSettings> settings,
         ILogger<SemanticMatcherService> logger)
     {
         this.settings = settings.Value;
-        embeddingClient = new SemanticEmbeddingClient(httpClient, this.settings.SemanticMatching);
+        this.embeddingClient = embeddingClient;
         this.logger = logger;
     }
 
