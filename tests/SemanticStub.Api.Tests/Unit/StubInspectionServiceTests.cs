@@ -583,6 +583,76 @@ public sealed class StubInspectionServiceTests
         Assert.Matches("^[0-9a-f]+$", hash);
     }
 
+    [Fact]
+    public void StubInspectionDocumentProjector_GetScenarioNames_DeduplicatesAndSortsOrdinally()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/checkout"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["409"] = new()
+                            {
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "z-flow",
+                                    State = "initial",
+                                    Next = "confirmed",
+                                },
+                            },
+                        },
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Scenario = new ScenarioDefinition
+                                    {
+                                        Name = "a-flow",
+                                        State = "initial",
+                                        Next = "authorized",
+                                    },
+                                },
+                            },
+                            new QueryMatchDefinition
+                            {
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 201,
+                                    Scenario = new ScenarioDefinition
+                                    {
+                                        Name = "z-flow",
+                                        State = "pending",
+                                        Next = "complete",
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                },
+            },
+        };
+
+        var scenarioNames = StubInspectionDocumentProjector.GetScenarioNames(document);
+
+        Assert.Equal(["a-flow", "z-flow"], scenarioNames);
+    }
+
+    [Fact]
+    public void StubInspectionDocumentProjector_FindRoute_ReturnsNull_WhenRouteIdDoesNotExist()
+    {
+        var route = StubInspectionDocumentProjector.FindRoute(SingleGetDocument(), "missing");
+
+        Assert.Null(route);
+    }
+
     // ---------------------------------------------------------------------------
     // GetRoutes — empty document
     // ---------------------------------------------------------------------------
