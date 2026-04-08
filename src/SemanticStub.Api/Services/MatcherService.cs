@@ -1,7 +1,4 @@
-using System.Collections;
-using System.Text.RegularExpressions;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Models;
 
@@ -12,12 +9,11 @@ namespace SemanticStub.Api.Services;
 /// </summary>
 public sealed class MatcherService : IMatcherService
 {
-    private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(100);
     private static readonly IReadOnlyDictionary<string, string> EmptyHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
     private static readonly QueryMatchSpecificityComparer MatchSpecificityComparer = QueryMatchSpecificityComparer.Instance;
-    private readonly ILogger<MatcherService>? logger;
     private readonly JsonBodyMatcher jsonBodyMatcher;
     private readonly QueryValueMatcher queryValueMatcher;
+    private readonly RegexQueryMatcher regexQueryMatcher;
 
     /// <summary>
     /// Creates a matcher with no logging. Invalid regex patterns will silently produce non-matches.
@@ -26,13 +22,14 @@ public sealed class MatcherService : IMatcherService
     {
         jsonBodyMatcher = new JsonBodyMatcher();
         queryValueMatcher = new QueryValueMatcher();
+        regexQueryMatcher = new RegexQueryMatcher();
     }
 
-    internal MatcherService(JsonBodyMatcher jsonBodyMatcher, ILogger<MatcherService> logger)
+    internal MatcherService(JsonBodyMatcher jsonBodyMatcher, RegexQueryMatcher regexQueryMatcher)
     {
-        this.logger = logger;
         this.jsonBodyMatcher = jsonBodyMatcher;
         queryValueMatcher = new QueryValueMatcher();
+        this.regexQueryMatcher = regexQueryMatcher;
     }
 
     /// <summary>
@@ -228,80 +225,8 @@ public sealed class MatcherService : IMatcherService
         IReadOnlyDictionary<string, string> queryParameterTypes)
     {
         return queryValueMatcher.IsExactMatch(match.Query, actual, queryParameterTypes) &&
-               IsRegexQueryMatch(match.RegexQuery, actual) &&
+               regexQueryMatcher.IsMatch(match.RegexQuery, actual) &&
                queryValueMatcher.IsPartialMatch(match.PartialQuery, actual, queryParameterTypes);
-    }
-
-    private bool IsRegexQueryMatch(
-        IReadOnlyDictionary<string, object?> expected,
-        IReadOnlyDictionary<string, StringValues> actual)
-    {
-        foreach (var pair in expected)
-        {
-            if (!actual.TryGetValue(pair.Key, out var value) || !IsRegexQueryValueMatch(pair.Value, value))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private bool IsRegexQueryValueMatch(object? expected, StringValues actual)
-    {
-        if (expected is IEnumerable expectedSequence && expected is not string)
-        {
-            return IsRegexQuerySequenceMatch(expectedSequence, actual);
-        }
-
-        return actual.Count == 1 &&
-               actual[0] is not null &&
-               IsSingleRegexQueryValueMatch(expected, actual[0]!);
-    }
-
-    private bool IsRegexQuerySequenceMatch(IEnumerable expectedSequence, StringValues actual)
-    {
-        var expectedValues = expectedSequence.Cast<object?>().ToArray();
-        var actualValues = actual.ToArray();
-
-        if (expectedValues.Length != actualValues.Length)
-        {
-            return false;
-        }
-
-        for (var index = 0; index < expectedValues.Length; index++)
-        {
-            if (actualValues[index] is null ||
-                !IsSingleRegexQueryValueMatch(expectedValues[index], actualValues[index]!))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private bool IsSingleRegexQueryValueMatch(object? expected, string actual)
-    {
-        if (expected is not string pattern)
-        {
-            return false;
-        }
-
-        try
-        {
-            return Regex.IsMatch(actual, pattern, RegexOptions.CultureInvariant, RegexMatchTimeout);
-        }
-        catch (ArgumentException ex)
-        {
-            logger?.LogWarning(ex, "Invalid x-regex-query pattern '{Pattern}' in stub definition — treating as non-match.", pattern);
-            return false;
-        }
-        catch (RegexMatchTimeoutException)
-        {
-            logger?.LogWarning("x-regex-query pattern '{Pattern}' timed out after {TimeoutMs}ms — treating as non-match.", pattern, RegexMatchTimeout.TotalMilliseconds);
-            return false;
-        }
     }
 
     private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)
