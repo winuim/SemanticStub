@@ -130,16 +130,12 @@ public sealed class MatcherService : IMatcherService
             return null;
         }
 
-        using var bodyDocument = jsonBodyMatcher.ParseRequestBody(body);
-        var queryParameterTypes = QueryParameterTypeMapBuilder.Build(pathParameters, operation.Parameters);
+        using var matchContext = CreateMatchContext(pathParameters, operation, query, headers, body);
 
         // Match conditions are conjunctive; after filtering, prefer the candidate with the most explicit constraints.
         return GetCandidatesMatchingRequest(
                 operation.Matches,
-                query,
-                headers,
-                queryParameterTypes,
-                bodyDocument?.RootElement,
+                matchContext,
                 candidateFilter)
             .OrderBy(match => match, MatchSpecificityComparer)
             .FirstOrDefault();
@@ -153,8 +149,7 @@ public sealed class MatcherService : IMatcherService
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
-        using var bodyDocument = jsonBodyMatcher.ParseRequestBody(body);
-        var queryParameterTypes = QueryParameterTypeMapBuilder.Build(pathParameters, operation.Parameters);
+        using var matchContext = CreateMatchContext(pathParameters, operation, query, headers, body);
         var evaluations = new List<QueryMatchCandidateEvaluation>(operation.Matches.Count);
 
         foreach (var candidate in operation.Matches)
@@ -162,9 +157,9 @@ public sealed class MatcherService : IMatcherService
             evaluations.Add(new QueryMatchCandidateEvaluation
             {
                 Candidate = candidate,
-                QueryMatched = IsQueryMatch(candidate, query, queryParameterTypes),
-                HeaderMatched = IsExactHeaderMatch(candidate.Headers, headers),
-                BodyMatched = jsonBodyMatcher.IsMatch(candidate.Body, bodyDocument?.RootElement),
+                QueryMatched = IsQueryMatch(candidate, matchContext),
+                HeaderMatched = IsExactHeaderMatch(candidate.Headers, matchContext.Headers),
+                BodyMatched = jsonBodyMatcher.IsMatch(candidate.Body, matchContext.RequestBody),
             });
         }
 
@@ -187,10 +182,7 @@ public sealed class MatcherService : IMatcherService
 
     private IEnumerable<QueryMatchDefinition> GetCandidatesMatchingRequest(
         IReadOnlyCollection<QueryMatchDefinition> candidates,
-        IReadOnlyDictionary<string, StringValues> query,
-        IReadOnlyDictionary<string, string> headers,
-        IReadOnlyDictionary<string, string> queryParameterTypes,
-        JsonElement? requestBody,
+        MatchEvaluationContext matchContext,
         Func<QueryMatchDefinition, bool>? candidateFilter)
     {
         foreach (var candidate in candidates)
@@ -200,7 +192,7 @@ public sealed class MatcherService : IMatcherService
                 continue;
             }
 
-            if (IsCandidateMatch(candidate, query, headers, queryParameterTypes, requestBody))
+            if (IsCandidateMatch(candidate, matchContext))
             {
                 yield return candidate;
             }
@@ -209,24 +201,32 @@ public sealed class MatcherService : IMatcherService
 
     private bool IsCandidateMatch(
         QueryMatchDefinition candidate,
-        IReadOnlyDictionary<string, StringValues> query,
-        IReadOnlyDictionary<string, string> headers,
-        IReadOnlyDictionary<string, string> queryParameterTypes,
-        JsonElement? requestBody)
+        MatchEvaluationContext matchContext)
     {
-        return IsQueryMatch(candidate, query, queryParameterTypes) &&
-               IsExactHeaderMatch(candidate.Headers, headers) &&
-               jsonBodyMatcher.IsMatch(candidate.Body, requestBody);
+        return IsQueryMatch(candidate, matchContext) &&
+               IsExactHeaderMatch(candidate.Headers, matchContext.Headers) &&
+               jsonBodyMatcher.IsMatch(candidate.Body, matchContext.RequestBody);
     }
 
     private bool IsQueryMatch(
         QueryMatchDefinition match,
-        IReadOnlyDictionary<string, StringValues> actual,
-        IReadOnlyDictionary<string, string> queryParameterTypes)
+        MatchEvaluationContext matchContext)
     {
-        return queryValueMatcher.IsExactMatch(match.Query, actual, queryParameterTypes) &&
-               regexQueryMatcher.IsMatch(match.RegexQuery, actual) &&
-               queryValueMatcher.IsPartialMatch(match.PartialQuery, actual, queryParameterTypes);
+        return queryValueMatcher.IsExactMatch(match.Query, matchContext.Query, matchContext.QueryParameterTypes) &&
+               regexQueryMatcher.IsMatch(match.RegexQuery, matchContext.Query) &&
+               queryValueMatcher.IsPartialMatch(match.PartialQuery, matchContext.Query, matchContext.QueryParameterTypes);
+    }
+
+    private MatchEvaluationContext CreateMatchContext(
+        IReadOnlyCollection<ParameterDefinition> pathParameters,
+        OperationDefinition operation,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
+    {
+        var bodyDocument = jsonBodyMatcher.ParseRequestBody(body);
+        var queryParameterTypes = QueryParameterTypeMapBuilder.Build(pathParameters, operation.Parameters);
+        return new MatchEvaluationContext(query, headers, queryParameterTypes, bodyDocument);
     }
 
     private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)
@@ -248,6 +248,37 @@ public sealed class MatcherService : IMatcherService
         }
 
         return true;
+    }
+
+    private readonly struct MatchEvaluationContext : IDisposable
+    {
+        public MatchEvaluationContext(
+            IReadOnlyDictionary<string, StringValues> query,
+            IReadOnlyDictionary<string, string> headers,
+            IReadOnlyDictionary<string, string> queryParameterTypes,
+            JsonDocument? bodyDocument)
+        {
+            Query = query;
+            Headers = headers;
+            QueryParameterTypes = queryParameterTypes;
+            this.bodyDocument = bodyDocument;
+            RequestBody = bodyDocument?.RootElement;
+        }
+
+        public IReadOnlyDictionary<string, StringValues> Query { get; }
+
+        public IReadOnlyDictionary<string, string> Headers { get; }
+
+        public IReadOnlyDictionary<string, string> QueryParameterTypes { get; }
+
+        public JsonElement? RequestBody { get; }
+
+        private readonly JsonDocument? bodyDocument;
+
+        public void Dispose()
+        {
+            bodyDocument?.Dispose();
+        }
     }
 
 }

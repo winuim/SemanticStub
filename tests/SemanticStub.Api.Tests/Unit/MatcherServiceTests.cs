@@ -298,6 +298,57 @@ public sealed class MatcherServiceTests
     }
 
     [Fact]
+    public void EvaluateCandidates_UsesSharedPreprocessingForTypedQueryAndInvalidBody()
+    {
+        var operation = new OperationDefinition
+        {
+            Parameters =
+            [
+                new ParameterDefinition
+                {
+                    Name = "page",
+                    In = "query",
+                    Schema = new ParameterSchemaDefinition
+                    {
+                        Type = "integer"
+                    }
+                }
+            ],
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["page"] = 2
+                    },
+                    Body = new Dictionary<object, object>
+                    {
+                        ["username"] = "demo"
+                    }
+                }
+            ]
+        };
+
+        var matcher = new MatcherService();
+
+        var evaluations = matcher.EvaluateCandidates(
+            [],
+            operation,
+            new Dictionary<string, StringValues>(StringComparer.Ordinal)
+            {
+                ["page"] = "2"
+            },
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "{not-json");
+
+        var evaluation = Assert.Single(evaluations);
+        Assert.True(evaluation.QueryMatched);
+        Assert.False(evaluation.BodyMatched);
+        Assert.False(evaluation.Matched);
+    }
+
+    [Fact]
     public void FindBestMatch_MatchesHeadersUsingCaseInsensitiveHeaderNames()
     {
         var operation = new OperationDefinition
