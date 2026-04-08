@@ -35,15 +35,7 @@ internal sealed class StubDefinitionState
         {
             try
             {
-                var reloadedDocument = loader.LoadDefaultDefinition();
-                scenarioService.ExecuteLocked(() =>
-                {
-                    Volatile.Write(ref currentDocument, reloadedDocument);
-                    scenarioService.ResetScenariosWithinLock(
-                        StubScenarioNameCollector.Collect(reloadedDocument),
-                        DateTimeOffset.UtcNow);
-                    return 0;
-                });
+                ApplyReloadedDocument(loader.LoadDefaultDefinition());
                 logger.LogInformation("Reloaded stub definitions from disk.");
                 return true;
             }
@@ -53,5 +45,22 @@ internal sealed class StubDefinitionState
                 return false;
             }
         }
+    }
+
+    private void ApplyReloadedDocument(StubDocument reloadedDocument)
+    {
+        scenarioService.ExecuteLocked(() =>
+        {
+            Volatile.Write(ref currentDocument, reloadedDocument);
+            ResetScenarioStatesWithinLock(reloadedDocument);
+            return 0;
+        });
+    }
+
+    private void ResetScenarioStatesWithinLock(StubDocument document)
+    {
+        scenarioService.ResetScenariosWithinLock(
+            StubScenarioNameCollector.Collect(document),
+            DateTimeOffset.UtcNow);
     }
 }
