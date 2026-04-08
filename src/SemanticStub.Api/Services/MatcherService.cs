@@ -16,6 +16,7 @@ public sealed class MatcherService : IMatcherService
 {
     private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(100);
     private static readonly IReadOnlyDictionary<string, string> EmptyHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    private static readonly QueryMatchSpecificityComparer MatchSpecificityComparer = QueryMatchSpecificityComparer.Instance;
     private readonly ILogger<MatcherService>? logger;
 
     /// <summary>
@@ -130,7 +131,7 @@ public sealed class MatcherService : IMatcherService
         }
 
         using var bodyDocument = ParseRequestBody(body);
-        var queryParameterTypes = BuildQueryParameterTypes(pathParameters, operation.Parameters);
+        var queryParameterTypes = QueryParameterTypeMapBuilder.Build(pathParameters, operation.Parameters);
 
         // Match conditions are conjunctive; after filtering, prefer the candidate with the most explicit constraints.
         return GetCandidatesMatchingRequest(
@@ -140,9 +141,7 @@ public sealed class MatcherService : IMatcherService
                 queryParameterTypes,
                 bodyDocument?.RootElement,
                 candidateFilter)
-            .OrderByDescending(GetExactQuerySpecificity)
-            .ThenByDescending(GetMatchSpecificity)
-            .ThenByDescending(GetRegexQuerySpecificity)
+            .OrderBy(match => match, MatchSpecificityComparer)
             .FirstOrDefault();
     }
 
@@ -155,7 +154,7 @@ public sealed class MatcherService : IMatcherService
         string? body)
     {
         using var bodyDocument = ParseRequestBody(body);
-        var queryParameterTypes = BuildQueryParameterTypes(pathParameters, operation.Parameters);
+        var queryParameterTypes = QueryParameterTypeMapBuilder.Build(pathParameters, operation.Parameters);
         var evaluations = new List<QueryMatchCandidateEvaluation>(operation.Matches.Count);
 
         foreach (var candidate in operation.Matches)
@@ -218,35 +217,6 @@ public sealed class MatcherService : IMatcherService
         return IsQueryMatch(candidate, query, queryParameterTypes) &&
                IsExactHeaderMatch(candidate.Headers, headers) &&
                IsBodyMatch(candidate.Body, requestBody);
-    }
-
-    private static Dictionary<string, string> BuildQueryParameterTypes(
-        IReadOnlyCollection<ParameterDefinition> pathParameters,
-        IReadOnlyCollection<ParameterDefinition> operationParameters)
-    {
-        var queryParameterTypes = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        AddQueryParameterTypes(pathParameters, queryParameterTypes);
-        AddQueryParameterTypes(operationParameters, queryParameterTypes);
-
-        return queryParameterTypes;
-    }
-
-    private static void AddQueryParameterTypes(
-        IReadOnlyCollection<ParameterDefinition> parameters,
-        IDictionary<string, string> queryParameterTypes)
-    {
-        foreach (var parameter in parameters)
-        {
-            if (!string.Equals(parameter.In, "query", StringComparison.OrdinalIgnoreCase) ||
-                string.IsNullOrWhiteSpace(parameter.Name) ||
-                string.IsNullOrWhiteSpace(parameter.Schema?.Type))
-            {
-                continue;
-            }
-
-            queryParameterTypes[parameter.Name] = parameter.Schema.Type;
-        }
     }
 
     private static bool IsExactQueryMatch(
@@ -708,30 +678,4 @@ public sealed class MatcherService : IMatcherService
         };
     }
 
-    private static int GetMatchSpecificity(QueryMatchDefinition match)
-    {
-        return match.Query.Count + match.RegexQuery.Count + match.PartialQuery.Count + match.Headers.Count + GetBodySpecificity(match.Body);
-    }
-
-    private static int GetExactQuerySpecificity(QueryMatchDefinition match)
-    {
-        return match.Query.Count;
-    }
-
-    private static int GetRegexQuerySpecificity(QueryMatchDefinition match)
-    {
-        return match.RegexQuery.Count;
-    }
-
-    private static int GetBodySpecificity(object? body)
-    {
-        // Nested body shapes should outrank shallower ones so more concrete matches win.
-        return body switch
-        {
-            null => 0,
-            IDictionary dictionary => dictionary.Count + dictionary.Values.Cast<object?>().Sum(GetBodySpecificity),
-            IEnumerable list when body is not string => list.Cast<object?>().Sum(GetBodySpecificity),
-            _ => 1
-        };
-    }
 }
