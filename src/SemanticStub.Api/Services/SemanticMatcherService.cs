@@ -1,6 +1,3 @@
-using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
@@ -14,7 +11,7 @@ namespace SemanticStub.Api.Services;
 /// </summary>
 public sealed class SemanticMatcherService : ISemanticMatcherService
 {
-    private readonly HttpClient httpClient;
+    private readonly SemanticEmbeddingClient embeddingClient;
     private readonly StubSettings settings;
     private readonly ILogger<SemanticMatcherService> logger;
 
@@ -29,8 +26,8 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         IOptions<StubSettings> settings,
         ILogger<SemanticMatcherService> logger)
     {
-        this.httpClient = httpClient;
         this.settings = settings.Value;
+        embeddingClient = new SemanticEmbeddingClient(httpClient, this.settings.SemanticMatching);
         this.logger = logger;
     }
 
@@ -83,12 +80,9 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             return new SemanticMatchExplanation();
         }
 
-        var semanticCandidates = candidates
-            .Where(candidate => candidateFilter is null || candidateFilter(candidate))
-            .Where(candidate => !string.IsNullOrWhiteSpace(candidate.SemanticMatch))
-            .ToArray();
+        var semanticCandidates = GetSemanticCandidates(candidates, candidateFilter);
 
-        if (semanticCandidates.Length == 0)
+        if (semanticCandidates.Count == 0)
         {
             logger.LogDebug(
                 "Semantic matching skipped for '{Path}' {Method}: no eligible candidates define x-semantic-match.",
@@ -99,8 +93,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
         try
         {
-            var requestText = BuildRequestText(method, path, query, headers, body);
-            var endpoint = NormalizeEndpoint(semanticSettings.Endpoint!);
+            var endpoint = SemanticEmbeddingClient.NormalizeEndpoint(semanticSettings.Endpoint!);
 
             logger.LogInformation(
                 "Semantic matching started for '{Path}' {Method}. Endpoint={Endpoint}, Threshold={Threshold}, TopScoreMargin={TopScoreMargin}, Candidates={CandidateCount}.",
@@ -109,119 +102,24 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 endpoint,
                 semanticSettings.Threshold,
                 semanticSettings.TopScoreMargin,
-                semanticCandidates.Length);
+                semanticCandidates.Count);
 
-            var allTexts = new List<string>(semanticCandidates.Length + 1) { requestText };
-            allTexts.AddRange(semanticCandidates.Select(c => c.SemanticMatch!));
+            var allEmbeddings = await GetEmbeddingsAsync(
+                method,
+                path,
+                query,
+                headers,
+                body,
+                semanticCandidates).ConfigureAwait(false);
 
-            var allEmbeddings = await GetEmbeddingsAsync(allTexts).ConfigureAwait(false);
-            var requestEmbedding = allEmbeddings[0];
-            var candidateScores = includeCandidateScores
-                ? new List<SemanticCandidateScore>(semanticCandidates.Length)
-                : null;
-
-            QueryMatchDefinition? bestCandidate = null;
-            double? bestScore = null;
-            double? secondBestScore = null;
-
-            for (var i = 0; i < semanticCandidates.Length; i++)
-            {
-                var candidate = semanticCandidates[i];
-                var candidateText = candidate.SemanticMatch!;
-                var candidateEmbedding = allEmbeddings[i + 1];
-                var score = CosineSimilarity(requestEmbedding, candidateEmbedding);
-
-                logger.LogDebug(
-                    "Semantic candidate scored for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}, Threshold={Threshold}.",
-                    path,
-                    normalizedMethod,
-                    candidateText,
-                    score,
-                    semanticSettings.Threshold);
-
-                candidateScores?.Add(new SemanticCandidateScore
-                {
-                    Candidate = candidate,
-                    Eligible = true,
-                    Score = score,
-                    AboveThreshold = score >= semanticSettings.Threshold,
-                });
-
-                if (score < semanticSettings.Threshold)
-                {
-                    continue;
-                }
-
-                if (bestScore is null || score > bestScore.Value)
-                {
-                    secondBestScore = bestScore;
-                    bestScore = score;
-                    bestCandidate = candidate;
-                }
-                else if (secondBestScore is null || score > secondBestScore.Value)
-                {
-                    secondBestScore = score;
-                }
-            }
-
-            if (bestCandidate is null || bestScore is null)
-            {
-                logger.LogDebug(
-                    "Semantic matching did not select a candidate for '{Path}' {Method}. Best score stayed below the threshold.",
-                    path,
-                    normalizedMethod);
-                return new SemanticMatchExplanation
-                {
-                    Attempted = true,
-                    Threshold = semanticSettings.Threshold,
-                    RequiredMargin = semanticSettings.TopScoreMargin,
-                    CandidateScores = candidateScores ?? [],
-                };
-            }
-
-            double? marginToSecondBest = secondBestScore.HasValue
-                ? bestScore.Value - secondBestScore.Value
-                : null;
-
-            if (secondBestScore is not null &&
-                marginToSecondBest < semanticSettings.TopScoreMargin)
-            {
-                logger.LogDebug(
-                    "Semantic matching did not select a candidate for '{Path}' {Method}. Top score margin {Margin} was below the required {RequiredMargin}.",
-                    path,
-                    normalizedMethod,
-                    marginToSecondBest,
-                    semanticSettings.TopScoreMargin);
-                return new SemanticMatchExplanation
-                {
-                    Attempted = true,
-                    Threshold = semanticSettings.Threshold,
-                    RequiredMargin = semanticSettings.TopScoreMargin,
-                    SelectedScore = bestScore,
-                    SecondBestScore = secondBestScore,
-                    MarginToSecondBest = marginToSecondBest,
-                    CandidateScores = candidateScores ?? [],
-                };
-            }
-
-            logger.LogInformation(
-                "Semantic matching selected candidate for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}.",
+            return ScoreAndLogExplanation(
                 path,
                 normalizedMethod,
-                bestCandidate.SemanticMatch,
-                bestScore.Value);
-
-            return new SemanticMatchExplanation
-            {
-                Attempted = true,
-                SelectedCandidate = bestCandidate,
-                SelectedScore = bestScore,
-                Threshold = semanticSettings.Threshold,
-                RequiredMargin = semanticSettings.TopScoreMargin,
-                SecondBestScore = secondBestScore,
-                MarginToSecondBest = marginToSecondBest,
-                CandidateScores = candidateScores ?? [],
-            };
+                semanticCandidates,
+                allEmbeddings,
+                semanticSettings.Threshold,
+                semanticSettings.TopScoreMargin,
+                includeCandidateScores);
         }
         catch (HttpRequestException ex)
         {
@@ -230,12 +128,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request failed. Treating the request as a non-match.",
                 path,
                 normalizedMethod);
-            return new SemanticMatchExplanation
-            {
-                Attempted = true,
-                Threshold = semanticSettings.Threshold,
-                RequiredMargin = semanticSettings.TopScoreMargin,
-            };
+            return CreateFailedExplanation(semanticSettings);
         }
         catch (TaskCanceledException ex)
         {
@@ -244,12 +137,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request timed out. Treating the request as a non-match.",
                 path,
                 normalizedMethod);
-            return new SemanticMatchExplanation
-            {
-                Attempted = true,
-                Threshold = semanticSettings.Threshold,
-                RequiredMargin = semanticSettings.TopScoreMargin,
-            };
+            return CreateFailedExplanation(semanticSettings);
         }
         catch (Exception ex)
         {
@@ -258,12 +146,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 "Semantic matching encountered an unexpected error for '{Path}' {Method}. Treating the request as a non-match.",
                 path,
                 normalizedMethod);
-            return new SemanticMatchExplanation
-            {
-                Attempted = true,
-                Threshold = semanticSettings.Threshold,
-                RequiredMargin = semanticSettings.TopScoreMargin,
-            };
+            return CreateFailedExplanation(semanticSettings);
         }
     }
 
@@ -287,139 +170,98 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         return true;
     }
 
-    private async Task<IReadOnlyList<float[]>> GetEmbeddingsAsync(IReadOnlyList<string> inputs)
+    private static IReadOnlyList<QueryMatchDefinition> GetSemanticCandidates(
+        IReadOnlyCollection<QueryMatchDefinition> candidates,
+        Func<QueryMatchDefinition, bool>? candidateFilter)
     {
-        var endpoint = NormalizeEndpoint(settings.SemanticMatching.Endpoint!);
-        var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs)).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        using var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-        using var document = await JsonDocument.ParseAsync(responseStream).ConfigureAwait(false);
-
-        if (TryReadEmbeddings(document.RootElement, inputs.Count, out var embeddings))
-        {
-            return embeddings;
-        }
-
-        throw new InvalidOperationException("The embedding endpoint returned an unexpected response shape.");
+        return candidates
+            .Where(candidate => candidateFilter is null || candidateFilter(candidate))
+            .Where(candidate => !string.IsNullOrWhiteSpace(candidate.SemanticMatch))
+            .ToArray();
     }
 
-    private static string NormalizeEndpoint(string endpoint)
-    {
-        var normalized = endpoint.TrimEnd('/');
-        return normalized.EndsWith("/embed", StringComparison.OrdinalIgnoreCase)
-            ? normalized
-            : normalized + "/embed";
-    }
-
-    private static bool TryReadEmbeddings(JsonElement root, int expectedCount, out IReadOnlyList<float[]> embeddings)
-    {
-        embeddings = [];
-
-        if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() != expectedCount)
-        {
-            return false;
-        }
-
-        var result = new float[expectedCount][];
-
-        for (var i = 0; i < expectedCount; i++)
-        {
-            var element = root[i];
-
-            if (element.ValueKind != JsonValueKind.Array)
-            {
-                return false;
-            }
-
-            result[i] = element.EnumerateArray()
-                .Select(v => v.GetSingle())
-                .ToArray();
-
-            if (result[i].Length == 0)
-            {
-                return false;
-            }
-        }
-
-        embeddings = result;
-        return true;
-    }
-
-    private static string BuildRequestText(
+    private async Task<IReadOnlyList<float[]>> GetEmbeddingsAsync(
         string method,
         string path,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
-        string? body)
+        string? body,
+        IReadOnlyList<QueryMatchDefinition> semanticCandidates)
     {
-        var builder = new StringBuilder();
-        builder.Append("method: ").Append(method.ToUpperInvariant()).AppendLine();
-        builder.Append("path: ").Append(path).AppendLine();
-
-        if (query.Count > 0)
+        var allTexts = new List<string>(semanticCandidates.Count + 1)
         {
-            builder.AppendLine("query:");
+            SemanticRequestTextBuilder.Build(method, path, query, headers, body)
+        };
 
-            foreach (var pair in query.OrderBy(pair => pair.Key, StringComparer.Ordinal))
-            {
-                builder.Append("  ")
-                    .Append(pair.Key)
-                    .Append(": ")
-                    .AppendLine(string.Join(", ", pair.Value.Select(value => value ?? string.Empty)));
-            }
-        }
-
-        if (headers.Count > 0)
-        {
-            builder.AppendLine("headers:");
-
-            foreach (var pair in headers.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
-            {
-                builder.Append("  ")
-                    .Append(pair.Key)
-                    .Append(": ")
-                    .AppendLine(pair.Value);
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(body))
-        {
-            builder.AppendLine("body:");
-            builder.Append(body.Trim());
-        }
-
-        return builder.ToString();
+        allTexts.AddRange(semanticCandidates.Select(candidate => candidate.SemanticMatch!));
+        return await embeddingClient.GetEmbeddingsAsync(allTexts).ConfigureAwait(false);
     }
 
-    private static double CosineSimilarity(IReadOnlyList<float> left, IReadOnlyList<float> right)
+    private SemanticMatchExplanation ScoreAndLogExplanation(
+        string path,
+        string normalizedMethod,
+        IReadOnlyList<QueryMatchDefinition> semanticCandidates,
+        IReadOnlyList<float[]> allEmbeddings,
+        double threshold,
+        double requiredMargin,
+        bool includeCandidateScores)
     {
-        if (left.Count == 0 || right.Count == 0 || left.Count != right.Count)
+        var scoringResult = SemanticCandidateScorer.ScoreCandidates(
+            semanticCandidates,
+            allEmbeddings[0],
+            allEmbeddings.Skip(1).ToArray(),
+            threshold,
+            includeCandidateScores,
+            (candidate, score) =>
+            {
+                logger.LogDebug(
+                    "Semantic candidate scored for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}, Threshold={Threshold}.",
+                    path,
+                    normalizedMethod,
+                    candidate.SemanticMatch,
+                    score,
+                    threshold);
+            });
+
+        var explanation = SemanticMatchSelector.Select(scoringResult, threshold, requiredMargin);
+
+        if (explanation.SelectedCandidate is null && explanation.SelectedScore is null)
         {
-            throw new InvalidOperationException("Embedding vectors must be non-empty and have the same dimension.");
+            logger.LogDebug(
+                "Semantic matching did not select a candidate for '{Path}' {Method}. Best score stayed below the threshold.",
+                path,
+                normalizedMethod);
+            return explanation;
         }
 
-        double dot = 0d;
-        double leftMagnitude = 0d;
-        double rightMagnitude = 0d;
-
-        for (var index = 0; index < left.Count; index++)
+        if (explanation.SelectedCandidate is null && explanation.SelectedScore is not null)
         {
-            var leftValue = left[index];
-            var rightValue = right[index];
-
-            dot += leftValue * rightValue;
-            leftMagnitude += leftValue * leftValue;
-            rightMagnitude += rightValue * rightValue;
+            logger.LogDebug(
+                "Semantic matching did not select a candidate for '{Path}' {Method}. Top score margin {Margin} was below the required {RequiredMargin}.",
+                path,
+                normalizedMethod,
+                explanation.MarginToSecondBest,
+                requiredMargin);
+            return explanation;
         }
 
-        if (leftMagnitude == 0d || rightMagnitude == 0d)
-        {
-            throw new InvalidOperationException("Embedding vectors must not have zero magnitude.");
-        }
+        logger.LogInformation(
+            "Semantic matching selected candidate for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}.",
+            path,
+            normalizedMethod,
+            explanation.SelectedCandidate!.SemanticMatch,
+            explanation.SelectedScore!.Value);
 
-        return dot / (Math.Sqrt(leftMagnitude) * Math.Sqrt(rightMagnitude));
+        return explanation;
     }
 
-    private sealed record EmbedRequest(IReadOnlyList<string> Inputs);
+    private static SemanticMatchExplanation CreateFailedExplanation(SemanticMatchingSettings semanticSettings)
+    {
+        return new SemanticMatchExplanation
+        {
+            Attempted = true,
+            Threshold = semanticSettings.Threshold,
+            RequiredMargin = semanticSettings.TopScoreMargin,
+        };
+    }
 }
