@@ -17,21 +17,36 @@ public static class StubServiceCollectionExtensions
     /// <returns>The same service collection for chaining.</returns>
     public static IServiceCollection AddStubServices(this IServiceCollection services)
     {
-        services.AddHttpClient<ISemanticMatcherService, SemanticMatcherService>((serviceProvider, client) =>
+        services.AddHttpClient("SemanticEmbedding", (serviceProvider, client) =>
         {
             var settings = serviceProvider.GetRequiredService<IOptions<StubSettings>>().Value;
             client.Timeout = TimeSpan.FromSeconds(settings.SemanticMatching.TimeoutSeconds);
         });
+        services.AddSingleton<SemanticEmbeddingClient>();
+        services.AddSingleton<ISemanticMatcherService>(serviceProvider => new SemanticMatcherService(
+            serviceProvider.GetRequiredService<SemanticEmbeddingClient>(),
+            serviceProvider.GetRequiredService<IOptions<StubSettings>>(),
+            serviceProvider.GetRequiredService<ILogger<SemanticMatcherService>>()));
         services.AddSingleton<IStubDefinitionLoader, StubDefinitionLoader>();
         services.AddSingleton<StubDefinitionState>();
-        services.AddSingleton<IStubInspectionService, StubInspectionService>();
+        services.AddSingleton<StubInspectionRuntimeStore>();
+        services.AddSingleton<StubInspectionScenarioCoordinator>();
+        services.AddSingleton<IStubInspectionService>(serviceProvider => new StubInspectionService(
+            serviceProvider.GetRequiredService<StubDefinitionState>(),
+            serviceProvider.GetRequiredService<IStubDefinitionLoader>(),
+            serviceProvider.GetRequiredService<IOptions<StubSettings>>(),
+            serviceProvider.GetRequiredService<IStubService>(),
+            serviceProvider.GetRequiredService<StubInspectionRuntimeStore>(),
+            serviceProvider.GetRequiredService<StubInspectionScenarioCoordinator>()));
         services.AddHostedService<StubDefinitionWatcher>();
         services.AddSingleton(serviceProvider => new JsonBodyMatcher(
             serviceProvider.GetRequiredService<ILogger<JsonBodyMatcher>>()));
+        services.AddSingleton<QueryValueMatcher>();
         services.AddSingleton(serviceProvider => new RegexQueryMatcher(
             serviceProvider.GetRequiredService<ILogger<RegexQueryMatcher>>()));
         services.AddSingleton<IMatcherService>(serviceProvider => new MatcherService(
             serviceProvider.GetRequiredService<JsonBodyMatcher>(),
+            serviceProvider.GetRequiredService<QueryValueMatcher>(),
             serviceProvider.GetRequiredService<RegexQueryMatcher>()));
         services.AddSingleton<ScenarioService>();
         services.AddSingleton<IStubService>(serviceProvider => new StubService(

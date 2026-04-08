@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using SemanticStub.Api.Infrastructure.Yaml;
 
 namespace SemanticStub.Api.Services;
@@ -9,18 +10,19 @@ namespace SemanticStub.Api.Services;
 /// </summary>
 internal sealed class SemanticEmbeddingClient
 {
-    private readonly HttpClient httpClient;
+    private const string HttpClientName = "SemanticEmbedding";
+    private readonly IHttpClientFactory httpClientFactory;
     private readonly SemanticMatchingSettings settings;
 
     /// <summary>
     /// Creates a client over the configured embedding endpoint settings.
     /// </summary>
-    /// <param name="httpClient">The HTTP client used to call the configured embedding endpoint.</param>
-    /// <param name="settings">The semantic matching settings that provide the endpoint configuration.</param>
-    public SemanticEmbeddingClient(HttpClient httpClient, SemanticMatchingSettings settings)
+    /// <param name="httpClientFactory">The factory used to create the configured embedding endpoint client.</param>
+    /// <param name="settings">The stub runtime settings that provide the semantic endpoint configuration.</param>
+    public SemanticEmbeddingClient(IHttpClientFactory httpClientFactory, IOptions<StubSettings> settings)
     {
-        this.httpClient = httpClient;
-        this.settings = settings;
+        this.httpClientFactory = httpClientFactory;
+        this.settings = settings.Value.SemanticMatching;
     }
 
     /// <summary>
@@ -33,6 +35,7 @@ internal sealed class SemanticEmbeddingClient
     /// <exception cref="InvalidOperationException">Thrown when the response shape is invalid.</exception>
     public async Task<IReadOnlyList<float[]>> GetEmbeddingsAsync(IReadOnlyList<string> inputs)
     {
+        var httpClient = httpClientFactory.CreateClient(HttpClientName);
         var endpoint = NormalizeEndpoint(settings.Endpoint!);
         var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs)).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
