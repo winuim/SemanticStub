@@ -18,16 +18,17 @@ public sealed class MatcherService : IMatcherService
     /// Creates a matcher with no logging. Invalid regex patterns will silently produce non-matches.
     /// </summary>
     public MatcherService()
+        : this(new JsonBodyMatcher(), new QueryValueMatcher(), new RegexQueryMatcher())
     {
-        jsonBodyMatcher = new JsonBodyMatcher();
-        queryValueMatcher = new QueryValueMatcher();
-        regexQueryMatcher = new RegexQueryMatcher();
     }
 
-    internal MatcherService(JsonBodyMatcher jsonBodyMatcher, RegexQueryMatcher regexQueryMatcher)
+    internal MatcherService(
+        JsonBodyMatcher jsonBodyMatcher,
+        QueryValueMatcher queryValueMatcher,
+        RegexQueryMatcher regexQueryMatcher)
     {
         this.jsonBodyMatcher = jsonBodyMatcher;
-        queryValueMatcher = new QueryValueMatcher();
+        this.queryValueMatcher = queryValueMatcher;
         this.regexQueryMatcher = regexQueryMatcher;
     }
 
