@@ -359,6 +359,22 @@ public sealed class StubInspectionServiceTests
             });
     }
 
+    [Fact]
+    public void StubInspectionRuntimeStore_RecordRequestMetrics_ClampsNegativeLatency()
+    {
+        var store = new StubInspectionRuntimeStore();
+
+        store.RecordRequestMetrics(
+            CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "listUsers"),
+            StatusCodes.Status200OK,
+            TimeSpan.FromMilliseconds(-10));
+
+        var metrics = store.GetRuntimeMetrics();
+
+        Assert.Equal(0, metrics.AverageLatencyMilliseconds);
+        Assert.Collection(metrics.TopRoutes, route => Assert.Equal("listUsers", route.RouteId));
+    }
+
     // ---------------------------------------------------------------------------
     // GetRecentRequests
     // ---------------------------------------------------------------------------
@@ -437,6 +453,23 @@ public sealed class StubInspectionServiceTests
         Assert.Equal(100, all.Count);
         Assert.Equal("/requests/104", all[0].Path);
         Assert.Equal("/requests/5", all[^1].Path);
+    }
+
+    [Fact]
+    public void StubInspectionRuntimeStore_GetRecentRequests_ReturnsEmpty_WhenLimitIsZeroOrNegative()
+    {
+        var store = new StubInspectionRuntimeStore();
+
+        store.RecordRecentRequest(
+            DateTimeOffset.Parse("2026-04-07T00:00:00Z"),
+            HttpMethods.Get,
+            "/users",
+            CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "listUsers"),
+            StatusCodes.Status200OK,
+            TimeSpan.FromMilliseconds(15));
+
+        Assert.Empty(store.GetRecentRequests(0));
+        Assert.Empty(store.GetRecentRequests(-1));
     }
 
     // ---------------------------------------------------------------------------
@@ -581,6 +614,76 @@ public sealed class StubInspectionServiceTests
         var hash = service.GetConfigSnapshot().ConfigurationHash;
 
         Assert.Matches("^[0-9a-f]+$", hash);
+    }
+
+    [Fact]
+    public void StubInspectionDocumentProjector_GetScenarioNames_DeduplicatesAndSortsOrdinally()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/checkout"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["409"] = new()
+                            {
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "z-flow",
+                                    State = "initial",
+                                    Next = "confirmed",
+                                },
+                            },
+                        },
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Scenario = new ScenarioDefinition
+                                    {
+                                        Name = "a-flow",
+                                        State = "initial",
+                                        Next = "authorized",
+                                    },
+                                },
+                            },
+                            new QueryMatchDefinition
+                            {
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 201,
+                                    Scenario = new ScenarioDefinition
+                                    {
+                                        Name = "z-flow",
+                                        State = "pending",
+                                        Next = "complete",
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                },
+            },
+        };
+
+        var scenarioNames = StubInspectionDocumentProjector.GetScenarioNames(document);
+
+        Assert.Equal(["a-flow", "z-flow"], scenarioNames);
+    }
+
+    [Fact]
+    public void StubInspectionDocumentProjector_FindRoute_ReturnsNull_WhenRouteIdDoesNotExist()
+    {
+        var route = StubInspectionDocumentProjector.FindRoute(SingleGetDocument(), "missing");
+
+        Assert.Null(route);
     }
 
     // ---------------------------------------------------------------------------
@@ -1225,6 +1328,65 @@ public sealed class StubInspectionServiceTests
     }
 
     [Fact]
+    public void StubInspectionScenarioCoordinator_ResetScenarioState_ReturnsFalse_WhenScenarioDoesNotExist()
+    {
+        var loader = new TestStubDefinitionLoader(EmptyDocument());
+        var scenarioService = new ScenarioService();
+        var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
+        var coordinator = new StubInspectionScenarioCoordinator(state, scenarioService);
+
+        var reset = coordinator.ResetScenarioState("missing");
+
+        Assert.False(reset);
+    }
+
+    [Fact]
+    public void StubInspectionScenarioCoordinator_GetScenarioStates_ReflectsAdvancedScenarioState()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/checkout"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["409"] = new()
+                            {
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "checkout-flow",
+                                    State = "initial",
+                                    Next = "confirmed",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+        var loader = new TestStubDefinitionLoader(document);
+        var scenarioService = new ScenarioService();
+        var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
+        var coordinator = new StubInspectionScenarioCoordinator(state, scenarioService);
+
+        scenarioService.Advance(new ScenarioDefinition
+        {
+            Name = "checkout-flow",
+            State = "initial",
+            Next = "confirmed",
+        });
+
+        var scenario = Assert.Single(coordinator.GetScenarioStates());
+
+        Assert.Equal("checkout-flow", scenario.Name);
+        Assert.Equal("confirmed", scenario.CurrentState);
+        Assert.NotNull(scenario.LastUpdatedTimestamp);
+    }
+
+    [Fact]
     public void GetLastMatchExplanation_ReturnsNull_WhenNothingHasBeenRecorded()
     {
         var service = CreateService(EmptyDocument());
@@ -1641,5 +1803,16 @@ public sealed class StubInspectionServiceTests
         Assert.True(explanation!.Result.Matched);
         Assert.Equal("fallback", explanation.Result.MatchMode);
         Assert.Equal("listUsers", explanation.Result.RouteId);
+    }
+
+    [Fact]
+    public void StubInspectionRuntimeStore_GetLastMatchExplanation_ReturnsRecordedInstance()
+    {
+        var store = new StubInspectionRuntimeStore();
+        var explanation = CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "listUsers");
+
+        store.RecordLastMatchExplanation(explanation);
+
+        Assert.Same(explanation, store.GetLastMatchExplanation());
     }
 }

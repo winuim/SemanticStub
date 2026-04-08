@@ -1,6 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using Microsoft.Extensions.Options;
 using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Infrastructure.Yaml;
@@ -10,24 +7,12 @@ namespace SemanticStub.Api.Services;
 
 internal sealed class StubInspectionService : IStubInspectionService
 {
-    private const int MaxRecentRequestCount = 100;
     private readonly StubDefinitionState state;
     private readonly IStubDefinitionLoader loader;
     private readonly IOptions<StubSettings> settings;
-    private readonly ScenarioService scenarioService;
     private readonly IStubService stubService;
-    private readonly object lastMatchSyncRoot = new();
-    private readonly object metricsSyncRoot = new();
-    private readonly Dictionary<int, long> statusCodeCounts = [];
-    private readonly Dictionary<string, long> routeRequestCounts = new(StringComparer.Ordinal);
-    private readonly Queue<RecentRequestInfo> recentRequests = [];
-    private MatchExplanationInfo? lastMatchExplanation;
-    private long totalRequestCount;
-    private long matchedRequestCount;
-    private long unmatchedRequestCount;
-    private long fallbackResponseCount;
-    private long semanticMatchCount;
-    private double totalLatencyMilliseconds;
+    private readonly StubInspectionRuntimeStore runtimeStore = new();
+    private readonly StubInspectionScenarioCoordinator scenarioCoordinator;
 
     public StubInspectionService(
         StubDefinitionState state,
@@ -39,20 +24,20 @@ internal sealed class StubInspectionService : IStubInspectionService
         this.state = state;
         this.loader = loader;
         this.settings = settings;
-        this.scenarioService = scenarioService;
         this.stubService = stubService;
+        scenarioCoordinator = new StubInspectionScenarioCoordinator(state, scenarioService);
     }
 
     /// <inheritdoc/>
     public StubConfigSnapshot GetConfigSnapshot()
     {
-        var document = state.GetCurrentDocument();
-        var routes = BuildRoutes(document);
+        var document = GetCurrentDocument();
+        var routes = StubInspectionDocumentProjector.BuildRoutes(document);
 
         return new StubConfigSnapshot
         {
             SnapshotTimestamp = DateTimeOffset.UtcNow,
-            ConfigurationHash = ComputeDocumentHash(document),
+            ConfigurationHash = StubInspectionDocumentProjector.ComputeDocumentHash(document),
             DefinitionsDirectoryPath = loader.GetDefinitionsDirectoryPath(),
             RouteCount = routes.Count,
             SemanticMatchingEnabled = settings.Value.SemanticMatching.Enabled,
@@ -62,8 +47,7 @@ internal sealed class StubInspectionService : IStubInspectionService
     /// <inheritdoc/>
     public IReadOnlyList<StubRouteInfo> GetRoutes()
     {
-        var document = state.GetCurrentDocument();
-        return BuildRoutes(document);
+        return StubInspectionDocumentProjector.BuildRoutes(GetCurrentDocument());
     }
 
     /// <inheritdoc/>
@@ -71,93 +55,32 @@ internal sealed class StubInspectionService : IStubInspectionService
     {
         ArgumentException.ThrowIfNullOrEmpty(routeId);
 
-        var document = state.GetCurrentDocument();
-        return FindRoute(document, routeId);
+        return StubInspectionDocumentProjector.FindRoute(GetCurrentDocument(), routeId);
     }
 
     /// <inheritdoc/>
     public IReadOnlyList<ScenarioStateInfo> GetScenarioStates()
     {
-        return scenarioService.ExecuteLocked(() =>
-        {
-            var document = state.GetCurrentDocument();
-            var scenarioNames = GetScenarioNames(document);
-
-            return scenarioNames
-                .Select(name =>
-                {
-                    var snapshot = scenarioService.GetSnapshotWithinLock(name);
-                    return new ScenarioStateInfo
-                    {
-                        Name = name,
-                        CurrentState = snapshot.State,
-                        LastUpdatedTimestamp = snapshot.LastUpdatedTimestamp,
-                    };
-                })
-                .ToList();
-        });
+        return scenarioCoordinator.GetScenarioStates();
     }
 
     /// <inheritdoc/>
     public RuntimeMetricsSummaryInfo GetRuntimeMetrics()
     {
-        lock (metricsSyncRoot)
-        {
-            return new RuntimeMetricsSummaryInfo
-            {
-                TotalRequestCount = totalRequestCount,
-                MatchedRequestCount = matchedRequestCount,
-                UnmatchedRequestCount = unmatchedRequestCount,
-                FallbackResponseCount = fallbackResponseCount,
-                SemanticMatchCount = semanticMatchCount,
-                AverageLatencyMilliseconds = totalRequestCount == 0
-                    ? 0
-                    : totalLatencyMilliseconds / totalRequestCount,
-                StatusCodes = statusCodeCounts
-                    .OrderByDescending(entry => entry.Value)
-                    .ThenBy(entry => entry.Key)
-                    .Select(entry => new RuntimeStatusCodeMetricInfo
-                    {
-                        StatusCode = entry.Key,
-                        RequestCount = entry.Value,
-                    })
-                    .ToList(),
-                TopRoutes = routeRequestCounts
-                    .OrderByDescending(entry => entry.Value)
-                    .ThenBy(entry => entry.Key, StringComparer.Ordinal)
-                    .Select(entry => new RouteUsageMetricInfo
-                    {
-                        RouteId = entry.Key,
-                        RequestCount = entry.Value,
-                    })
-                    .ToList(),
-            };
-        }
+        return runtimeStore.GetRuntimeMetrics();
     }
 
     /// <inheritdoc/>
     public IReadOnlyList<RecentRequestInfo> GetRecentRequests(int limit)
     {
-        lock (metricsSyncRoot)
-        {
-            var normalizedLimit = Math.Clamp(limit, 0, MaxRecentRequestCount);
-
-            if (normalizedLimit == 0)
-            {
-                return [];
-            }
-
-            return recentRequests
-                .Reverse()
-                .Take(normalizedLimit)
-                .ToList();
-        }
+        return runtimeStore.GetRecentRequests(limit);
     }
 
     /// <inheritdoc/>
     public async Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request)
     {
-        return (await stubService.ExplainMatchAsync(request).ConfigureAwait(false)).Result;
+        var explanation = await stubService.ExplainMatchAsync(request).ConfigureAwait(false);
+        return explanation.Result;
     }
 
     /// <inheritdoc/>
@@ -169,332 +92,41 @@ internal sealed class StubInspectionService : IStubInspectionService
     /// <inheritdoc/>
     public MatchExplanationInfo? GetLastMatchExplanation()
     {
-        lock (lastMatchSyncRoot)
-        {
-            return lastMatchExplanation;
-        }
+        return runtimeStore.GetLastMatchExplanation();
     }
 
     /// <inheritdoc/>
     public void RecordLastMatchExplanation(MatchExplanationInfo explanation)
     {
-        lock (lastMatchSyncRoot)
-        {
-            lastMatchExplanation = explanation;
-        }
+        runtimeStore.RecordLastMatchExplanation(explanation);
     }
 
     /// <inheritdoc/>
     public void RecordRequestMetrics(MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
     {
-        ArgumentNullException.ThrowIfNull(explanation);
-
-        lock (metricsSyncRoot)
-        {
-            totalRequestCount++;
-
-            if (explanation.Result.Matched)
-            {
-                matchedRequestCount++;
-            }
-            else
-            {
-                unmatchedRequestCount++;
-            }
-
-            if (string.Equals(explanation.Result.MatchMode, "fallback", StringComparison.Ordinal))
-            {
-                fallbackResponseCount++;
-            }
-
-            if (string.Equals(explanation.Result.MatchMode, "semantic", StringComparison.Ordinal))
-            {
-                semanticMatchCount++;
-            }
-
-            totalLatencyMilliseconds += Math.Max(0, elapsed.TotalMilliseconds);
-
-            statusCodeCounts[statusCode] = statusCodeCounts.GetValueOrDefault(statusCode) + 1;
-
-            if (!string.IsNullOrEmpty(explanation.Result.RouteId))
-            {
-                routeRequestCounts[explanation.Result.RouteId] = routeRequestCounts.GetValueOrDefault(explanation.Result.RouteId) + 1;
-            }
-        }
+        runtimeStore.RecordRequestMetrics(explanation, statusCode, elapsed);
     }
 
     /// <inheritdoc/>
     public void RecordRecentRequest(DateTimeOffset timestamp, string method, string path, MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
     {
-        ArgumentException.ThrowIfNullOrEmpty(method);
-        ArgumentException.ThrowIfNullOrEmpty(path);
-        ArgumentNullException.ThrowIfNull(explanation);
-
-        lock (metricsSyncRoot)
-        {
-            if (recentRequests.Count >= MaxRecentRequestCount)
-            {
-                recentRequests.Dequeue();
-            }
-
-            recentRequests.Enqueue(new RecentRequestInfo
-            {
-                Timestamp = timestamp,
-                Method = method,
-                Path = path,
-                RouteId = explanation.Result.RouteId,
-                StatusCode = statusCode,
-                ElapsedMilliseconds = Math.Max(0, elapsed.TotalMilliseconds),
-                MatchMode = explanation.Result.MatchMode,
-                FailureReason = explanation.Result.Matched || string.IsNullOrWhiteSpace(explanation.SelectionReason)
-                    ? null
-                    : explanation.SelectionReason,
-            });
-        }
+        runtimeStore.RecordRecentRequest(timestamp, method, path, explanation, statusCode, elapsed);
     }
 
     /// <inheritdoc/>
     public void ResetScenarioStates()
     {
-        scenarioService.ExecuteLocked(() =>
-        {
-            var document = state.GetCurrentDocument();
-            scenarioService.ResetScenariosWithinLock(GetScenarioNames(document), DateTimeOffset.UtcNow);
-            return 0;
-        });
+        scenarioCoordinator.ResetScenarioStates();
     }
 
     /// <inheritdoc/>
     public bool ResetScenarioState(string scenarioName)
     {
-        return scenarioService.ExecuteLocked(() =>
-        {
-            var document = state.GetCurrentDocument();
-            var scenarioNames = GetScenarioNames(document);
-
-            if (!scenarioNames.Contains(scenarioName, StringComparer.Ordinal))
-            {
-                return false;
-            }
-
-            scenarioService.ResetScenarioWithinLock(scenarioName, DateTimeOffset.UtcNow);
-            return true;
-        });
+        return scenarioCoordinator.ResetScenarioState(scenarioName);
     }
 
-    private static IReadOnlyList<StubRouteInfo> BuildRoutes(StubDocument document)
+    private StubDocument GetCurrentDocument()
     {
-        var routes = new List<StubRouteInfo>();
-
-        foreach (var (path, pathItem) in document.Paths)
-        {
-            var operations = EnumerateOperations(pathItem);
-
-            foreach (var (method, op) in operations)
-            {
-                if (op is null) continue;
-
-                routes.Add(new StubRouteInfo
-                {
-                    RouteId = GetRouteId(method, path, op),
-                    Method = method,
-                    PathPattern = path,
-                    UsesSemanticMatching = HasSemanticMatch(op),
-                    UsesScenario = HasScenario(op),
-                    ResponseCount = op.Responses.Count,
-                });
-            }
-        }
-
-        return routes;
-    }
-
-    private static StubRouteDetailInfo? FindRoute(StubDocument document, string routeId)
-    {
-        foreach (var (path, pathItem) in document.Paths)
-        {
-            foreach (var (method, op) in EnumerateOperations(pathItem))
-            {
-                if (op is null)
-                {
-                    continue;
-                }
-
-                if (!string.Equals(GetRouteId(method, path, op), routeId, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                return new StubRouteDetailInfo
-                {
-                    RouteId = routeId,
-                    Method = method,
-                    PathPattern = path,
-                    UsesSemanticMatching = HasSemanticMatch(op),
-                    UsesScenario = HasScenario(op),
-                    ResponseCount = op.Responses.Count,
-                    HasConditionalMatches = op.Matches.Count > 0,
-                    Responses = BuildResponses(op),
-                    ConditionalMatches = BuildConditionalMatches(op),
-                };
-            }
-        }
-
-        return null;
-    }
-
-    private static IReadOnlyList<StubRouteResponseInfo> BuildResponses(OperationDefinition operation)
-    {
-        return operation.Responses
-            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
-            .Select(entry => new StubRouteResponseInfo
-            {
-                ResponseId = entry.Key,
-                UsesScenario = entry.Value.Scenario is not null,
-                Scenario = BuildScenario(entry.Value.Scenario),
-            })
-            .ToList();
-    }
-
-    private static IReadOnlyList<StubRouteConditionInfo> BuildConditionalMatches(OperationDefinition operation)
-    {
-        return operation.Matches
-            .Select((match, index) => new StubRouteConditionInfo
-            {
-                CandidateIndex = index,
-                HasExactQuery = match.Query.Count > 0,
-                ExactQueryKeys = OrderKeys(match.Query.Keys),
-                HasPartialQuery = match.PartialQuery.Count > 0,
-                PartialQueryKeys = OrderKeys(match.PartialQuery.Keys),
-                HasRegexQuery = match.RegexQuery.Count > 0,
-                RegexQueryKeys = OrderKeys(match.RegexQuery.Keys),
-                HeaderKeys = OrderKeys(match.Headers.Keys),
-                HasBody = match.Body is not null,
-                UsesSemanticMatching = match.SemanticMatch is not null,
-                ResponseStatusCode = match.Response.StatusCode,
-                UsesScenario = match.Response.Scenario is not null,
-                Scenario = BuildScenario(match.Response.Scenario),
-            })
-            .ToList();
-    }
-
-    private static StubRouteScenarioInfo? BuildScenario(ScenarioDefinition? scenario)
-    {
-        return scenario is null
-            ? null
-            : new StubRouteScenarioInfo
-            {
-                Name = scenario.Name,
-                State = scenario.State,
-                Next = scenario.Next,
-            };
-    }
-
-    private static IReadOnlyList<string> OrderKeys(IEnumerable<string> keys)
-        => keys.OrderBy(key => key, StringComparer.Ordinal).ToList();
-
-    private static string GetRouteId(string method, string path, OperationDefinition operation)
-        => string.IsNullOrEmpty(operation.OperationId)
-            ? $"{method}:{path}"
-            : operation.OperationId;
-
-    private static (string Method, OperationDefinition? Op)[] EnumerateOperations(PathItemDefinition pathItem)
-    {
-        return
-        [
-            ("GET", pathItem.Get),
-            ("POST", pathItem.Post),
-            ("PUT", pathItem.Put),
-            ("PATCH", pathItem.Patch),
-            ("DELETE", pathItem.Delete),
-        ];
-    }
-
-    private static bool HasSemanticMatch(OperationDefinition op)
-        => op.Matches.Any(m => m.SemanticMatch is not null);
-
-    private static bool HasScenario(OperationDefinition op)
-        => op.Responses.Values.Any(r => r.Scenario is not null)
-        || op.Matches.Any(m => m.Response.Scenario is not null);
-
-    private static IReadOnlyList<string> GetScenarioNames(StubDocument document)
-    {
-        var scenarioNames = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var pathItem in document.Paths.Values)
-        {
-            AddScenarioNames(pathItem.Get, scenarioNames);
-            AddScenarioNames(pathItem.Post, scenarioNames);
-            AddScenarioNames(pathItem.Put, scenarioNames);
-            AddScenarioNames(pathItem.Patch, scenarioNames);
-            AddScenarioNames(pathItem.Delete, scenarioNames);
-        }
-
-        return scenarioNames.OrderBy(name => name, StringComparer.Ordinal).ToList();
-    }
-
-    private static void AddScenarioNames(OperationDefinition? operation, ISet<string> scenarioNames)
-    {
-        if (operation is null)
-        {
-            return;
-        }
-
-        foreach (var response in operation.Responses.Values)
-        {
-            if (response.Scenario is not null)
-            {
-                scenarioNames.Add(response.Scenario.Name);
-            }
-        }
-
-        foreach (var match in operation.Matches)
-        {
-            if (match.Response.Scenario is not null)
-            {
-                scenarioNames.Add(match.Response.Scenario.Name);
-            }
-        }
-    }
-
-    private static string ComputeDocumentHash(StubDocument document)
-    {
-        // Serialize a stable, ordered summary of the full route configuration.
-        // Includes operation-level details (operationId, response keys, match rules,
-        // semantic match descriptions) so that changes within existing routes are reflected
-        // in the hash, not just path/method presence changes.
-        // Avoids object?-typed fields (query dicts, body) to prevent serialization issues.
-        var summary = document.Paths
-            .OrderBy(p => p.Key, StringComparer.Ordinal)
-            .Select(p => new
-            {
-                Path = p.Key,
-                Operations = GetOperationSummaries(p.Value),
-            });
-
-        var json = JsonSerializer.Serialize(summary);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-    }
-
-    private static IEnumerable<object> GetOperationSummaries(PathItemDefinition pathItem)
-    {
-        foreach (var (method, op) in EnumerateOperations(pathItem))
-        {
-            if (op is null) continue;
-
-            yield return new
-            {
-                Method = method,
-                OperationId = op.OperationId,
-                Responses = op.Responses.Keys.OrderBy(k => k, StringComparer.Ordinal).ToList(),
-                MatchCount = op.Matches.Count,
-                SemanticMatches = op.Matches
-                    .Where(m => m.SemanticMatch is not null)
-                    .Select(m => m.SemanticMatch!)
-                    .OrderBy(s => s, StringComparer.Ordinal)
-                    .ToList(),
-            };
-        }
+        return state.GetCurrentDocument();
     }
 }
