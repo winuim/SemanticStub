@@ -132,7 +132,7 @@ public sealed class StubService : IStubService
     /// <returns>The configured methods for the resolved path, or an empty list when no path matches.</returns>
     public IReadOnlyList<string> GetAllowedMethods(string path)
     {
-        var pathItem = ResolvePathItem(documentAccessor(), path);
+        var pathItem = StubRouteResolver.ResolvePathItem(documentAccessor(), path);
 
         if (pathItem is null)
         {
@@ -140,7 +140,7 @@ public sealed class StubService : IStubService
         }
 
         return SupportedMethodOrder
-            .Where(method => GetOperation(method, pathItem) is not null)
+            .Where(method => StubOperationResolver.GetOperation(method, pathItem) is not null)
             .ToArray();
     }
 
@@ -274,8 +274,8 @@ public sealed class StubService : IStubService
     public async Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request)
     {
         var dispatch = await EvaluateAsync(
-            NormalizeMethod(request.Method),
-            NormalizePath(request.Path),
+            StubRouteResolver.NormalizeMethod(request.Method),
+            StubRouteResolver.NormalizePath(request.Path),
             ConvertQueryValues(request.Query),
             new Dictionary<string, string>(request.Headers, StringComparer.OrdinalIgnoreCase),
             string.IsNullOrWhiteSpace(request.Body) ? null : request.Body,
@@ -298,7 +298,7 @@ public sealed class StubService : IStubService
     {
         var document = documentAccessor();
 
-        if (!TryResolveOperation(document, method, path, out var pathPattern, out var pathItem, out var operation, out var failedMatchResult))
+        if (!StubOperationResolver.TryResolveOperation(document, method, path, out var pathPattern, out var pathItem, out var operation, out var failedMatchResult))
         {
             return CreateFailedDispatchResult(
                 failedMatchResult,
@@ -537,120 +537,6 @@ public sealed class StubService : IStubService
             StringComparer.Ordinal);
     }
 
-    private static PathItemDefinition? ResolvePathItem(StubDocument document, string requestPath)
-    {
-        // Keep deterministic routing: exact paths always win before template paths.
-        if (document.Paths.TryGetValue(requestPath, out var exactPathItem))
-        {
-            return exactPathItem;
-        }
-
-        return document.Paths
-            .Where(entry => IsTemplateMatch(entry.Key, requestPath))
-            .OrderByDescending(entry => GetTemplateSpecificity(entry.Key))
-            .ThenBy(entry => entry.Key, StringComparer.Ordinal)
-            .Select(entry => entry.Value)
-            .FirstOrDefault();
-    }
-
-    private static (string PathPattern, PathItemDefinition PathItem)? ResolvePath(StubDocument document, string requestPath)
-    {
-        if (document.Paths.TryGetValue(requestPath, out var exactPathItem))
-        {
-            return (requestPath, exactPathItem);
-        }
-
-        return document.Paths
-            .Where(entry => IsTemplateMatch(entry.Key, requestPath))
-            .OrderByDescending(entry => GetTemplateSpecificity(entry.Key))
-            .ThenBy(entry => entry.Key, StringComparer.Ordinal)
-            .Select(entry => ((string PathPattern, PathItemDefinition PathItem)?) (entry.Key, entry.Value))
-            .FirstOrDefault();
-    }
-
-    private static bool IsTemplateMatch(string templatePath, string requestPath)
-    {
-        var templateSegments = GetPathSegments(templatePath);
-        var requestSegments = GetPathSegments(requestPath);
-
-        if (templateSegments.Length != requestSegments.Length)
-        {
-            return false;
-        }
-
-        for (var index = 0; index < templateSegments.Length; index++)
-        {
-            var templateSegment = templateSegments[index];
-            var requestSegment = requestSegments[index];
-
-            if (IsPathParameterSegment(templateSegment))
-            {
-                if (string.IsNullOrEmpty(requestSegment))
-                {
-                    return false;
-                }
-
-                continue;
-            }
-
-            if (!string.Equals(templateSegment, requestSegment, StringComparison.Ordinal))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static int GetTemplateSpecificity(string templatePath)
-    {
-        return GetPathSegments(templatePath).Count(segment => !IsPathParameterSegment(segment));
-    }
-
-    private static string[] GetPathSegments(string path)
-    {
-        return path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
-    }
-
-    private static bool IsPathParameterSegment(string segment)
-    {
-        return segment.Length > 2 &&
-               segment[0] == '{' &&
-               segment[^1] == '}' &&
-               !segment[1..^1].Contains('{') &&
-               !segment[1..^1].Contains('}');
-    }
-
-    private static OperationDefinition? GetOperation(string method, PathItemDefinition pathItem)
-    {
-        if (HttpMethods.IsGet(method))
-        {
-            return pathItem.Get;
-        }
-
-        if (HttpMethods.IsPost(method))
-        {
-            return pathItem.Post;
-        }
-
-        if (HttpMethods.IsPut(method))
-        {
-            return pathItem.Put;
-        }
-
-        if (HttpMethods.IsPatch(method))
-        {
-            return pathItem.Patch;
-        }
-
-        if (HttpMethods.IsDelete(method))
-        {
-            return pathItem.Delete;
-        }
-
-        return null;
-    }
-
     private QueryMatchEvaluationResult TryBuildMatchedQueryResponse(
         string method,
         string path,
@@ -707,45 +593,6 @@ public sealed class StubService : IStubService
                candidate.RegexQuery.Count > 0 ||
                candidate.Headers.Count > 0 ||
                candidate.Body is not null;
-    }
-
-    private bool TryResolveOperation(
-        StubDocument document,
-        string method,
-        string path,
-        out string pathPattern,
-        out PathItemDefinition pathItem,
-        out OperationDefinition operation,
-        out StubMatchResult failedMatchResult)
-    {
-        pathPattern = string.Empty;
-        pathItem = null!;
-        operation = null!;
-        failedMatchResult = StubMatchResult.Matched;
-
-        var resolvedPath = ResolvePath(document, path);
-
-        if (resolvedPath is null)
-        {
-            failedMatchResult = StubMatchResult.PathNotFound;
-            return false;
-        }
-
-        var (resolvedPathPattern, resolvedPathItem) = resolvedPath.Value;
-        var resolvedOperation = GetOperation(method, resolvedPathItem);
-
-        if (resolvedOperation is null)
-        {
-            failedMatchResult = StubMatchResult.MethodNotAllowed;
-            pathPattern = resolvedPathPattern;
-            pathItem = resolvedPathItem;
-            return false;
-        }
-
-        pathPattern = resolvedPathPattern;
-        pathItem = resolvedPathItem;
-        operation = resolvedOperation;
-        return true;
     }
 
     private static StubDispatchResult CreateFailedDispatchResult(
@@ -919,21 +766,6 @@ public sealed class StubService : IStubService
         return string.IsNullOrEmpty(operation.OperationId)
             ? $"{method}:{pathPattern}"
             : operation.OperationId;
-    }
-
-    private static string NormalizeMethod(string method)
-        => string.IsNullOrWhiteSpace(method) ? HttpMethods.Get : method.Trim().ToUpperInvariant();
-
-    private static string NormalizePath(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return "/";
-        }
-
-        return path.StartsWith('/')
-            ? path
-            : "/" + path;
     }
 
     private static bool IsConfiguredResponse(QueryMatchResponseDefinition response)
