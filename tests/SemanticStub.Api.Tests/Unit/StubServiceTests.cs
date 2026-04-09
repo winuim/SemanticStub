@@ -97,6 +97,114 @@ public sealed class StubServiceTests
     }
 
     [Fact]
+    public async Task TryGetResponseAsync_ReturnsSameMatchedResponseContractAsSyncPath()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/hello"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new()
+                                    {
+                                        Example = new Dictionary<object, object>
+                                        {
+                                            ["message"] = "Hello"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        IStubService service = new StubService(document, new ScenarioService());
+
+        var (result, response) = await service.TryGetResponseAsync(
+            HttpMethods.Get,
+            "/hello",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+
+        var matchedResponse = AssertMatchedResponse(result, response);
+
+        Assert.Equal(200, matchedResponse.StatusCode);
+    }
+
+    [Fact]
+    public void TryGetResponse_QueryOnlyOverload_MatchesFullOverloadBehavior()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                                {
+                                    ["role"] = "admin"
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new()
+                                        {
+                                            Example = new Dictionary<object, object>
+                                            {
+                                                ["message"] = "admin"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        };
+
+        var service = new StubService(document, new ScenarioService());
+        var query = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["role"] = "admin"
+        };
+
+        var queryOnlyResult = service.TryGetResponse(HttpMethods.Get, "/users", query, out var queryOnlyResponse);
+        var fullResult = service.TryGetResponse(
+            HttpMethods.Get,
+            "/users",
+            query.ToDictionary(entry => entry.Key, entry => new StringValues(entry.Value), StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null,
+            out var fullResponse);
+
+        var queryOnlyMatchedResponse = AssertMatchedResponse(queryOnlyResult, queryOnlyResponse);
+        var fullMatchedResponse = AssertMatchedResponse(fullResult, fullResponse);
+
+        Assert.Equal(fullMatchedResponse.StatusCode, queryOnlyMatchedResponse.StatusCode);
+        Assert.Equal(fullMatchedResponse.Body, queryOnlyMatchedResponse.Body);
+    }
+
+    [Fact]
     public void TryGetResponse_UsesStatusCodeDefinedInYamlResponses()
     {
         var document = new StubDocument
