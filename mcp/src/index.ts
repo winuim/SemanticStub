@@ -237,6 +237,7 @@ server.registerTool(
     inputSchema: {
       scenarioName: z
         .string()
+        .min(1, "Scenario name must be a non-empty string.")
         .optional()
         .describe("Scenario name to reset. Omit to reset all configured scenarios."),
     },
@@ -249,7 +250,8 @@ server.registerTool(
   },
   async ({ scenarioName }) => {
     // Reuse the existing reset endpoints so MCP does not redefine scenario mutation behavior.
-    const path = scenarioName
+    const hasScenarioName = scenarioName !== undefined;
+    const path = hasScenarioName
       ? `/scenarios/${encodeURIComponent(scenarioName)}/reset`
       : "/scenarios/reset";
 
@@ -258,7 +260,7 @@ server.registerTool(
     return toText({
       operation: "reset_scenario_state",
       status: "ok",
-      scope: scenarioName ? "single" : "all",
+      scope: hasScenarioName ? "single" : "all",
       scenarioName: scenarioName ?? null,
     });
   }
