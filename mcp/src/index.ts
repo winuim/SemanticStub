@@ -237,6 +237,7 @@ server.registerTool(
     inputSchema: {
       scenarioName: z
         .string()
+        .trim()
         .min(1, "Scenario name must be a non-empty string.")
         .optional()
         .describe("Scenario name to reset. Omit to reset all configured scenarios."),
