@@ -395,45 +395,6 @@ public sealed class StubService : IStubService
             : operation.OperationId;
     }
 
-    private static bool IsConfiguredResponse(QueryMatchResponseDefinition response)
-    {
-        return StubInspectionProjectionBuilder.IsConfiguredResponse(response);
-    }
-
-    private static bool IsConfiguredResponse(ResponseDefinition response)
-    {
-        return StubInspectionProjectionBuilder.IsConfiguredResponse(response);
-    }
-
-    private static bool IsScenarioMatch(
-        ScenarioDefinition? scenario,
-        IReadOnlyDictionary<string, ScenarioStateSnapshot> scenarioSnapshots)
-    {
-        return StubInspectionProjectionBuilder.IsScenarioMatch(scenario, scenarioSnapshots);
-    }
-
-    private static (string ResponseId, int StatusCode)? GetDefaultResponse(
-        OperationDefinition operation,
-        IReadOnlyDictionary<string, ScenarioStateSnapshot> scenarioSnapshots)
-    {
-        foreach (var response in operation.Responses)
-        {
-            if (!int.TryParse(response.Key, out var statusCode))
-            {
-                continue;
-            }
-
-            if (!IsScenarioMatch(response.Value.Scenario, scenarioSnapshots) || !IsConfiguredResponse(response.Value))
-            {
-                continue;
-            }
-
-            return (response.Key, statusCode);
-        }
-
-        return null;
-    }
-
     private StubMatchResult TryGetResponseCore(
         string method,
         string path,

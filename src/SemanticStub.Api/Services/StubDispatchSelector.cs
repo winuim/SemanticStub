@@ -49,6 +49,8 @@ internal sealed class StubDispatchSelector
 
         if (selectedDeterministicCandidate is not null)
         {
+            var matchedCandidateIndex = operation.Matches.FindIndex(candidate => ReferenceEquals(candidate, selectedDeterministicCandidate));
+
             if (!responseBuilder.TryBuild(selectedDeterministicCandidate.Response, out var deterministicResponse))
             {
                 return new StubDispatchSelectionResult
@@ -58,7 +60,7 @@ internal sealed class StubDispatchSelector
                     SelectedCandidate = selectedDeterministicCandidate,
                     SelectedResponseId = selectedDeterministicCandidate.Response.StatusCode.ToString(),
                     SelectedResponseStatusCode = selectedDeterministicCandidate.Response.StatusCode,
-                    SelectionReason = "Deterministic candidate matched, but its response is not configured.",
+                    SelectionReason = $"Deterministic candidate {matchedCandidateIndex} matched, but its response is not configured.",
                 };
             }
 
@@ -83,7 +85,7 @@ internal sealed class StubDispatchSelector
                 SelectedCandidate = selectedDeterministicCandidate,
                 SelectedResponseId = selectedDeterministicCandidate.Response.StatusCode.ToString(),
                 SelectedResponseStatusCode = selectedDeterministicCandidate.Response.StatusCode,
-                SelectionReason = "Deterministic candidate matched all configured conditions and was selected.",
+                SelectionReason = $"Deterministic candidate {matchedCandidateIndex} matched all configured conditions and was selected.",
             };
         }
 

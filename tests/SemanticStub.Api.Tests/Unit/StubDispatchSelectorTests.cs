@@ -46,6 +46,79 @@ public sealed class StubDispatchSelectorTests
         Assert.Equal("exact", result.MatchMode);
         Assert.Same(candidate, result.SelectedCandidate);
         Assert.Equal("200", result.SelectedResponseId);
+        Assert.Equal("Deterministic candidate 0 matched, but its response is not configured.", result.SelectionReason);
+    }
+
+    [Fact]
+    public async Task SelectAsync_IncludesCandidateIndexInDeterministicSelectionReason()
+    {
+        var matcherService = new MatcherService();
+        var selector = new StubDispatchSelector(
+            matcherService,
+            semanticMatcherService: null,
+            new StubResponseBuilder(_ => throw new InvalidOperationException("No file loading expected.")),
+            new ScenarioService(),
+            logger: null);
+        var ignoredCandidate = new QueryMatchDefinition
+        {
+            Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["role"] = "user"
+            },
+            Response = new QueryMatchResponseDefinition
+            {
+                StatusCode = 201,
+                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                {
+                    ["application/json"] = new()
+                    {
+                        Example = new Dictionary<object, object> { ["message"] = "user" }
+                    }
+                }
+            }
+        };
+        var selectedCandidate = new QueryMatchDefinition
+        {
+            Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["role"] = "admin",
+                ["team"] = "ops"
+            },
+            Response = new QueryMatchResponseDefinition
+            {
+                StatusCode = 202,
+                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                {
+                    ["application/json"] = new()
+                    {
+                        Example = new Dictionary<object, object> { ["message"] = "admin" }
+                    }
+                }
+            }
+        };
+        var operation = new OperationDefinition
+        {
+            Matches = [ignoredCandidate, selectedCandidate]
+        };
+        var query = new Dictionary<string, StringValues>(StringComparer.Ordinal)
+        {
+            ["role"] = new("admin"),
+            ["team"] = new("ops")
+        };
+
+        var result = await selector.SelectAsync(
+            HttpMethods.Get,
+            "/users",
+            new PathItemDefinition(),
+            operation,
+            query,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            null,
+            mutateScenarioState: true,
+            includeSemanticCandidates: false);
+
+        Assert.Equal(StubMatchResult.Matched, result.Result);
+        Assert.Equal("Deterministic candidate 1 matched all configured conditions and was selected.", result.SelectionReason);
     }
 
     [Fact]
