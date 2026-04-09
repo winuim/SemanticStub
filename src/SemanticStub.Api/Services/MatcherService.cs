@@ -36,7 +36,7 @@ public sealed class MatcherService
     /// <remarks>
     /// When multiple candidates match, exact-query specificity wins first, then overall query/header/body specificity,
     /// then regex-query specificity as the final tie-breaker.
-    /// This is the most complete matcher entry point and is the contract used by <see cref="StubService"/>.
+    /// Use this entry point when the caller needs the single best deterministic candidate for the current request.
     /// </remarks>
     public QueryMatchDefinition? FindBestMatch(
         IReadOnlyCollection<ParameterDefinition> pathParameters,
@@ -62,7 +62,15 @@ public sealed class MatcherService
             .FirstOrDefault();
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Evaluates each <c>x-match</c> candidate independently and reports which deterministic dimensions matched.
+    /// </summary>
+    /// <param name="pathParameters">Path-level parameters whose query-schema definitions may contribute typed comparison metadata.</param>
+    /// <param name="operation">The operation whose <c>x-match</c> candidates should be evaluated.</param>
+    /// <param name="query">Query parameters keyed by parameter name, including repeated values in request order.</param>
+    /// <param name="headers">Request headers keyed by header name. Supply a case-insensitive dictionary for HTTP semantics.</param>
+    /// <param name="body">The request body used for JSON body matching. Invalid JSON is treated as "no structured body" instead of causing an exception.</param>
+    /// <returns>The deterministic evaluation result for each configured candidate, in source order.</returns>
     public IReadOnlyList<QueryMatchCandidateEvaluation> EvaluateCandidates(
         IReadOnlyCollection<ParameterDefinition> pathParameters,
         OperationDefinition operation,
