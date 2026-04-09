@@ -1,0 +1,32 @@
+services:
+  tei:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+    platform: linux/amd64
+    volumes:
+      - ./data/models:/data
+    command:
+      - --model-id
+      - intfloat/multilingual-e5-small
+
+  semantic-stub:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      StubSettings__DefinitionsPath: /app/samples
+      StubSettings__SemanticMatching__Enabled: "true"
+      StubSettings__SemanticMatching__Endpoint: http://tei:80
+    volumes:
+      - ./samples:/app/samples
+    depends_on:
+      - tei
+
+  mcp:
+    build: ./mcp
+    stdin_open: true
+    tty: false
+    environment:
+      SEMANTIC_STUB_URL: http://semantic-stub:8080
+    depends_on:
+      - semantic-stub

@@ -282,6 +282,51 @@ dotnet run --project src/SemanticStub.Api
 ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/SemanticStub.Api
 ```
 
+## Docker
+
+Docker ベースの構成をビルドします:
+
+```sh
+docker compose build
+```
+
+SemanticStub と埋め込みサービスをバックグラウンドで起動します:
+
+```sh
+docker compose up -d tei semantic-stub
+```
+
+この構成では SemanticStub を `http://localhost:8080` で公開します。
+`samples/` ディレクトリはコンテナへマウントされるため、stub YAML を編集しても
+イメージの再ビルドは不要です。TEI は Docker 内部ネットワークだけで使用され、
+ホストには公開しません。
+
+Claude Desktop には次のように MCP サーバーを追加します:
+
+**macOS**
+```
+~/Library/Application Support/Claude/claude_desktop_config.json
+```
+
+```json
+{
+  "mcpServers": {
+    "semantic-stub": {
+      "command": "docker",
+      "args": [
+        "compose",
+        "-f",
+        "/path/to/SemanticStub/docker-compose.yml",
+        "run",
+        "--rm",
+        "-i",
+        "mcp"
+      ]
+    }
+  }
+}
+```
+
 ## テスト
 
 ```sh
