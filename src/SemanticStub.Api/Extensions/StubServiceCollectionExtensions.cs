@@ -44,17 +44,33 @@ public static class StubServiceCollectionExtensions
         services.AddSingleton<QueryValueMatcher>();
         services.AddSingleton(serviceProvider => new RegexQueryMatcher(
             serviceProvider.GetRequiredService<ILogger<RegexQueryMatcher>>()));
-        services.AddSingleton<IMatcherService>(serviceProvider => new MatcherService(
+        services.AddSingleton<MatcherService>(serviceProvider => new MatcherService(
             serviceProvider.GetRequiredService<JsonBodyMatcher>(),
             serviceProvider.GetRequiredService<QueryValueMatcher>(),
             serviceProvider.GetRequiredService<RegexQueryMatcher>()));
         services.AddSingleton<ScenarioService>();
+        services.AddSingleton<Func<string, string>>(serviceProvider =>
+            serviceProvider.GetRequiredService<StubDefinitionState>().LoadResponseFileContent);
+        services.AddSingleton<StubResponseBuilder>(serviceProvider => new StubResponseBuilder(
+            serviceProvider.GetRequiredService<Func<string, string>>()));
+        services.AddSingleton<StubDefaultResponseSelector>(serviceProvider => new StubDefaultResponseSelector(
+            serviceProvider.GetRequiredService<StubResponseBuilder>(),
+            serviceProvider.GetRequiredService<ScenarioService>()));
+        services.AddSingleton<StubDispatchSelector>(serviceProvider => new StubDispatchSelector(
+            serviceProvider.GetRequiredService<MatcherService>(),
+            serviceProvider.GetRequiredService<ISemanticMatcherService>(),
+            serviceProvider.GetRequiredService<StubResponseBuilder>(),
+            serviceProvider.GetRequiredService<StubDefaultResponseSelector>(),
+            serviceProvider.GetRequiredService<ScenarioService>(),
+            serviceProvider.GetRequiredService<ILogger<StubDispatchSelector>>()));
+        services.AddSingleton<StubInspectionProjectionBuilder>(serviceProvider => new StubInspectionProjectionBuilder(
+            serviceProvider.GetRequiredService<ScenarioService>()));
         services.AddSingleton<IStubService>(serviceProvider => new StubService(
             serviceProvider.GetRequiredService<StubDefinitionState>(),
-            serviceProvider.GetRequiredService<IMatcherService>(),
+            serviceProvider.GetRequiredService<MatcherService>(),
             serviceProvider.GetRequiredService<ScenarioService>(),
-            serviceProvider.GetRequiredService<ISemanticMatcherService>(),
-            serviceProvider.GetRequiredService<ILogger<StubService>>()));
+            serviceProvider.GetRequiredService<StubDispatchSelector>(),
+            serviceProvider.GetRequiredService<StubInspectionProjectionBuilder>()));
 
         return services;
     }
