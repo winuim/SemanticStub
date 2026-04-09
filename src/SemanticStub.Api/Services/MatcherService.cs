@@ -7,20 +7,12 @@ namespace SemanticStub.Api.Services;
 /// <summary>
 /// Evaluates <c>x-match</c> candidates and returns the most specific successful match without mutating request or stub state.
 /// </summary>
-public sealed class MatcherService : IMatcherService
+public sealed class MatcherService
 {
     private static readonly QueryMatchSpecificityComparer MatchSpecificityComparer = QueryMatchSpecificityComparer.Instance;
     private readonly JsonBodyMatcher jsonBodyMatcher;
     private readonly QueryValueMatcher queryValueMatcher;
     private readonly RegexQueryMatcher regexQueryMatcher;
-
-    /// <summary>
-    /// Creates a matcher with no logging. Invalid regex patterns will silently produce non-matches.
-    /// </summary>
-    public MatcherService()
-        : this(new JsonBodyMatcher(), new QueryValueMatcher(), new RegexQueryMatcher())
-    {
-    }
 
     internal MatcherService(
         JsonBodyMatcher jsonBodyMatcher,

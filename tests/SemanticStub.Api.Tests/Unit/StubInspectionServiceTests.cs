@@ -12,6 +12,11 @@ namespace SemanticStub.Api.Tests.Unit;
 
 public sealed class StubInspectionServiceTests
 {
+    private static MatcherService CreateMatcherService()
+    {
+        return new MatcherService(new JsonBodyMatcher(), new QueryValueMatcher(), new RegexQueryMatcher());
+    }
+
     // ---------------------------------------------------------------------------
     // Test helpers
     // ---------------------------------------------------------------------------
@@ -44,7 +49,7 @@ public sealed class StubInspectionServiceTests
         StubDocument document,
         string directoryPath = "/test/definitions",
         bool semanticMatchingEnabled = false,
-        IMatcherService? matcherService = null,
+        MatcherService? matcherService = null,
         ISemanticMatcherService? semanticMatcherService = null)
     {
         var loader = new TestStubDefinitionLoader(document, directoryPath);
@@ -57,15 +62,16 @@ public sealed class StubInspectionServiceTests
         var stubService = new StubService(
             document,
             _ => throw new InvalidOperationException("Not used in inspection tests"),
-            matcherService ?? new MatcherService(),
+            matcherService ?? CreateMatcherService(),
             scenarioService,
             semanticMatcherService ?? new NoOpSemanticMatcherService());
         return new StubInspectionService(
             state,
             loader,
             settings,
-            scenarioService,
-            stubService);
+            stubService,
+            new StubInspectionRuntimeStore(),
+            new StubInspectionScenarioCoordinator(state, scenarioService));
     }
 
     private static StubDocument EmptyDocument() => new StubDocument
@@ -1149,10 +1155,16 @@ public sealed class StubInspectionServiceTests
         var stubService = new StubService(
             initialDocument,
             _ => throw new InvalidOperationException("Not used in inspection tests"),
-            new MatcherService(),
+            CreateMatcherService(),
             scenarioService,
             new NoOpSemanticMatcherService());
-        var service = new StubInspectionService(state, loader, settings, scenarioService, stubService);
+        var service = new StubInspectionService(
+            state,
+            loader,
+            settings,
+            stubService,
+            new StubInspectionRuntimeStore(),
+            new StubInspectionScenarioCoordinator(state, scenarioService));
 
         Assert.NotNull(service.GetRoute("initialRoute"));
         Assert.Null(service.GetRoute("reloadedRoute"));
@@ -1236,8 +1248,14 @@ public sealed class StubInspectionServiceTests
         var scenarioService = new ScenarioService();
         var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
         var settings = Options.Create(new StubSettings());
-        var stubService = new StubService(document, _ => throw new InvalidOperationException("Not used in inspection tests"), new MatcherService(), scenarioService, new NoOpSemanticMatcherService());
-        var service = new StubInspectionService(state, loader, settings, scenarioService, stubService);
+        var stubService = new StubService(document, _ => throw new InvalidOperationException("Not used in inspection tests"), CreateMatcherService(), scenarioService, new NoOpSemanticMatcherService());
+        var service = new StubInspectionService(
+            state,
+            loader,
+            settings,
+            stubService,
+            new StubInspectionRuntimeStore(),
+            new StubInspectionScenarioCoordinator(state, scenarioService));
 
         scenarioService.Advance(new ScenarioDefinition
         {
@@ -1309,8 +1327,14 @@ public sealed class StubInspectionServiceTests
         var scenarioService = new ScenarioService();
         var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
         var settings = Options.Create(new StubSettings());
-        var stubService = new StubService(document, _ => throw new InvalidOperationException("Not used in inspection tests"), new MatcherService(), scenarioService, new NoOpSemanticMatcherService());
-        var service = new StubInspectionService(state, loader, settings, scenarioService, stubService);
+        var stubService = new StubService(document, _ => throw new InvalidOperationException("Not used in inspection tests"), CreateMatcherService(), scenarioService, new NoOpSemanticMatcherService());
+        var service = new StubInspectionService(
+            state,
+            loader,
+            settings,
+            stubService,
+            new StubInspectionRuntimeStore(),
+            new StubInspectionScenarioCoordinator(state, scenarioService));
 
         scenarioService.Advance(new ScenarioDefinition { Name = "checkout-flow", State = "initial", Next = "confirmed" });
         scenarioService.Advance(new ScenarioDefinition { Name = "payment-flow", State = "initial", Next = "authorized" });
@@ -1430,13 +1454,14 @@ public sealed class StubInspectionServiceTests
         var loader = new TestStubDefinitionLoader(document);
         var scenarioService = new ScenarioService();
         var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
-        var stubService = new StubService(document, _ => throw new InvalidOperationException("Not used in inspection tests"), new MatcherService(), scenarioService, new NoOpSemanticMatcherService());
+        var stubService = new StubService(document, _ => throw new InvalidOperationException("Not used in inspection tests"), CreateMatcherService(), scenarioService, new NoOpSemanticMatcherService());
         var service = new StubInspectionService(
             state,
             loader,
             Options.Create(new StubSettings()),
-            scenarioService,
-            stubService);
+            stubService,
+            new StubInspectionRuntimeStore(),
+            new StubInspectionScenarioCoordinator(state, scenarioService));
 
         var result = await service.TestMatchAsync(new MatchRequestInfo
         {

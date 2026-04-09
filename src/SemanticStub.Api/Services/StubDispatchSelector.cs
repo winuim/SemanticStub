@@ -7,25 +7,26 @@ namespace SemanticStub.Api.Services;
 internal sealed class StubDispatchSelector
 {
     private readonly StubDefaultResponseSelector defaultResponseSelector;
-    private readonly IMatcherService matcherService;
+    private readonly MatcherService matcherService;
     private readonly ISemanticMatcherService? semanticMatcherService;
     private readonly StubResponseBuilder responseBuilder;
     private readonly ScenarioService scenarioService;
     private readonly ILogger? logger;
 
     public StubDispatchSelector(
-        IMatcherService matcherService,
+        MatcherService matcherService,
         ISemanticMatcherService? semanticMatcherService,
         StubResponseBuilder responseBuilder,
+        StubDefaultResponseSelector defaultResponseSelector,
         ScenarioService scenarioService,
         ILogger? logger)
     {
         this.matcherService = matcherService;
         this.semanticMatcherService = semanticMatcherService;
         this.responseBuilder = responseBuilder;
+        this.defaultResponseSelector = defaultResponseSelector;
         this.scenarioService = scenarioService;
         this.logger = logger;
-        defaultResponseSelector = new StubDefaultResponseSelector(responseBuilder, scenarioService);
     }
 
     public async Task<StubDispatchSelectionResult> SelectAsync(
