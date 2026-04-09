@@ -8,6 +8,11 @@ namespace SemanticStub.Api.Tests.Unit;
 
 public sealed class MatcherServiceTests
 {
+    private static MatcherService CreateMatcherService()
+    {
+        return new MatcherService(new JsonBodyMatcher(), new QueryValueMatcher(), new RegexQueryMatcher());
+    }
+
     [Fact]
     public void FindBestMatch_PrefersMoreSpecificQueryAndBodyMatch()
     {
@@ -42,7 +47,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
         var query = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["role"] = "admin",
@@ -79,7 +84,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -108,7 +113,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -137,7 +142,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -199,7 +204,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = matcher.FindBestMatch(
             pathParameters,
@@ -249,7 +254,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var evaluations = matcher.EvaluateCandidates(
             [],
@@ -304,7 +309,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var evaluations = matcher.EvaluateCandidates(
             [],
@@ -339,7 +344,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -383,7 +388,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -427,7 +432,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -471,7 +476,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -515,7 +520,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -547,7 +552,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = matcher.FindBestMatch(
             [
@@ -589,7 +594,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -621,7 +626,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -653,7 +658,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -693,7 +698,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -727,7 +732,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -767,7 +772,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -801,7 +806,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -833,7 +838,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -865,7 +870,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -897,7 +902,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -930,7 +935,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -962,7 +967,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
         var query = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["role"] = new string('a', 4096) + "!"
@@ -1011,7 +1016,7 @@ public sealed class MatcherServiceTests
             Matches = [broaderRegexMatch, specificHeaderMatch]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,
@@ -1056,7 +1061,7 @@ public sealed class MatcherServiceTests
             ]
         };
 
-        var matcher = new MatcherService();
+        var matcher = CreateMatcherService();
 
         var match = FindBestMatch(
             matcher,

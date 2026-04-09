@@ -8,15 +8,22 @@ namespace SemanticStub.Api.Tests.Unit;
 
 public sealed class StubDispatchSelectorTests
 {
+    private static MatcherService CreateMatcherService()
+    {
+        return new MatcherService(new JsonBodyMatcher(), new QueryValueMatcher(), new RegexQueryMatcher());
+    }
+
     [Fact]
     public async Task SelectAsync_ReturnsResponseNotConfiguredWhenDeterministicCandidateHasInvalidResponse()
     {
-        var matcherService = new MatcherService();
+        var matcherService = CreateMatcherService();
         var scenarioService = new ScenarioService();
+        var responseBuilder = new StubResponseBuilder(_ => throw new InvalidOperationException("No file loading expected."));
         var selector = new StubDispatchSelector(
             matcherService,
             semanticMatcherService: null,
-            new StubResponseBuilder(_ => throw new InvalidOperationException("No file loading expected.")),
+            responseBuilder,
+            new StubDefaultResponseSelector(responseBuilder, scenarioService),
             scenarioService,
             logger: null);
         var candidate = new QueryMatchDefinition
@@ -52,12 +59,15 @@ public sealed class StubDispatchSelectorTests
     [Fact]
     public async Task SelectAsync_IncludesCandidateIndexInDeterministicSelectionReason()
     {
-        var matcherService = new MatcherService();
+        var matcherService = CreateMatcherService();
+        var scenarioService = new ScenarioService();
+        var responseBuilder = new StubResponseBuilder(_ => throw new InvalidOperationException("No file loading expected."));
         var selector = new StubDispatchSelector(
             matcherService,
             semanticMatcherService: null,
-            new StubResponseBuilder(_ => throw new InvalidOperationException("No file loading expected.")),
-            new ScenarioService(),
+            responseBuilder,
+            new StubDefaultResponseSelector(responseBuilder, scenarioService),
+            scenarioService,
             logger: null);
         var ignoredCandidate = new QueryMatchDefinition
         {
@@ -124,6 +134,8 @@ public sealed class StubDispatchSelectorTests
     [Fact]
     public async Task SelectAsync_UsesSemanticFallbackWhenDeterministicMatchFails()
     {
+        var scenarioService = new ScenarioService();
+        var responseBuilder = new StubResponseBuilder(_ => throw new InvalidOperationException("No file loading expected."));
         var semanticCandidate = new QueryMatchDefinition
         {
             SemanticMatch = "find admin users",
@@ -140,14 +152,15 @@ public sealed class StubDispatchSelectorTests
             }
         };
         var selector = new StubDispatchSelector(
-            new MatcherService(),
+            CreateMatcherService(),
             new StubSemanticMatcherService(new SemanticMatchExplanation
             {
                 Attempted = true,
                 SelectedCandidate = semanticCandidate
             }),
-            new StubResponseBuilder(_ => throw new InvalidOperationException("No file loading expected.")),
-            new ScenarioService(),
+            responseBuilder,
+            new StubDefaultResponseSelector(responseBuilder, scenarioService),
+            scenarioService,
             logger: null);
 
         var result = await selector.SelectAsync(
@@ -172,10 +185,12 @@ public sealed class StubDispatchSelectorTests
     public async Task SelectAsync_AdvancesDefaultScenarioOnlyWhenMutatingState()
     {
         var scenarioService = new ScenarioService();
+        var responseBuilder = new StubResponseBuilder(_ => throw new InvalidOperationException("No file loading expected."));
         var selector = new StubDispatchSelector(
-            new MatcherService(),
+            CreateMatcherService(),
             semanticMatcherService: null,
-            new StubResponseBuilder(_ => throw new InvalidOperationException("No file loading expected.")),
+            responseBuilder,
+            new StubDefaultResponseSelector(responseBuilder, scenarioService),
             scenarioService,
             logger: null);
         var operation = new OperationDefinition
