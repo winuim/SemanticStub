@@ -498,3 +498,8 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# SemanticStub MCP (Node.js)
+mcp/node_modules/
+mcp/dist/
+mcp/*.tsbuildinfo
