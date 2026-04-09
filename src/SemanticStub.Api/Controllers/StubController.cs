@@ -70,83 +70,13 @@ public sealed class StubController : ControllerBase
     private async Task<IActionResult> HandleRequest(string method, string? path)
     {
         var stopwatch = Stopwatch.StartNew();
-        var requestPath = string.IsNullOrEmpty(path) ? "/" : "/" + path;
-        var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
-        var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
-        Request.EnableBuffering();
-        var requestBody = await ReadRequestBodyAsync();
-        var dispatch = await stubService.DispatchAsync(method, requestPath, query, headers, requestBody).ConfigureAwait(false);
-        var matchResult = dispatch.Result;
-        var response = dispatch.Response;
+        var requestPath = NormalizeRequestPath(path);
+        var dispatch = await DispatchRequestAsync(method, requestPath).ConfigureAwait(false);
         int? statusCode = null;
 
         try
         {
-            if (matchResult == StubMatchResult.Matched)
-            {
-                inspectionService.RecordLastMatchExplanation(dispatch.Explanation);
-            }
-
-            if (matchResult == StubMatchResult.PathNotFound)
-            {
-                statusCode = StatusCodes.Status404NotFound;
-                return NotFound();
-            }
-
-            if (matchResult == StubMatchResult.MethodNotAllowed)
-            {
-                var allowedMethods = stubService.GetAllowedMethods(requestPath);
-
-                if (allowedMethods.Count > 0)
-                {
-                    Response.Headers.Allow = string.Join(", ", allowedMethods);
-                }
-
-                statusCode = StatusCodes.Status405MethodNotAllowed;
-                return StatusCode(StatusCodes.Status405MethodNotAllowed);
-            }
-
-            if (matchResult == StubMatchResult.ResponseNotConfigured)
-            {
-                statusCode = StatusCodes.Status500InternalServerError;
-                return StatusCode(StatusCodes.Status500InternalServerError);
-            }
-
-            if (response is null)
-            {
-                statusCode = StatusCodes.Status500InternalServerError;
-                return StatusCode(StatusCodes.Status500InternalServerError);
-            }
-
-            statusCode = response.StatusCode;
-
-            if (response.DelayMilliseconds is > 0)
-            {
-                await Task.Delay(response.DelayMilliseconds.Value, HttpContext.RequestAborted);
-            }
-
-            foreach (var header in response.Headers)
-            {
-                if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                Response.Headers[header.Key] = header.Value;
-            }
-
-            if (!string.IsNullOrEmpty(response.FilePath))
-            {
-                Response.StatusCode = response.StatusCode;
-                return PhysicalFile(response.FilePath, response.ContentType);
-            }
-
-            return new ContentResult
-            {
-                StatusCode = response.StatusCode,
-                ContentType = response.ContentType,
-                Content = response.Body
-            };
+            return await CreateActionResultAsync(dispatch, requestPath, code => statusCode = code).ConfigureAwait(false);
         }
         finally
         {
@@ -154,16 +84,108 @@ public sealed class StubController : ControllerBase
 
             if (statusCode.HasValue)
             {
-                inspectionService.RecordRequestMetrics(dispatch.Explanation, statusCode.Value, stopwatch.Elapsed);
-                inspectionService.RecordRecentRequest(
-                    DateTimeOffset.UtcNow,
-                    method,
-                    requestPath,
-                    dispatch.Explanation,
-                    statusCode.Value,
-                    stopwatch.Elapsed);
+                RecordRequestObservation(dispatch, method, requestPath, statusCode.Value, stopwatch.Elapsed);
             }
         }
+    }
+
+    private static string NormalizeRequestPath(string? path)
+    {
+        return string.IsNullOrEmpty(path) ? "/" : "/" + path;
+    }
+
+    private async Task<StubDispatchResult> DispatchRequestAsync(string method, string requestPath)
+    {
+        var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
+        var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
+        Request.EnableBuffering();
+        var requestBody = await ReadRequestBodyAsync().ConfigureAwait(false);
+        return await stubService.DispatchAsync(method, requestPath, query, headers, requestBody).ConfigureAwait(false);
+    }
+
+    private async Task<IActionResult> CreateActionResultAsync(StubDispatchResult dispatch, string requestPath, Action<int> setStatusCode)
+    {
+        if (dispatch.Result == StubMatchResult.Matched)
+        {
+            inspectionService.RecordLastMatchExplanation(dispatch.Explanation);
+        }
+
+        if (dispatch.Result == StubMatchResult.PathNotFound)
+        {
+            setStatusCode(StatusCodes.Status404NotFound);
+            return NotFound();
+        }
+
+        if (dispatch.Result == StubMatchResult.MethodNotAllowed)
+        {
+            ApplyAllowHeader(requestPath);
+            setStatusCode(StatusCodes.Status405MethodNotAllowed);
+            return StatusCode(StatusCodes.Status405MethodNotAllowed);
+        }
+
+        if (dispatch.Result == StubMatchResult.ResponseNotConfigured || dispatch.Response is null)
+        {
+            setStatusCode(StatusCodes.Status500InternalServerError);
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
+
+        var response = dispatch.Response;
+        setStatusCode(response.StatusCode);
+
+        if (response.DelayMilliseconds is > 0)
+        {
+            await Task.Delay(response.DelayMilliseconds.Value, HttpContext.RequestAborted).ConfigureAwait(false);
+        }
+
+        CopyResponseHeaders(response);
+
+        if (!string.IsNullOrEmpty(response.FilePath))
+        {
+            Response.StatusCode = response.StatusCode;
+            return PhysicalFile(response.FilePath, response.ContentType);
+        }
+
+        return new ContentResult
+        {
+            StatusCode = response.StatusCode,
+            ContentType = response.ContentType,
+            Content = response.Body
+        };
+    }
+
+    private void ApplyAllowHeader(string requestPath)
+    {
+        var allowedMethods = stubService.GetAllowedMethods(requestPath);
+
+        if (allowedMethods.Count > 0)
+        {
+            Response.Headers.Allow = string.Join(", ", allowedMethods);
+        }
+    }
+
+    private void CopyResponseHeaders(StubResponse response)
+    {
+        foreach (var header in response.Headers)
+        {
+            if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            Response.Headers[header.Key] = header.Value;
+        }
+    }
+
+    private void RecordRequestObservation(StubDispatchResult dispatch, string method, string requestPath, int statusCode, TimeSpan elapsed)
+    {
+        inspectionService.RecordRequestMetrics(dispatch.Explanation, statusCode, elapsed);
+        inspectionService.RecordRecentRequest(
+            DateTimeOffset.UtcNow,
+            method,
+            requestPath,
+            dispatch.Explanation,
+            statusCode,
+            elapsed);
     }
 
     private async Task<string?> ReadRequestBodyAsync()
