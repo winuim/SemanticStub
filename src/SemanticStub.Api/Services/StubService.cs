@@ -16,11 +16,8 @@ public sealed class StubService : IStubService
     private readonly Func<StubDocument> documentAccessor;
     private readonly StubDispatchSelector dispatchSelector;
     private readonly StubInspectionProjectionBuilder inspectionProjectionBuilder;
-    private readonly StubResponseBuilder responseBuilder;
     private readonly IMatcherService matcherService;
     private readonly ScenarioService scenarioService;
-    private readonly ISemanticMatcherService? semanticMatcherService;
-    private readonly ILogger<StubService>? logger;
 
     /// <summary>
     /// Creates a service that loads its stub document immediately from the configured loader and uses the supplied matcher implementation for conditional matches.
@@ -92,13 +89,11 @@ public sealed class StubService : IStubService
         ILogger<StubService>? logger)
     {
         this.documentAccessor = documentAccessor;
-        this.responseBuilder = new StubResponseBuilder(responseFileReader);
+        var responseBuilder = new StubResponseBuilder(responseFileReader);
         this.dispatchSelector = new StubDispatchSelector(matcherService, semanticMatcherService, responseBuilder, scenarioService, logger);
         this.inspectionProjectionBuilder = new StubInspectionProjectionBuilder(scenarioService);
         this.matcherService = matcherService;
         this.scenarioService = scenarioService;
-        this.semanticMatcherService = semanticMatcherService;
-        this.logger = logger;
     }
 
     private static Func<StubDocument> CreateLoadedDocumentAccessor(IStubDefinitionLoader loader)
@@ -116,13 +111,7 @@ public sealed class StubService : IStubService
     /// <returns>The same result contract as the full overload, with query, header, and body matching treated as unspecified.</returns>
     public StubMatchResult TryGetResponse(string method, string path, out StubResponse? response)
     {
-        return TryGetResponse(
-            method,
-            path,
-            new Dictionary<string, StringValues>(StringComparer.Ordinal),
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            body: null,
-            out response);
+        return TryGetResponseCore(method, path, CreateEmptyQuery(), body: null, out response);
     }
 
     /// <summary>
@@ -154,13 +143,7 @@ public sealed class StubService : IStubService
     /// <returns>The same result contract as the full overload, with headers omitted and the body treated as unspecified.</returns>
     public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, out StubResponse? response)
     {
-        return TryGetResponse(
-            method,
-            path,
-            ConvertQueryValues(query),
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            body: null,
-            out response);
+        return TryGetResponseCore(method, path, ConvertQueryValues(query), body: null, out response);
     }
 
     /// <summary>
@@ -173,13 +156,7 @@ public sealed class StubService : IStubService
     /// <returns>The same result contract as the full overload, with headers omitted and the body treated as unspecified.</returns>
     public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, StringValues> query, out StubResponse? response)
     {
-        return TryGetResponse(
-            method,
-            path,
-            query,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            body: null,
-            out response);
+        return TryGetResponseCore(method, path, query, body: null, out response);
     }
 
     /// <summary>
@@ -193,13 +170,7 @@ public sealed class StubService : IStubService
     /// <returns>The same result contract as the full overload, with headers omitted.</returns>
     public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, string? body, out StubResponse? response)
     {
-        return TryGetResponse(
-            method,
-            path,
-            ConvertQueryValues(query),
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            body,
-            out response);
+        return TryGetResponseCore(method, path, ConvertQueryValues(query), body, out response);
     }
 
     /// <summary>
@@ -213,13 +184,7 @@ public sealed class StubService : IStubService
     /// <returns>The same result contract as the full overload, with headers omitted.</returns>
     public StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, StringValues> query, string? body, out StubResponse? response)
     {
-        return TryGetResponse(
-            method,
-            path,
-            query,
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            body,
-            out response);
+        return TryGetResponseCore(method, path, query, body, out response);
     }
 
     /// <summary>
@@ -246,9 +211,7 @@ public sealed class StubService : IStubService
         string? body,
         out StubResponse? response)
     {
-        var dispatch = DispatchAsync(method, path, query, headers, body).GetAwaiter().GetResult();
-        response = dispatch.Response;
-        return dispatch.Result;
+        return TryGetResponseCore(method, path, query, headers, body, out response);
     }
 
     /// <inheritdoc/>
@@ -274,11 +237,11 @@ public sealed class StubService : IStubService
     public async Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request)
     {
         var dispatch = await EvaluateAsync(
-            StubRouteResolver.NormalizeMethod(request.Method),
-            StubRouteResolver.NormalizePath(request.Path),
+            CreateExplainMethod(request),
+            CreateExplainPath(request),
             ConvertQueryValues(request.Query),
-            new Dictionary<string, string>(request.Headers, StringComparer.OrdinalIgnoreCase),
-            string.IsNullOrWhiteSpace(request.Body) ? null : request.Body,
+            CreateHeaders(request.Headers),
+            NormalizeBody(request.Body),
             mutateScenarioState: false,
             includeCandidates: request.IncludeCandidates,
             includeSemanticCandidates: request.IncludeSemanticCandidates).ConfigureAwait(false);
@@ -425,64 +388,6 @@ public sealed class StubService : IStubService
             StringComparer.Ordinal);
     }
 
-    private QueryMatchEvaluationResult TryBuildMatchedQueryResponse(
-        string method,
-        string path,
-        PathItemDefinition pathItem,
-        OperationDefinition operation,
-        IReadOnlyDictionary<string, StringValues> query,
-        IReadOnlyDictionary<string, string> headers,
-        string? body,
-        out StubResponse response)
-    {
-        response = null!;
-
-        if (operation.Matches.Count == 0)
-        {
-            return QueryMatchEvaluationResult.NoMatch;
-        }
-
-        // Query/header/body conditions are combined, then the most specific surviving candidate wins.
-        var matchedCandidate = matcherService.FindBestMatch(
-            pathItem.Parameters,
-            operation,
-            query,
-            headers,
-            body,
-            candidate => scenarioService.IsMatch(candidate.Response.Scenario) && IsDeterministicCandidate(candidate));
-
-        if (matchedCandidate is null)
-        {
-            return QueryMatchEvaluationResult.NoMatch;
-        }
-
-        if (!responseBuilder.TryBuild(matchedCandidate.Response, out response))
-        {
-            return QueryMatchEvaluationResult.MatchedButInvalidResponse;
-        }
-
-        logger?.LogInformation(
-            "Deterministic conditional match selected for '{Path}' {Method}. QueryKeys={QueryKeys}, HeaderKeys={HeaderKeys}, HasBody={HasBody}.",
-            path,
-            method.ToUpperInvariant(),
-            matchedCandidate.Query.Count + matchedCandidate.PartialQuery.Count + matchedCandidate.RegexQuery.Count,
-            matchedCandidate.Headers.Count,
-            matchedCandidate.Body is not null);
-
-        scenarioService.Advance(matchedCandidate.Response.Scenario);
-
-        return QueryMatchEvaluationResult.Matched;
-    }
-
-    private static bool IsDeterministicCandidate(QueryMatchDefinition candidate)
-    {
-        return candidate.Query.Count > 0 ||
-               candidate.PartialQuery.Count > 0 ||
-               candidate.RegexQuery.Count > 0 ||
-               candidate.Headers.Count > 0 ||
-               candidate.Body is not null;
-    }
-
     private static string GetRouteId(string method, string pathPattern, OperationDefinition operation)
     {
         return string.IsNullOrEmpty(operation.OperationId)
@@ -527,6 +432,59 @@ public sealed class StubService : IStubService
         }
 
         return null;
+    }
+
+    private StubMatchResult TryGetResponseCore(
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query,
+        string? body,
+        out StubResponse? response)
+    {
+        return TryGetResponseCore(method, path, query, CreateEmptyHeaders(), body, out response);
+    }
+
+    private StubMatchResult TryGetResponseCore(
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body,
+        out StubResponse? response)
+    {
+        var dispatch = DispatchAsync(method, path, query, headers, body).GetAwaiter().GetResult();
+        response = dispatch.Response;
+        return dispatch.Result;
+    }
+
+    private static IReadOnlyDictionary<string, StringValues> CreateEmptyQuery()
+    {
+        return new Dictionary<string, StringValues>(StringComparer.Ordinal);
+    }
+
+    private static IReadOnlyDictionary<string, string> CreateEmptyHeaders()
+    {
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyDictionary<string, string> CreateHeaders(IReadOnlyDictionary<string, string> headers)
+    {
+        return new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string CreateExplainMethod(MatchRequestInfo request)
+    {
+        return StubRouteResolver.NormalizeMethod(request.Method);
+    }
+
+    private static string CreateExplainPath(MatchRequestInfo request)
+    {
+        return StubRouteResolver.NormalizePath(request.Path);
+    }
+
+    private static string? NormalizeBody(string? body)
+    {
+        return string.IsNullOrWhiteSpace(body) ? null : body;
     }
 
 }
