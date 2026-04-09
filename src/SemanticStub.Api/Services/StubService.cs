@@ -1,11 +1,8 @@
 using SemanticStub.Api.Infrastructure.Yaml;
 using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Models;
-using SemanticStub.Api.Utilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
-using System.Collections;
-using System.Globalization;
 
 namespace SemanticStub.Api.Services;
 
@@ -14,11 +11,10 @@ namespace SemanticStub.Api.Services;
 /// </summary>
 public sealed class StubService : IStubService
 {
-    private const string JsonContentType = "application/json";
     private static readonly string[] SupportedMethodOrder = [HttpMethods.Get, HttpMethods.Post, HttpMethods.Put, HttpMethods.Patch, HttpMethods.Delete];
     private static readonly Func<string, string> MissingResponseFileReader = _ => throw new InvalidOperationException("No response file reader configured.");
     private readonly Func<StubDocument> documentAccessor;
-    private readonly Func<string, string> responseFileReader;
+    private readonly StubResponseBuilder responseBuilder;
     private readonly IMatcherService matcherService;
     private readonly ScenarioService scenarioService;
     private readonly ISemanticMatcherService? semanticMatcherService;
@@ -94,7 +90,7 @@ public sealed class StubService : IStubService
         ILogger<StubService>? logger)
     {
         this.documentAccessor = documentAccessor;
-        this.responseFileReader = responseFileReader;
+        this.responseBuilder = new StubResponseBuilder(responseFileReader);
         this.matcherService = matcherService;
         this.scenarioService = scenarioService;
         this.semanticMatcherService = semanticMatcherService;
@@ -368,7 +364,7 @@ public sealed class StubService : IStubService
             var matchedCandidate = deterministicEvaluations.First(candidate =>
                 ReferenceEquals(operation.Matches[candidate.CandidateIndex], selectedDeterministicCandidate));
 
-            if (!TryBuildStubResponse(selectedDeterministicCandidate.Response, out var deterministicResponse))
+            if (!responseBuilder.TryBuild(selectedDeterministicCandidate.Response, out var deterministicResponse))
             {
                 return CreateMatchedDispatchResult(
                     request,
@@ -446,7 +442,7 @@ public sealed class StubService : IStubService
                     operation.Matches.FindIndex(candidate => ReferenceEquals(candidate, semanticExplanation.SelectedCandidate)),
                     scenarioSnapshots);
 
-            if (!TryBuildStubResponse(semanticExplanation.SelectedCandidate.Response, out var semanticResponse))
+            if (!responseBuilder.TryBuild(semanticExplanation.SelectedCandidate.Response, out var semanticResponse))
             {
                 return CreateMatchedDispatchResult(
                     request,
@@ -568,7 +564,7 @@ public sealed class StubService : IStubService
             return QueryMatchEvaluationResult.NoMatch;
         }
 
-        if (!TryBuildStubResponse(matchedCandidate.Response, out response))
+        if (!responseBuilder.TryBuild(matchedCandidate.Response, out response))
         {
             return QueryMatchEvaluationResult.MatchedButInvalidResponse;
         }
@@ -829,7 +825,7 @@ public sealed class StubService : IStubService
             return false;
         }
 
-        var built = TryBuildStubResponse(statusCode, matchedResponse.Value, out response);
+        var built = responseBuilder.TryBuild(statusCode, matchedResponse.Value, out response);
 
         if (built && mutateScenarioState)
         {
@@ -846,224 +842,4 @@ public sealed class StubService : IStubService
                (responseDefinition.Content.Count > 0 || !string.IsNullOrEmpty(responseDefinition.ResponseFile));
     }
 
-    private bool TryBuildStubResponse(int statusCode, ResponseDefinition responseDefinition, out StubResponse response)
-    {
-        response = null!;
-
-        if (!string.IsNullOrEmpty(responseDefinition.ResponseFile))
-        {
-            response = CreateStubResponse(
-                statusCode,
-                responseDefinition.DelayMilliseconds,
-                responseDefinition.Content,
-                responseDefinition.Headers,
-                responseDefinition.ResponseFile);
-
-            return true;
-        }
-
-        var responseBody = BuildResponseBody(responseDefinition.Content);
-
-        if (responseBody is null)
-        {
-            return false;
-        }
-
-        response = CreateStubResponse(
-            statusCode,
-            responseDefinition.DelayMilliseconds,
-            responseDefinition.Content,
-            responseDefinition.Headers,
-            responseBody,
-            filePath: null);
-
-        return true;
-    }
-
-    private bool TryBuildStubResponse(QueryMatchResponseDefinition responseDefinition, out StubResponse response)
-    {
-        response = null!;
-
-        if (responseDefinition.StatusCode <= 0)
-        {
-            return false;
-        }
-
-        if (!string.IsNullOrEmpty(responseDefinition.ResponseFile))
-        {
-            response = CreateStubResponse(
-                responseDefinition.StatusCode,
-                responseDefinition.DelayMilliseconds,
-                responseDefinition.Content,
-                responseDefinition.Headers,
-                responseDefinition.ResponseFile);
-
-            return true;
-        }
-
-        var responseBody = BuildResponseBody(responseDefinition.Content);
-
-        if (responseBody is null)
-        {
-            return false;
-        }
-
-        response = CreateStubResponse(
-            responseDefinition.StatusCode,
-            responseDefinition.DelayMilliseconds,
-            responseDefinition.Content,
-            responseDefinition.Headers,
-            responseBody,
-            filePath: null);
-
-        return true;
-    }
-
-    private static StubResponse CreateStubResponse(
-        int statusCode,
-        int? delayMilliseconds,
-        IReadOnlyDictionary<string, MediaTypeDefinition> content,
-        IReadOnlyDictionary<string, HeaderDefinition> headers,
-        string responseBody,
-        string? filePath)
-    {
-        return new StubResponse
-        {
-            StatusCode = statusCode,
-            DelayMilliseconds = delayMilliseconds,
-            ContentType = ResolveContentType(content),
-            Headers = BuildResponseHeaders(headers),
-            Body = responseBody,
-            FilePath = filePath
-        };
-    }
-
-    private StubResponse CreateStubResponse(
-        int statusCode,
-        int? delayMilliseconds,
-        IReadOnlyDictionary<string, MediaTypeDefinition> content,
-        IReadOnlyDictionary<string, HeaderDefinition> headers,
-        string responseFile)
-    {
-        if (Path.IsPathRooted(responseFile))
-        {
-            return CreateStubResponse(
-                statusCode,
-                delayMilliseconds,
-                content,
-                headers,
-                string.Empty,
-                responseFile);
-        }
-
-        return CreateStubResponse(
-            statusCode,
-            delayMilliseconds,
-            content,
-            headers,
-            responseFileReader(responseFile),
-            filePath: null);
-    }
-
-    private string? BuildResponseBody(IReadOnlyDictionary<string, MediaTypeDefinition> content)
-    {
-        var selectedKey = SelectMediaTypeKey(content);
-
-        if (selectedKey is null || !content.TryGetValue(selectedKey, out var mediaType) || mediaType.Example is null)
-        {
-            return null;
-        }
-
-        // Non-JSON string examples are returned as-is; JSON types go through serialization.
-        if (!IsJsonContentType(selectedKey) && mediaType.Example is string rawExample)
-        {
-            return rawExample;
-        }
-
-        return StubExampleSerializer.Serialize(mediaType.Example);
-    }
-
-    private static string ResolveContentType(IReadOnlyDictionary<string, MediaTypeDefinition> content)
-    {
-        return SelectMediaTypeKey(content) ?? JsonContentType;
-    }
-
-    // Prefer JSON content types to preserve deterministic behavior for stubs that declare
-    // multiple media types (e.g. application/json alongside text/plain for documentation).
-    // Fall back to the first declared entry only when no JSON type is present.
-    private static string? SelectMediaTypeKey(IReadOnlyDictionary<string, MediaTypeDefinition> content)
-    {
-        return content.Keys.FirstOrDefault(IsJsonContentType) ?? content.Keys.FirstOrDefault();
-    }
-
-    private static bool IsJsonContentType(string contentType)
-    {
-        return contentType.Equals(JsonContentType, StringComparison.OrdinalIgnoreCase)
-            || contentType.EndsWith("+json", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static IReadOnlyDictionary<string, StringValues> BuildResponseHeaders(IReadOnlyDictionary<string, HeaderDefinition> headers)
-    {
-        if (headers.Count == 0)
-        {
-            return new Dictionary<string, StringValues>(StringComparer.OrdinalIgnoreCase);
-        }
-
-        var resolvedHeaders = new Dictionary<string, StringValues>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var header in headers)
-        {
-            var resolvedValue = ResolveHeaderValue(header.Value);
-
-            if (resolvedValue.Count == 0)
-            {
-                continue;
-            }
-
-            resolvedHeaders[header.Key] = string.Equals(header.Key, "Set-Cookie", StringComparison.OrdinalIgnoreCase)
-                ? resolvedValue
-                : new StringValues(string.Join(", ", resolvedValue.ToArray().Where(static value => value is not null)!));
-        }
-
-        return resolvedHeaders;
-    }
-
-    private static StringValues ResolveHeaderValue(HeaderDefinition header)
-    {
-        return ConvertHeaderValueToStringValues(header.Example).Count > 0
-            ? ConvertHeaderValueToStringValues(header.Example)
-            : ConvertHeaderValueToStringValues(header.Schema?.Example);
-    }
-
-    private static StringValues ConvertHeaderValueToStringValues(object? value)
-    {
-        return value switch
-        {
-            null => StringValues.Empty,
-            string text => new StringValues(text),
-            char character => new StringValues(character.ToString()),
-            bool boolean => new StringValues(boolean ? "true" : "false"),
-            DateTime dateTime => new StringValues(dateTime.ToString("O", CultureInfo.InvariantCulture)),
-            DateTimeOffset dateTimeOffset => new StringValues(dateTimeOffset.ToString("O", CultureInfo.InvariantCulture)),
-            DateOnly dateOnly => new StringValues(dateOnly.ToString("O", CultureInfo.InvariantCulture)),
-            TimeOnly timeOnly => new StringValues(timeOnly.ToString("O", CultureInfo.InvariantCulture)),
-            Guid guid => new StringValues(guid.ToString()),
-            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal
-                => new StringValues(Convert.ToString(value, CultureInfo.InvariantCulture)),
-            IFormattable formattable => new StringValues(formattable.ToString(format: null, CultureInfo.InvariantCulture)),
-            IEnumerable sequence => ConvertHeaderSequenceToStringValues(sequence),
-            _ => new StringValues(value.ToString())
-        };
-    }
-
-    private static StringValues ConvertHeaderSequenceToStringValues(IEnumerable sequence)
-    {
-        var values = sequence
-            .Cast<object?>()
-            .SelectMany(static value => ConvertHeaderValueToStringValues(value).ToArray())
-            .Where(static value => !string.IsNullOrEmpty(value))
-            .ToArray();
-
-        return values.Length == 0 ? StringValues.Empty : new StringValues(values);
-    }
 }
