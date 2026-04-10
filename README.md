@@ -142,7 +142,7 @@ Each `x-match` entry may contain:
 
 Notes:
 
-- `response.statusCode` is required and must be a positive integer.
+- `response.statusCode` is required and must be an HTTP status code between 100 and 599.
 - `x-match` responses support the same `content`, `headers`, `x-delay`, and
   `x-response-file` fields as normal responses.
 - Query, header, and body conditions are combined with AND semantics inside a
@@ -201,17 +201,23 @@ paths:
       responses:
         "404":
           description: No match found
+          content:
+            application/json:
+              example:
+                message: no match
 ```
 
 Configure semantic matching in `appsettings.json`:
 
 ```json
-"SemanticMatching": {
-  "Enabled": true,
-  "Endpoint": "http://localhost:8081",
-  "Threshold": 0.85,
-  "TopScoreMargin": 0,
-  "TimeoutSeconds": 30
+"StubSettings": {
+  "SemanticMatching": {
+    "Enabled": true,
+    "Endpoint": "http://localhost:8081",
+    "Threshold": 0.85,
+    "TopScoreMargin": 0,
+    "TimeoutSeconds": 30
+  }
 }
 ```
 
@@ -251,8 +257,8 @@ This keeps routing deterministic for the current feature set.
 
 ## Runtime inspection
 
-SemanticStub exposes read-only runtime inspection endpoints under the reserved
-prefix `/_semanticstub/runtime`.
+SemanticStub exposes runtime inspection endpoints under the reserved prefix
+`/_semanticstub/runtime`.
 
 - `GET /_semanticstub/runtime/config` returns metadata for the active effective configuration snapshot.
 - `GET /_semanticstub/runtime/routes` returns the active normalized route list.
@@ -263,6 +269,8 @@ prefix `/_semanticstub/runtime`.
 - `POST /_semanticstub/runtime/test-match` evaluates a virtual request without executing a real response or mutating scenario state.
 - `POST /_semanticstub/runtime/explain` returns structured match details for a virtual request, including deterministic and semantic evaluation when applicable.
 - `GET /_semanticstub/runtime/explain/last` returns the latest explanation captured from a real matched request in the current process.
+- `POST /_semanticstub/runtime/scenarios/reset` resets all configured scenarios back to their initial state.
+- `POST /_semanticstub/runtime/scenarios/{name}/reset` resets one configured scenario back to its initial state.
 - YAML stub definitions under `/_semanticstub/runtime/*` are reserved for these inspection endpoints and are not reachable as normal stub routes.
 
 Inspection notes:
@@ -275,6 +283,7 @@ Inspection notes:
 - `/_semanticstub/runtime/requests` is process-local and currently returns up to 100 recent real requests in newest-first order. Each item includes timestamp, method, path, resolved route id when available, status code, elapsed time, match mode, and failure reason for unmatched requests. The `limit` query parameter defaults to `20`.
 - `/_semanticstub/runtime/test-match` and `/_semanticstub/runtime/explain` accept a virtual request payload with method, path, optional query/header/body values, and optional candidate-detail flags.
 - `/_semanticstub/runtime/explain/last` is process-local and only updates after a real request produces a matched stub response.
+- `/_semanticstub/runtime/scenarios/reset` and `/_semanticstub/runtime/scenarios/{name}/reset` mutate only in-memory scenario state for the current process.
 - These endpoints do not expose raw YAML, internal domain objects, or full response payload bodies.
 
 Example request body for `POST /_semanticstub/runtime/test-match` and
@@ -291,7 +300,7 @@ Example request body for `POST /_semanticstub/runtime/test-match` and
 }
 ```
 
-Example response body for `GET /_semanticstub/runtime/routes/listUsers`:
+Excerpt from the response body for `GET /_semanticstub/runtime/routes/listUsers`:
 
 ```json
 {
@@ -432,7 +441,10 @@ A Claude skill is available for efficient use of the MCP tools.
 5. Upload the `.skill` file
 
 ## Test
+
+```sh
 dotnet test
+```
 
 ## Notes
 See `AGENTS.md` for repository guidance.
