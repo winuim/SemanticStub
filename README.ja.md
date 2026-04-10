@@ -131,7 +131,7 @@ paths:
 
 補足:
 
-- `response.statusCode` は必須で、正の整数である必要があります。
+- `response.statusCode` は必須で、100 から 599 までの HTTP status code である必要があります。
 - `x-match` のレスポンスは、通常レスポンスと同じく `content`、`headers`、`x-delay`、`x-response-file` をサポートします。
 - query、header、body 条件は、1 つの `x-match` 内では AND 条件として組み合わされます。
 - `x-match` で使う query と header のキーは、path または operation にパラメータ宣言がある場合、その OpenAPI 宣言を参照している必要があります。
@@ -172,17 +172,23 @@ paths:
       responses:
         "404":
           description: No match found
+          content:
+            application/json:
+              example:
+                message: no match
 ```
 
 `appsettings.json` でセマンティックマッチングを設定します:
 
 ```json
-"SemanticMatching": {
-  "Enabled": true,
-  "Endpoint": "http://localhost:8081",
-  "Threshold": 0.85,
-  "TopScoreMargin": 0,
-  "TimeoutSeconds": 30
+"StubSettings": {
+  "SemanticMatching": {
+    "Enabled": true,
+    "Endpoint": "http://localhost:8081",
+    "Threshold": 0.85,
+    "TopScoreMargin": 0,
+    "TimeoutSeconds": 30
+  }
 }
 ```
 
@@ -217,22 +223,86 @@ paths:
 
 ## Runtime inspection
 
-SemanticStub は、読み取り専用の runtime inspection endpoint を予約プレフィックス
+SemanticStub は、runtime inspection endpoint を予約プレフィックス
 `/_semanticstub/runtime` 配下に公開します。
 
 - `GET /_semanticstub/runtime/config` は、現在有効な effective configuration snapshot のメタデータを返します。
 - `GET /_semanticstub/runtime/routes` は、現在有効な正規化済み route list を返します。
+- `GET /_semanticstub/runtime/routes/{routeId}` は、1 件の active route の effective runtime detail を返します。
+- `GET /_semanticstub/runtime/scenarios` は、現在の scenario state snapshot を返します。
 - `GET /_semanticstub/runtime/metrics` は、現在のプロセスで処理した実リクエストの集計 metrics を返します。
 - `GET /_semanticstub/runtime/requests?limit=20` は、現在のプロセスで処理した実リクエストの recent request history を返します。
+- `POST /_semanticstub/runtime/test-match` は、実レスポンスを実行せず scenario state も変更せずに virtual request を評価します。
+- `POST /_semanticstub/runtime/explain` は、virtual request の structured match detail を返します。該当する場合は deterministic / semantic evaluation も含みます。
+- `GET /_semanticstub/runtime/explain/last` は、現在のプロセスで最後に実リクエストから記録された explanation を返します。
+- `POST /_semanticstub/runtime/scenarios/reset` は、設定済みの全 scenario を初期状態に戻します。
+- `POST /_semanticstub/runtime/scenarios/{name}/reset` は、設定済みの 1 scenario を初期状態に戻します。
 - `/_semanticstub/runtime/*` 配下の YAML stub 定義は inspection endpoint 用に予約されており、通常の stub route としては到達できません。
 
 補足:
 
 - `/_semanticstub/runtime/config` はサマリ表示です。現在は snapshot timestamp、configuration hash、definitions directory、route count、semantic matching の有効状態などを返します。
 - `/_semanticstub/runtime/routes` は、現在有効な path と HTTP method の組み合わせごとに 1 件ずつ、route id、正規化済み path pattern、semantic matching の利用有無、scenario の利用有無、response 数を返します。
+- `/_semanticstub/runtime/routes/{routeId}` は、1 件の route について top-level response と正規化済み conditional match metadata を含む detail view を返します。
+- `/_semanticstub/runtime/scenarios` は、既知の scenario ごとに現在の state と active かどうかを返します。
 - `/_semanticstub/runtime/metrics` は process-local で、total request count、matched / unmatched count、fallback / semantic count、average latency、status code summary、top routes を返します。
 - `/_semanticstub/runtime/requests` は process-local で、最大 100 件の recent request history を新しい順で返します。各 item には timestamp、method、path、利用可能な場合の route id、status code、elapsed time、match mode、および unmatched request の failure reason が含まれます。`limit` query parameter のデフォルトは `20` です。
-- 現時点では、各 route の完全な response 定義、raw YAML、詳細な `x-match` 条件までは公開しません。
+- `/_semanticstub/runtime/test-match` と `/_semanticstub/runtime/explain` は、method、path、省略可能な query / header / body、および省略可能な candidate detail flag を持つ virtual request payload を受け取ります。
+- `/_semanticstub/runtime/explain/last` は process-local で、実リクエストが stub response に match した後だけ更新されます。
+- `/_semanticstub/runtime/scenarios/reset` と `/_semanticstub/runtime/scenarios/{name}/reset` は、現在のプロセスの in-memory scenario state だけを変更します。
+- これらの endpoint は、raw YAML、内部 domain object、完全な response payload body は公開しません。
+
+`POST /_semanticstub/runtime/test-match` と
+`POST /_semanticstub/runtime/explain` のリクエストボディ例:
+
+```json
+{
+  "method": "GET",
+  "path": "/users",
+  "query": {
+    "role": ["admin"]
+  },
+  "includeCandidates": true
+}
+```
+
+`GET /_semanticstub/runtime/routes/listUsers` のレスポンス抜粋例:
+
+```json
+{
+  "routeId": "listUsers",
+  "method": "GET",
+  "pathPattern": "/users",
+  "usesSemanticMatching": false,
+  "usesScenario": false,
+  "responseCount": 1,
+  "hasConditionalMatches": true,
+  "responses": [
+    {
+      "responseId": "200",
+      "usesScenario": false,
+      "scenario": null
+    }
+  ],
+  "conditionalMatches": [
+    {
+      "candidateIndex": 0,
+      "hasExactQuery": true,
+      "exactQueryKeys": ["role"],
+      "hasPartialQuery": false,
+      "partialQueryKeys": [],
+      "hasRegexQuery": false,
+      "regexQueryKeys": [],
+      "headerKeys": [],
+      "hasBody": false,
+      "usesSemanticMatching": false,
+      "responseStatusCode": 200,
+      "usesScenario": false,
+      "scenario": null
+    }
+  ]
+}
+```
 
 `GET /_semanticstub/runtime/requests?limit=1` のレスポンス例:
 

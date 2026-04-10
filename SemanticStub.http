@@ -64,6 +64,14 @@ Accept: application/json
 GET {{host}}/_semanticstub/runtime/explain/last
 Accept: application/json
 
+### Runtime inspection reset all scenarios
+POST {{host}}/_semanticstub/runtime/scenarios/reset
+Accept: application/json
+
+### Runtime inspection reset one scenario
+POST {{host}}/_semanticstub/runtime/scenarios/checkout-flow/reset
+Accept: application/json
+
 ### Runtime observability walkthrough: trigger a real request
 GET {{host}}/users?role=admin
 Accept: application/json
