@@ -180,6 +180,35 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
+    public async Task FindBestMatchAsync_UsesDefaultThresholdWhenNoneIsConfigured()
+    {
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei"
+                }
+            },
+            CreateEmbeddingHandler(new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["method: POST\npath: /search\nbody:\ncoffee shop search"] = "[1.0,0.0]",
+                ["show unpaid billing invoices"] = "[0.84,0.5425863986500215]"
+            }));
+
+        var match = await service.FindBestMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "coffee shop search",
+            [CreateCandidate("show unpaid billing invoices")]);
+
+        Assert.Null(match);
+    }
+
+    [Fact]
     public async Task FindBestMatchAsync_ReturnsNullWhenTopScoreMarginIsTooSmall()
     {
         var service = CreateService(
