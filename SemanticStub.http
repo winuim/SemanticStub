@@ -1,4 +1,4 @@
-@host = http://localhost:5000
+@host = http://localhost:8080
 
 ### Runtime inspection config summary
 GET {{host}}/_semanticstub/runtime/config
