@@ -327,6 +327,14 @@ Claude Desktop には次のように MCP サーバーを追加します:
 }
 ```
 
+## Claude Skill
+
+Claude Skill を使うと、MCP ツールを効率よく利用できます。
+
+1. `mcp/skill/semantic-stub.skill` をダウンロードします
+2. Claude Desktop → Settings → Profile → Skills を開きます
+3. `.skill` ファイルをインストールします
+
 ## テスト
 
 ```sh

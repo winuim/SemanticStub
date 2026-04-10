@@ -421,6 +421,14 @@ Add the MCP server to Claude Desktop:
 }
 ```
 
+## Claude Skill
+
+A Claude skill is available for efficient use of the MCP tools.
+
+1. Download `mcp/skill/semantic-stub.skill`
+2. Open Claude Desktop → Settings → Profile → Skills
+3. Install the `.skill` file
+
 ## Test
 dotnet test
 
