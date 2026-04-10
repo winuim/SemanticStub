@@ -503,3 +503,6 @@ FodyWeavers.xsd
 mcp/node_modules/
 mcp/dist/
 mcp/*.tsbuildinfo
+
+# Local Docker model cache
+data/

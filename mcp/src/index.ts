@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-const BASE_URL = process.env.SEMANTIC_STUB_URL ?? "http://localhost:5000";
+const BASE_URL = process.env.SEMANTIC_STUB_URL ?? "http://localhost:8080";
 // Keep the MCP layer thin by delegating to the existing HTTP inspection surface.
 const RUNTIME = `${BASE_URL}/_semanticstub/runtime`;
 

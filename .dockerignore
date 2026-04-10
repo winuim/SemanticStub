@@ -1,0 +1,8 @@
+.git
+.claude
+.codex
+**/bin
+**/obj
+mcp/node_modules
+mcp/dist
+data

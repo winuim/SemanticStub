@@ -5,6 +5,9 @@ It exposes runtime inspection, match simulation, and scenario reset as tools so 
 
 Japanese documentation is available in [README.ja.md](./README.ja.md).
 
+For normal usage, prefer the Docker Compose setup in the repository root
+[README.md](../README.md). This file describes how to run `mcp` on its own.
+
 ## Requirements
 
 - Node.js 18+
@@ -34,7 +37,7 @@ Add this server to `claude_desktop_config.json`.
       "command": "node",
       "args": ["/path/to/SemanticStub/mcp/dist/index.js"],
       "env": {
-        "SEMANTIC_STUB_URL": "http://localhost:5000"
+        "SEMANTIC_STUB_URL": "http://localhost:8080"
       }
     }
   }
@@ -78,4 +81,4 @@ npm run dev
 
 | Variable | Default | Description |
 |---|---|---|
-| `SEMANTIC_STUB_URL` | `http://localhost:5000` | Base URL of the SemanticStub API |
+| `SEMANTIC_STUB_URL` | `http://localhost:8080` | Base URL of the SemanticStub API |
