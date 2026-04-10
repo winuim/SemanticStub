@@ -180,7 +180,7 @@ paths:
 "SemanticMatching": {
   "Enabled": true,
   "Endpoint": "http://localhost:8081",
-  "Threshold": 0.8,
+  "Threshold": 0.85,
   "TopScoreMargin": 0,
   "TimeoutSeconds": 30
 }
@@ -190,7 +190,7 @@ paths:
 | --- | --- | --- |
 | `Enabled` | セマンティックマッチングフォールバックを有効化します。 | `false` |
 | `Endpoint` | TEI エンドポイントのベース URL。 | `""` |
-| `Threshold` | マッチを受け入れる最小コサイン類似度 (-1.0〜1.0)。 | `0.8` |
+| `Threshold` | マッチを受け入れる最小コサイン類似度 (-1.0〜1.0)。 | `0.85` |
 | `TopScoreMargin` | 上位2候補間の最小スコア差。`0` で曖昧性チェックを無効化します。 | `0` |
 | `TimeoutSeconds` | 埋め込みエンドポイントへの HTTP リクエストタイムアウト（秒）。 | `30` |
 

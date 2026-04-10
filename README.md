@@ -209,7 +209,7 @@ Configure semantic matching in `appsettings.json`:
 "SemanticMatching": {
   "Enabled": true,
   "Endpoint": "http://localhost:8081",
-  "Threshold": 0.8,
+  "Threshold": 0.85,
   "TopScoreMargin": 0,
   "TimeoutSeconds": 30
 }
@@ -219,7 +219,7 @@ Configure semantic matching in `appsettings.json`:
 | --- | --- | --- |
 | `Enabled` | Enables semantic matching fallback. | `false` |
 | `Endpoint` | Base URL of the TEI endpoint. | `""` |
-| `Threshold` | Minimum cosine similarity to accept a match (-1.0–1.0). | `0.8` |
+| `Threshold` | Minimum cosine similarity to accept a match (-1.0–1.0). | `0.85` |
 | `TopScoreMargin` | Minimum score gap between the top two candidates; `0` disables the ambiguity check. | `0` |
 | `TimeoutSeconds` | HTTP request timeout for the embedding endpoint. | `30` |
 
