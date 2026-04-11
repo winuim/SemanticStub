@@ -265,6 +265,7 @@ SemanticStub exposes runtime inspection endpoints under the reserved prefix
 - `GET /_semanticstub/runtime/routes/{routeId}` returns the effective runtime details for one active route.
 - `GET /_semanticstub/runtime/scenarios` returns the current scenario state snapshot.
 - `GET /_semanticstub/runtime/metrics` returns aggregate runtime metrics for real requests handled by the current process.
+- `POST /_semanticstub/runtime/metrics/reset` resets aggregate runtime metrics and recent request history for the current process.
 - `GET /_semanticstub/runtime/requests?limit=20` returns a bounded recent request history for real requests handled by the current process.
 - `POST /_semanticstub/runtime/test-match` evaluates a virtual request without executing a real response or mutating scenario state.
 - `POST /_semanticstub/runtime/explain` returns structured match details for a virtual request, including deterministic and semantic evaluation when applicable.
@@ -280,6 +281,7 @@ Inspection notes:
 - `/_semanticstub/runtime/routes/{routeId}` expands a single route into a stable detail view with top-level responses and normalized conditional match metadata.
 - `/_semanticstub/runtime/scenarios` returns one item per known scenario with its current state and whether it is active.
 - `/_semanticstub/runtime/metrics` is process-local and currently returns total request count, matched and unmatched counts, fallback and semantic counts, average latency, status-code summaries, and top routes.
+- `/_semanticstub/runtime/metrics/reset` clears process-local aggregate metrics and recent request history without reloading configuration, changing scenario state, or clearing `/_semanticstub/runtime/explain/last`.
 - `/_semanticstub/runtime/requests` is process-local and currently returns up to 100 recent real requests in newest-first order. Each item includes timestamp, method, path, resolved route id when available, status code, elapsed time, match mode, and failure reason for unmatched requests. The `limit` query parameter defaults to `20`.
 - `/_semanticstub/runtime/test-match` and `/_semanticstub/runtime/explain` accept a virtual request payload with method, path, optional query/header/body values, and optional candidate-detail flags.
 - `/_semanticstub/runtime/explain/last` is process-local and only updates after a real request produces a matched stub response.

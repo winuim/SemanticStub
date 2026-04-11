@@ -47,6 +47,14 @@ public sealed class StubInspectionController : ControllerBase
     [HttpGet("metrics")]
     public IActionResult GetMetrics() => Ok(inspectionService.GetRuntimeMetrics());
 
+    /// <summary>Resets aggregate runtime metrics and recent request history for the current process.</summary>
+    [HttpPost("metrics/reset")]
+    public IActionResult ResetMetrics()
+    {
+        inspectionService.ResetRuntimeMetrics();
+        return NoContent();
+    }
+
     /// <summary>Returns the bounded recent request history for real requests handled by the current process.</summary>
     [HttpGet("requests")]
     public IActionResult GetRecentRequests([FromQuery] int limit = 20) => Ok(inspectionService.GetRecentRequests(limit));

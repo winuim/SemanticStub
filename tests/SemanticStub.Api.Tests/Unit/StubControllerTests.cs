@@ -424,6 +424,8 @@ public sealed class StubControllerTests
             RecordRecentRequestCallCount++;
         }
 
+        public void ResetRuntimeMetrics() => throw new NotSupportedException();
+
         public void ResetScenarioStates() => throw new NotSupportedException();
 
         public bool ResetScenarioState(string scenarioName) => throw new NotSupportedException();
