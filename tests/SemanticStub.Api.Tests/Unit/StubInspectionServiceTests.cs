@@ -381,6 +381,37 @@ public sealed class StubInspectionServiceTests
         Assert.Collection(metrics.TopRoutes, route => Assert.Equal("listUsers", route.RouteId));
     }
 
+    [Fact]
+    public void ResetRuntimeMetrics_ClearsMetricsAndRecentRequests_ButKeepsLastMatchExplanation()
+    {
+        var service = CreateService(EmptyDocument());
+        var explanation = CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "listUsers", matchMode: "fallback");
+
+        service.RecordRequestMetrics(explanation, StatusCodes.Status200OK, TimeSpan.FromMilliseconds(25));
+        service.RecordRecentRequest(
+            DateTimeOffset.Parse("2026-04-07T00:00:00Z"),
+            HttpMethods.Get,
+            "/users",
+            explanation,
+            StatusCodes.Status200OK,
+            TimeSpan.FromMilliseconds(25));
+        service.RecordLastMatchExplanation(explanation);
+
+        service.ResetRuntimeMetrics();
+
+        var metrics = service.GetRuntimeMetrics();
+        Assert.Equal(0, metrics.TotalRequestCount);
+        Assert.Equal(0, metrics.MatchedRequestCount);
+        Assert.Equal(0, metrics.UnmatchedRequestCount);
+        Assert.Equal(0, metrics.FallbackResponseCount);
+        Assert.Equal(0, metrics.SemanticMatchCount);
+        Assert.Equal(0, metrics.AverageLatencyMilliseconds);
+        Assert.Empty(metrics.StatusCodes);
+        Assert.Empty(metrics.TopRoutes);
+        Assert.Empty(service.GetRecentRequests(20));
+        Assert.Same(explanation, service.GetLastMatchExplanation());
+    }
+
     // ---------------------------------------------------------------------------
     // GetRecentRequests
     // ---------------------------------------------------------------------------

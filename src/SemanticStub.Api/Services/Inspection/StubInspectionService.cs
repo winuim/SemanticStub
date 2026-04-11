@@ -116,6 +116,12 @@ internal sealed class StubInspectionService : IStubInspectionService
     }
 
     /// <inheritdoc/>
+    public void ResetRuntimeMetrics()
+    {
+        runtimeStore.ResetMetrics();
+    }
+
+    /// <inheritdoc/>
     public void ResetScenarioStates()
     {
         scenarioCoordinator.ResetScenarioStates();

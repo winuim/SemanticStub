@@ -82,6 +82,11 @@ public interface IStubInspectionService
     void RecordRecentRequest(DateTimeOffset timestamp, string method, string path, MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed);
 
     /// <summary>
+    /// Resets aggregate runtime metrics and recent request history for the current process.
+    /// </summary>
+    void ResetRuntimeMetrics();
+
+    /// <summary>
     /// Resets all configured scenarios back to their initial state.
     /// </summary>
     void ResetScenarioStates();
