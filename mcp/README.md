@@ -53,6 +53,7 @@ Add this server to `claude_desktop_config.json`.
 | `get_route` | `GET /runtime/routes/{id}` | Detailed route information |
 | `get_scenarios` | `GET /runtime/scenarios` | Current scenario state |
 | `get_metrics` | `GET /runtime/metrics` | Runtime metrics |
+| `reset_metrics` | `POST /runtime/metrics/reset` | Reset runtime metrics and recent request history |
 | `get_requests` | `GET /runtime/requests?limit=` | Recent request history with limit |
 | `test_match` | `POST /runtime/test-match` | Match simulation without side effects |
 | `explain_match` | `POST /runtime/explain` | Detailed match explanation |
@@ -68,6 +69,7 @@ Add this server to `claude_desktop_config.json`.
 ## Constraints
 
 - `metrics`, `requests`, `get_last_explain`, and `scenarios` return process-local runtime state.
+- `reset_metrics` clears aggregate metrics and recent request history only. It does not reset scenario state, reload active stub definitions, or clear the latest real-request explanation.
 - This MCP server is a thin bridge to the SemanticStub HTTP API and does not change YAML or core behavior.
 
 ## Development

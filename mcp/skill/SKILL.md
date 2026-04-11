@@ -22,10 +22,12 @@ efficiently — choosing the right tool for the task and minimizing unnecessary 
 | `get_route` | Detail of one route (responses, conditional matches, scenario usage) |
 | `get_scenarios` | Current scenario state snapshot |
 | `get_metrics` | Aggregate metrics (request counts, latency, top routes) |
+| `reset_metrics` | Reset aggregate metrics and recent request history |
 | `get_requests` | Recent real request history (newest first) |
 | `test_match` | Check which stub a virtual request matches — no side effects |
 | `explain_match` | Full match explanation including semantic evaluation |
 | `get_last_explain` | Explanation from the most recent real matched request |
+| `reset_scenario_state` | Reset all scenarios or one named scenario to its initial state |
 
 ## Tool selection guide
 
@@ -49,6 +51,10 @@ Look for items where `matchMode` is `null` or `failureReason` is non-null for un
 ### "How is the server performing?"
 → Use `get_metrics` for aggregate data. Use `get_requests` for per-request detail.
 
+### "Reset metrics" / "Clear recent requests"
+→ Use `reset_metrics`. It clears aggregate metrics and recent request history only.
+It does not reset scenario state, reload active stub definitions, or clear `get_last_explain`.
+
 ### General health check
 → Use `get_config` to confirm the server is running and check route count.
 
@@ -61,7 +67,7 @@ Look for items where `matchMode` is `null` or `failureReason` is non-null for un
 
 ### Scenario debugging
 1. `get_scenarios` to see current state
-2. If state is wrong, suggest restarting the stub server to reset (no reset API yet)
+2. If state is wrong, use `reset_scenario_state` for all scenarios or the named scenario
 
 ### Quick status check
 1. `get_config` → confirm running
@@ -78,5 +84,5 @@ Look for items where `matchMode` is `null` or `failureReason` is non-null for un
 ## Notes
 
 - `test_match` and `explain_match` do NOT mutate scenario state — safe to call anytime
-- Scenario state resets on stub server restart
+- `reset_metrics` clears metrics and recent requests, but does not change scenario state, active stub definitions, or the latest real-request explanation
 - All tools fail gracefully if the stub server is not running — inform the user and suggest starting it
