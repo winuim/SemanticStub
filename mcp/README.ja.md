@@ -53,6 +53,7 @@ npm run build
 | `get_route` | `GET /runtime/routes/{id}` | ルート詳細 |
 | `get_scenarios` | `GET /runtime/scenarios` | シナリオ状態 |
 | `get_metrics` | `GET /runtime/metrics` | メトリクス |
+| `reset_metrics` | `POST /runtime/metrics/reset` | メトリクスとリクエスト履歴のリセット |
 | `get_requests` | `GET /runtime/requests?limit=` | 件数指定つきリクエスト履歴 |
 | `test_match` | `POST /runtime/test-match` | マッチ確認（副作用なし） |
 | `explain_match` | `POST /runtime/explain` | マッチ詳細説明 |
@@ -68,6 +69,7 @@ npm run build
 ## 制約
 
 - `metrics` / `requests` / `get_last_explain` / `scenarios` は process-local な runtime 状態を返します。
+- `reset_metrics` は aggregate metrics と recent request history だけを消去します。scenario state、active stub definitions、直近の real-request explanation は変更しません。
 - この MCP サーバー自体は SemanticStub HTTP API への薄い委譲層であり、YAML や core behavior は変更しません。
 
 ## 開発時
