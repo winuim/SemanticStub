@@ -234,6 +234,105 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_DoesNotReportCombinationErrorWhenSemanticMatchIsEmpty()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /search:
+                post:
+                  x-match:
+                    - x-semantic-match: "   "
+                      query:
+                        role: admin
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              message: admin
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].x-semantic-match must not be empty", exception.Message);
+        Assert.DoesNotContain("x-match[0].x-semantic-match cannot be combined", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("query", "query:\n                        role: admin")]
+    [InlineData("x-query-partial", "x-query-partial:\n                        role: admin")]
+    [InlineData("x-query-regex", "x-query-regex:\n                        role: ^admin-[0-9]+$")]
+    [InlineData("headers", "headers:\n                        X-Env: staging")]
+    [InlineData("body", "body:\n                        role: admin")]
+    public void LoadDefaultDefinition_ThrowsWhenSemanticMatchIsCombinedWithDeterministicCondition(
+        string deterministicField,
+        string deterministicCondition)
+    {
+        using var workspace = TestWorkspace.Create(
+            $$"""
+            openapi: 3.1.0
+            paths:
+              /search:
+                post:
+                  x-match:
+                    - x-semantic-match: find admin users
+                      {{deterministicCondition}}
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              message: admin
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains(
+            $"x-match[0].x-semantic-match cannot be combined with {deterministicField}.",
+            exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_DoesNotReportParameterDeclarationErrorsWhenSemanticMatchIsCombinedWithQuery()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /search:
+                post:
+                  parameters:
+                    - name: status
+                      in: query
+                      schema:
+                        type: string
+                  x-match:
+                    - x-semantic-match: find admin users
+                      query:
+                        role: admin
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              message: admin
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].x-semantic-match cannot be combined with query.", exception.Message);
+        Assert.DoesNotContain("x-match[0].query['role'] must reference a declared query parameter", exception.Message);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_ThrowsForInvalidMatchedResponse()
     {
         using var workspace = TestWorkspace.Create(
