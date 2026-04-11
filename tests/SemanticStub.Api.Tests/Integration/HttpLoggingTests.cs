@@ -71,6 +71,17 @@ public sealed class HttpLoggingTests
     }
 
     [Fact]
+    public void CreateClient_ConfiguresYamlInfrastructureCategoryAtInformation()
+    {
+        using var factory = new HttpLoggingFactory("Production");
+        using var client = factory.CreateClient();
+
+        var configuration = factory.Services.GetRequiredService<IConfiguration>();
+
+        Assert.Equal("Information", configuration["Logging:LogLevel:SemanticStub.Api.Infrastructure.Yaml"]);
+    }
+
+    [Fact]
     public async Task GetPlainText_WritesTextResponseBodyToHttpLogs()
     {
         using var workspace = HttpLoggingWorkspace.Create(
