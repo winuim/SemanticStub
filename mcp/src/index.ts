@@ -118,6 +118,29 @@ server.registerTool(
 );
 
 server.registerTool(
+  "reset_metrics",
+  {
+    description:
+      "Reset process-local aggregate metrics and recent request history. Does not reset scenario state, reload active stub definitions, or clear the latest real-request explanation.",
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async () => {
+    await postNoContent("/metrics/reset");
+
+    return toText({
+      operation: "reset_metrics",
+      status: "ok",
+      scope: "metrics_and_recent_requests",
+    });
+  }
+);
+
+server.registerTool(
   "get_requests",
   {
     description:
