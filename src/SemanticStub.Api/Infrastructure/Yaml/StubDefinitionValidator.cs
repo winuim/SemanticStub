@@ -119,6 +119,7 @@ internal sealed class StubDefinitionValidator
         for (var index = 0; index < operation.Matches.Count; index++)
         {
             var match = operation.Matches[index];
+            var semanticMatchErrorCount = errors.Count;
 
             ValidateSemanticMatchDefinition(
                 path,
@@ -127,47 +128,50 @@ internal sealed class StubDefinitionValidator
                 match,
                 errors);
 
-            foreach (var queryKey in match.Query.Keys)
+            if (errors.Count == semanticMatchErrorCount)
             {
-                if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
+                foreach (var queryKey in match.Query.Keys)
                 {
-                    errors.Add(
-                        $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].query['{queryKey}'] must reference a declared query parameter.");
-                }
-            }
-
-            foreach (var queryKey in match.PartialQuery.Keys)
-            {
-                if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
-                {
-                    errors.Add(
-                        $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-partial['{queryKey}'] must reference a declared query parameter.");
-                }
-            }
-
-            foreach (var queryKey in match.RegexQuery.Keys)
-            {
-                if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
-                {
-                    errors.Add(
-                        $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex['{queryKey}'] must reference a declared query parameter.");
+                    if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
+                    {
+                        errors.Add(
+                            $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].query['{queryKey}'] must reference a declared query parameter.");
+                    }
                 }
 
-                ValidateRegexQueryDefinition(
-                    path,
-                    method,
-                    index,
-                    queryKey,
-                    match.RegexQuery[queryKey],
-                    errors);
-            }
-
-            foreach (var headerKey in match.Headers.Keys)
-            {
-                if (headerParameters.Count > 0 && !headerParameters.Contains(headerKey))
+                foreach (var queryKey in match.PartialQuery.Keys)
                 {
-                    errors.Add(
-                        $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].headers['{headerKey}'] must reference a declared header parameter.");
+                    if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
+                    {
+                        errors.Add(
+                            $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-partial['{queryKey}'] must reference a declared query parameter.");
+                    }
+                }
+
+                foreach (var queryKey in match.RegexQuery.Keys)
+                {
+                    if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
+                    {
+                        errors.Add(
+                            $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex['{queryKey}'] must reference a declared query parameter.");
+                    }
+
+                    ValidateRegexQueryDefinition(
+                        path,
+                        method,
+                        index,
+                        queryKey,
+                        match.RegexQuery[queryKey],
+                        errors);
+                }
+
+                foreach (var headerKey in match.Headers.Keys)
+                {
+                    if (headerParameters.Count > 0 && !headerParameters.Contains(headerKey))
+                    {
+                        errors.Add(
+                            $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].headers['{headerKey}'] must reference a declared header parameter.");
+                    }
                 }
             }
 
@@ -222,16 +226,39 @@ internal sealed class StubDefinitionValidator
         if (string.IsNullOrWhiteSpace(match.SemanticMatch))
         {
             errors.Add($"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-semantic-match must not be empty.");
+            return;
         }
 
-        if (match.Query.Count > 0 ||
-            match.PartialQuery.Count > 0 ||
-            match.RegexQuery.Count > 0 ||
-            match.Headers.Count > 0 ||
-            match.Body is not null)
+        var conflicts = new List<string>();
+        if (match.Query.Count > 0)
+        {
+            conflicts.Add("query");
+        }
+
+        if (match.PartialQuery.Count > 0)
+        {
+            conflicts.Add("x-query-partial");
+        }
+
+        if (match.RegexQuery.Count > 0)
+        {
+            conflicts.Add("x-query-regex");
+        }
+
+        if (match.Headers.Count > 0)
+        {
+            conflicts.Add("headers");
+        }
+
+        if (match.Body is not null)
+        {
+            conflicts.Add("body");
+        }
+
+        if (conflicts.Count > 0)
         {
             errors.Add(
-                $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-semantic-match cannot be combined with query, x-query-partial, x-query-regex, headers, or body.");
+                $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-semantic-match cannot be combined with {string.Join(", ", conflicts)}.");
         }
     }
 
