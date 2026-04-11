@@ -48,9 +48,18 @@
 - Do not remove tests without reason
 
 ## Approval Required
+
 Ask before:
 - breaking YAML compatibility
 - changing routing behavior
 - changing API contracts
 - adding new abstractions without clear need
 - introducing external services
+
+## Language Rules
+- All commit messages must be written in English
+- All pull request titles and descriptions must be written in English
+- All GitHub issue titles and descriptions must be written in English
+- Follow Conventional Commits in English (e.g. feat:, fix:, refactor:)
+- Inline code comments may be written in Japanese if it improves clarity
+- Do not mix Japanese and English in the same commit message or PR description
