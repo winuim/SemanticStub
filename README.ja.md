@@ -231,6 +231,7 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
 - `GET /_semanticstub/runtime/routes/{routeId}` は、1 件の active route の effective runtime detail を返します。
 - `GET /_semanticstub/runtime/scenarios` は、現在の scenario state snapshot を返します。
 - `GET /_semanticstub/runtime/metrics` は、現在のプロセスで処理した実リクエストの集計 metrics を返します。
+- `POST /_semanticstub/runtime/metrics/reset` は、現在のプロセスの集計 metrics と recent request history を reset します。
 - `GET /_semanticstub/runtime/requests?limit=20` は、現在のプロセスで処理した実リクエストの recent request history を返します。
 - `POST /_semanticstub/runtime/test-match` は、実レスポンスを実行せず scenario state も変更せずに virtual request を評価します。
 - `POST /_semanticstub/runtime/explain` は、virtual request の structured match detail を返します。該当する場合は deterministic / semantic evaluation も含みます。
@@ -246,6 +247,7 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
 - `/_semanticstub/runtime/routes/{routeId}` は、1 件の route について top-level response と正規化済み conditional match metadata を含む detail view を返します。
 - `/_semanticstub/runtime/scenarios` は、既知の scenario ごとに現在の state と active かどうかを返します。
 - `/_semanticstub/runtime/metrics` は process-local で、total request count、matched / unmatched count、fallback / semantic count、average latency、status code summary、top routes を返します。
+- `/_semanticstub/runtime/metrics/reset` は process-local な aggregate metrics と recent request history を消去します。configuration reload、scenario state の変更、`/_semanticstub/runtime/explain/last` の消去は行いません。
 - `/_semanticstub/runtime/requests` は process-local で、最大 100 件の recent request history を新しい順で返します。各 item には timestamp、method、path、利用可能な場合の route id、status code、elapsed time、match mode、および unmatched request の failure reason が含まれます。`limit` query parameter のデフォルトは `20` です。
 - `/_semanticstub/runtime/test-match` と `/_semanticstub/runtime/explain` は、method、path、省略可能な query / header / body、および省略可能な candidate detail flag を持つ virtual request payload を受け取ります。
 - `/_semanticstub/runtime/explain/last` は process-local で、実リクエストが stub response に match した後だけ更新されます。

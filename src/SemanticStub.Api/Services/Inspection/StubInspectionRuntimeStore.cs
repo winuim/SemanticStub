@@ -109,6 +109,22 @@ internal sealed class StubInspectionRuntimeStore
         }
     }
 
+    public void ResetMetrics()
+    {
+        lock (metricsSyncRoot)
+        {
+            statusCodeCounts.Clear();
+            routeRequestCounts.Clear();
+            recentRequests.Clear();
+            totalRequestCount = 0;
+            matchedRequestCount = 0;
+            unmatchedRequestCount = 0;
+            fallbackResponseCount = 0;
+            semanticMatchCount = 0;
+            totalLatencyMilliseconds = 0;
+        }
+    }
+
     public IReadOnlyList<RecentRequestInfo> GetRecentRequests(int limit)
     {
         lock (metricsSyncRoot)
