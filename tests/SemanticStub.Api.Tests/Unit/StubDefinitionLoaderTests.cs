@@ -233,6 +233,43 @@ public sealed class StubDefinitionLoaderTests
         Assert.Contains("x-match[0].x-semantic-match must not be empty", exception.Message);
     }
 
+    [Theory]
+    [InlineData("query", "query:\n                        role: admin")]
+    [InlineData("x-query-partial", "x-query-partial:\n                        role: admin")]
+    [InlineData("x-query-regex", "x-query-regex:\n                        role: ^admin-[0-9]+$")]
+    [InlineData("headers", "headers:\n                        X-Env: staging")]
+    [InlineData("body", "body:\n                        role: admin")]
+    public void LoadDefaultDefinition_ThrowsWhenSemanticMatchIsCombinedWithDeterministicCondition(
+        string deterministicField,
+        string deterministicCondition)
+    {
+        using var workspace = TestWorkspace.Create(
+            $$"""
+            openapi: 3.1.0
+            paths:
+              /search:
+                post:
+                  x-match:
+                    - x-semantic-match: find admin users
+                      {{deterministicCondition}}
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              message: admin
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains(
+            "x-match[0].x-semantic-match cannot be combined with query, x-query-partial, x-query-regex, headers, or body",
+            exception.Message);
+        Assert.Contains(deterministicField, exception.Message);
+    }
+
     [Fact]
     public void LoadDefaultDefinition_ThrowsForInvalidMatchedResponse()
     {

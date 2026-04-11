@@ -124,7 +124,7 @@ internal sealed class StubDefinitionValidator
                 path,
                 method,
                 index,
-                match.SemanticMatch,
+                match,
                 errors);
 
             foreach (var queryKey in match.Query.Keys)
@@ -211,17 +211,27 @@ internal sealed class StubDefinitionValidator
         string path,
         string method,
         int index,
-        string? semanticMatch,
+        QueryMatchDefinition match,
         ICollection<string> errors)
     {
-        if (semanticMatch is null)
+        if (match.SemanticMatch is null)
         {
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(semanticMatch))
+        if (string.IsNullOrWhiteSpace(match.SemanticMatch))
         {
             errors.Add($"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-semantic-match must not be empty.");
+        }
+
+        if (match.Query.Count > 0 ||
+            match.PartialQuery.Count > 0 ||
+            match.RegexQuery.Count > 0 ||
+            match.Headers.Count > 0 ||
+            match.Body is not null)
+        {
+            errors.Add(
+                $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-semantic-match cannot be combined with query, x-query-partial, x-query-regex, headers, or body.");
         }
     }
 
