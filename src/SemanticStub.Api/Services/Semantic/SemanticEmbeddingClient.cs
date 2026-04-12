@@ -37,11 +37,11 @@ internal sealed class SemanticEmbeddingClient
     {
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
         var endpoint = NormalizeEndpoint(settings.Endpoint!);
-        var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs)).ConfigureAwait(false);
+        var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs));
         response.EnsureSuccessStatusCode();
 
-        using var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-        using var document = await JsonDocument.ParseAsync(responseStream).ConfigureAwait(false);
+        using var responseStream = await response.Content.ReadAsStreamAsync();
+        using var document = await JsonDocument.ParseAsync(responseStream);
 
         if (TryReadEmbeddings(document.RootElement, inputs.Count, out var embeddings))
         {

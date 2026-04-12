@@ -81,7 +81,7 @@ internal sealed class StubInspectionService : IStubInspectionService
     /// <inheritdoc/>
     public async Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request)
     {
-        var explanation = await stubService.ExplainMatchAsync(request).ConfigureAwait(false);
+        var explanation = await stubService.ExplainMatchAsync(request);
         return explanation.Result;
     }
 
