@@ -148,7 +148,7 @@ public interface IStubService
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
-        var dispatch = await DispatchAsync(method, path, query, headers, body).ConfigureAwait(false);
+        var dispatch = await DispatchAsync(method, path, query, headers, body);
         return (dispatch.Result, dispatch.Response);
     }
 

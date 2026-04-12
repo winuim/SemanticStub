@@ -100,7 +100,7 @@ internal sealed class StubDispatchSelector
                 body,
                 operation.Matches,
                 candidate => scenarioService.IsMatch(candidate.Response.Scenario),
-                includeCandidateScores: includeSemanticCandidates).ConfigureAwait(false);
+                includeCandidateScores: includeSemanticCandidates);
 
         if (semanticExplanation.SelectedCandidate is not null)
         {

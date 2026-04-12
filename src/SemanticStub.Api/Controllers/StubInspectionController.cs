@@ -63,14 +63,14 @@ public sealed class StubInspectionController : ControllerBase
     [HttpPost("test-match")]
     public async Task<IActionResult> TestMatch([FromBody] MatchRequestInfo request)
     {
-        return Ok(await inspectionService.TestMatchAsync(request).ConfigureAwait(false));
+        return Ok(await inspectionService.TestMatchAsync(request));
     }
 
     /// <summary>Explains how the runtime evaluated a virtual request without executing a response.</summary>
     [HttpPost("explain")]
     public async Task<IActionResult> ExplainMatch([FromBody] MatchRequestInfo request)
     {
-        return Ok(await inspectionService.ExplainMatchAsync(request).ConfigureAwait(false));
+        return Ok(await inspectionService.ExplainMatchAsync(request));
     }
 
     /// <summary>Returns the explanation captured for the most recent real request.</summary>
