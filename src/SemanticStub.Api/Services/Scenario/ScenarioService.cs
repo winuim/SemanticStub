@@ -143,10 +143,10 @@ public sealed class ScenarioService
     /// <param name="action">The scenario-aware async operation to run atomically.</param>
     public async Task<T> ExecuteLockedAsync<T>(Func<Task<T>> action)
     {
-        await semaphore.WaitAsync().ConfigureAwait(false);
+        await semaphore.WaitAsync();
         try
         {
-            return await action().ConfigureAwait(false);
+            return await action();
         }
         finally
         {

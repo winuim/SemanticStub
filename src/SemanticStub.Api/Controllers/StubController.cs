@@ -71,12 +71,12 @@ public sealed class StubController : ControllerBase
     {
         var stopwatch = Stopwatch.StartNew();
         var requestPath = NormalizeRequestPath(path);
-        var dispatch = await DispatchRequestAsync(method, requestPath).ConfigureAwait(false);
+        var dispatch = await DispatchRequestAsync(method, requestPath);
         int? statusCode = null;
 
         try
         {
-            return await CreateActionResultAsync(dispatch, requestPath, code => statusCode = code).ConfigureAwait(false);
+            return await CreateActionResultAsync(dispatch, requestPath, code => statusCode = code);
         }
         finally
         {
@@ -99,8 +99,8 @@ public sealed class StubController : ControllerBase
         var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
         var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
         Request.EnableBuffering();
-        var requestBody = await ReadRequestBodyAsync().ConfigureAwait(false);
-        return await stubService.DispatchAsync(method, requestPath, query, headers, requestBody).ConfigureAwait(false);
+        var requestBody = await ReadRequestBodyAsync();
+        return await stubService.DispatchAsync(method, requestPath, query, headers, requestBody);
     }
 
     private async Task<IActionResult> CreateActionResultAsync(StubDispatchResult dispatch, string requestPath, Action<int> setStatusCode)
@@ -134,7 +134,7 @@ public sealed class StubController : ControllerBase
 
         if (response.DelayMilliseconds is > 0)
         {
-            await Task.Delay(response.DelayMilliseconds.Value, HttpContext.RequestAborted).ConfigureAwait(false);
+            await Task.Delay(response.DelayMilliseconds.Value, HttpContext.RequestAborted);
         }
 
         CopyResponseHeaders(response);

@@ -207,7 +207,7 @@ public sealed class StubService : IStubService
             body,
             mutateScenarioState: true,
             includeCandidates: true,
-            includeSemanticCandidates: false).ConfigureAwait(false);
+            includeSemanticCandidates: false);
     }
 
     /// <inheritdoc/>
@@ -221,7 +221,7 @@ public sealed class StubService : IStubService
             NormalizeBody(request.Body),
             mutateScenarioState: false,
             includeCandidates: request.IncludeCandidates,
-            includeSemanticCandidates: request.IncludeSemanticCandidates).ConfigureAwait(false);
+            includeSemanticCandidates: request.IncludeSemanticCandidates);
 
         return dispatch.Explanation;
     }
@@ -252,10 +252,10 @@ public sealed class StubService : IStubService
         if (OperationUsesScenario(operation))
         {
             return await scenarioService.ExecuteLockedAsync(
-                () => DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates)).ConfigureAwait(false);
+                () => DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates));
         }
 
-        return await DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates).ConfigureAwait(false);
+        return await DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates);
     }
 
     /// <inheritdoc/>
@@ -266,7 +266,7 @@ public sealed class StubService : IStubService
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
-        var dispatch = await DispatchAsync(method, path, query, headers, body).ConfigureAwait(false);
+        var dispatch = await DispatchAsync(method, path, query, headers, body);
         return (dispatch.Result, dispatch.Response);
     }
 
@@ -304,7 +304,7 @@ public sealed class StubService : IStubService
             headers,
             body,
             mutateScenarioState,
-            includeSemanticCandidates).ConfigureAwait(false);
+            includeSemanticCandidates);
 
         SemanticMatchInfo? semanticEvaluationInfo = null;
         if (selection.SemanticExplanation.Attempted)

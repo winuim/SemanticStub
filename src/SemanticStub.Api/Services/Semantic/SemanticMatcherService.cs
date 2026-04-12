@@ -45,7 +45,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             body,
             candidates,
             candidateFilter,
-            includeCandidateScores: false).ConfigureAwait(false);
+            includeCandidateScores: false);
 
         return explanation.SelectedCandidate;
     }
@@ -104,7 +104,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 query,
                 headers,
                 body,
-                semanticCandidates).ConfigureAwait(false);
+                semanticCandidates);
 
             return ScoreAndLogExplanation(
                 path,
@@ -188,7 +188,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         };
 
         allTexts.AddRange(semanticCandidates.Select(candidate => candidate.SemanticMatch!));
-        return await embeddingClient.GetEmbeddingsAsync(allTexts).ConfigureAwait(false);
+        return await embeddingClient.GetEmbeddingsAsync(allTexts);
     }
 
     private SemanticMatchExplanation ScoreAndLogExplanation(
