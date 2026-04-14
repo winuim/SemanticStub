@@ -131,6 +131,7 @@ internal sealed class StubDefinitionValidator
             if (errors.Count == semanticMatchErrorCount)
             {
                 ValidateLegacyQueryMatchFields(path, method, index, match, errors);
+                ValidateBodyMatchDefinition(path, method, index, match.Body, errors);
 
                 foreach (var queryKey in match.Query.Keys)
                 {
@@ -410,6 +411,58 @@ internal sealed class StubDefinitionValidator
         if (match.RegexQuery.Count > 0)
         {
             errors.Add($"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex is no longer supported; use query.<name>.regex instead.");
+        }
+    }
+
+    private static void ValidateBodyMatchDefinition(
+        string path,
+        string method,
+        int index,
+        object? body,
+        ICollection<string> errors)
+    {
+        if (!TryGetBodyMap(body, out var bodyMap) ||
+            !bodyMap.ContainsKey("form"))
+        {
+            return;
+        }
+
+        var conflicts = new List<string>();
+        if (bodyMap.ContainsKey("json"))
+        {
+            conflicts.Add("body.json");
+        }
+
+        if (bodyMap.ContainsKey("text"))
+        {
+            conflicts.Add("body.text");
+        }
+
+        if (conflicts.Count > 0)
+        {
+            errors.Add(
+                $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].body.form cannot be combined with {string.Join(", ", conflicts)}.");
+        }
+    }
+
+    private static bool TryGetBodyMap(object? value, out Dictionary<string, object?> map)
+    {
+        switch (value)
+        {
+            case IDictionary<string, object?> typed:
+                map = new Dictionary<string, object?>(typed, StringComparer.Ordinal);
+                return true;
+            case IDictionary dictionary:
+                map = new Dictionary<string, object?>(StringComparer.Ordinal);
+                foreach (DictionaryEntry entry in dictionary)
+                {
+                    map[entry.Key.ToString() ?? string.Empty] = entry.Value;
+                }
+
+                return true;
+            default:
+                map = [];
+                return false;
         }
     }
 

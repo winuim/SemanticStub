@@ -10,6 +10,7 @@ namespace SemanticStub.Api.Services;
 public sealed class MatcherService
 {
     private static readonly QueryMatchSpecificityComparer MatchSpecificityComparer = QueryMatchSpecificityComparer.Instance;
+    private readonly FormBodyMatcher formBodyMatcher;
     private readonly JsonBodyMatcher jsonBodyMatcher;
     private readonly QueryValueMatcher queryValueMatcher;
     private readonly RegexQueryMatcher regexQueryMatcher;
@@ -18,8 +19,18 @@ public sealed class MatcherService
         JsonBodyMatcher jsonBodyMatcher,
         QueryValueMatcher queryValueMatcher,
         RegexQueryMatcher regexQueryMatcher)
+        : this(jsonBodyMatcher, new FormBodyMatcher(), queryValueMatcher, regexQueryMatcher)
+    {
+    }
+
+    internal MatcherService(
+        JsonBodyMatcher jsonBodyMatcher,
+        FormBodyMatcher formBodyMatcher,
+        QueryValueMatcher queryValueMatcher,
+        RegexQueryMatcher regexQueryMatcher)
     {
         this.jsonBodyMatcher = jsonBodyMatcher;
+        this.formBodyMatcher = formBodyMatcher;
         this.queryValueMatcher = queryValueMatcher;
         this.regexQueryMatcher = regexQueryMatcher;
     }
@@ -88,7 +99,7 @@ public sealed class MatcherService
                 Candidate = candidate,
                 QueryMatched = IsQueryMatch(candidate, matchContext),
                 HeaderMatched = IsHeaderMatch(candidate.Headers, matchContext.Headers),
-                BodyMatched = jsonBodyMatcher.IsMatch(candidate.Body, matchContext.RequestBody),
+                BodyMatched = IsBodyMatch(candidate.Body, matchContext),
             });
         }
 
@@ -120,7 +131,14 @@ public sealed class MatcherService
     {
         return IsQueryMatch(candidate, matchContext) &&
                IsHeaderMatch(candidate.Headers, matchContext.Headers) &&
-               jsonBodyMatcher.IsMatch(candidate.Body, matchContext.RequestBody);
+               IsBodyMatch(candidate.Body, matchContext);
+    }
+
+    private bool IsBodyMatch(object? expectedBody, MatchEvaluationContext matchContext)
+    {
+        return matchContext.RequestForm is not null && formBodyMatcher.HasFormCondition(expectedBody)
+            ? formBodyMatcher.IsMatch(expectedBody, matchContext.RequestForm)
+            : jsonBodyMatcher.IsMatch(expectedBody, matchContext.RequestBody);
     }
 
     private bool IsQueryMatch(
@@ -140,7 +158,21 @@ public sealed class MatcherService
     {
         var queryParameterTypes = QueryParameterTypeMapBuilder.Build(pathParameters, operation.Parameters);
         var bodyDocument = jsonBodyMatcher.ParseRequestBody(body);
-        return new MatchEvaluationContext(query, headers, queryParameterTypes, bodyDocument);
+        var requestForm = formBodyMatcher.ParseRequestBody(body, GetContentType(headers));
+        return new MatchEvaluationContext(query, headers, queryParameterTypes, bodyDocument, requestForm);
+    }
+
+    private static string? GetContentType(IReadOnlyDictionary<string, string> headers)
+    {
+        foreach (var header in headers)
+        {
+            if (string.Equals(header.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+            {
+                return header.Value;
+            }
+        }
+
+        return null;
     }
 
     private bool IsHeaderMatch(IReadOnlyDictionary<string, object?> expected, IReadOnlyDictionary<string, string> actual)
@@ -160,13 +192,15 @@ public sealed class MatcherService
             IReadOnlyDictionary<string, StringValues> query,
             IReadOnlyDictionary<string, string> headers,
             IReadOnlyDictionary<string, string> queryParameterTypes,
-            JsonDocument? bodyDocument)
+            JsonDocument? bodyDocument,
+            IReadOnlyDictionary<string, StringValues>? requestForm)
         {
             Query = query;
             Headers = headers;
             QueryParameterTypes = queryParameterTypes;
             this.bodyDocument = bodyDocument;
             RequestBody = bodyDocument?.RootElement;
+            RequestForm = requestForm;
         }
 
         public IReadOnlyDictionary<string, StringValues> Query { get; }
@@ -176,6 +210,8 @@ public sealed class MatcherService
         public IReadOnlyDictionary<string, string> QueryParameterTypes { get; }
 
         public JsonElement? RequestBody { get; }
+
+        public IReadOnlyDictionary<string, StringValues>? RequestForm { get; }
 
         private readonly JsonDocument? bodyDocument;
 

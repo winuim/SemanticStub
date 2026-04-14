@@ -126,6 +126,141 @@ public sealed class MatcherServiceTests
     }
 
     [Fact]
+    public void FindBestMatch_MatchesFormUrlEncodedBodyCondition()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Body = new Dictionary<object, object>
+                    {
+                        ["form"] = new Dictionary<object, object>
+                        {
+                            ["userId"] = "test001",
+                            ["password"] = "secret"
+                        }
+                    }
+                }
+            ]
+        };
+
+        var matcher = CreateMatcherService();
+
+        var match = FindBestMatch(
+            matcher,
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = "application/x-www-form-urlencoded"
+            },
+            "userId=test001&password=secret&extra=allowed");
+
+        Assert.NotNull(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_ReturnsNullWhenFormContentTypeIsMissing()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Body = new Dictionary<object, object>
+                    {
+                        ["form"] = new Dictionary<object, object>
+                        {
+                            ["userId"] = "test001"
+                        }
+                    }
+                }
+            ]
+        };
+
+        var matcher = CreateMatcherService();
+
+        var match = FindBestMatch(
+            matcher,
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "userId=test001");
+
+        Assert.Null(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_ReturnsNullWhenFormValueDiffers()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Body = new Dictionary<object, object>
+                    {
+                        ["form"] = new Dictionary<object, object>
+                        {
+                            ["userId"] = "test001"
+                        }
+                    }
+                }
+            ]
+        };
+
+        var matcher = CreateMatcherService();
+
+        var match = FindBestMatch(
+            matcher,
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = "application/x-www-form-urlencoded"
+            },
+            "userId=other");
+
+        Assert.Null(match);
+    }
+
+    [Fact]
+    public void FindBestMatch_KeepsBodyFormAsJsonWhenContentTypeIsJson()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Body = new Dictionary<object, object>
+                    {
+                        ["form"] = "legacy-json-property"
+                    }
+                }
+            ]
+        };
+
+        var matcher = CreateMatcherService();
+
+        var match = FindBestMatch(
+            matcher,
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = "application/json"
+            },
+            "{\"form\":\"legacy-json-property\"}");
+
+        Assert.NotNull(match);
+    }
+
+    [Fact]
     public void FindBestMatch_ReturnsNullWhenBodyDefinitionContainsUnsupportedValue()
     {
         var operation = new OperationDefinition

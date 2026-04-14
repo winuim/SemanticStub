@@ -41,11 +41,13 @@ public static class StubServiceCollectionExtensions
         services.AddHostedService<StubDefinitionWatcher>();
         services.AddSingleton(serviceProvider => new JsonBodyMatcher(
             serviceProvider.GetRequiredService<ILogger<JsonBodyMatcher>>()));
+        services.AddSingleton<FormBodyMatcher>();
         services.AddSingleton<QueryValueMatcher>();
         services.AddSingleton(serviceProvider => new RegexQueryMatcher(
             serviceProvider.GetRequiredService<ILogger<RegexQueryMatcher>>()));
         services.AddSingleton<MatcherService>(serviceProvider => new MatcherService(
             serviceProvider.GetRequiredService<JsonBodyMatcher>(),
+            serviceProvider.GetRequiredService<FormBodyMatcher>(),
             serviceProvider.GetRequiredService<QueryValueMatcher>(),
             serviceProvider.GetRequiredService<RegexQueryMatcher>()));
         services.AddSingleton<ScenarioService>();
