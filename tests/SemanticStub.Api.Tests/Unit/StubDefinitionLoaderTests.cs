@@ -631,6 +631,92 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenFormBodyOperatorValueIsAnEmptyMap()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /login:
+                post:
+                  x-match:
+                    - body:
+                        form:
+                          username: {}
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              message: ok
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].body.form['username'] must define at least one supported operator", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenFormBodyMatchOperatorIsUnsupported()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /login:
+                post:
+                  x-match:
+                    - body:
+                        form:
+                          username:
+                            contains: demo
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              message: ok
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].body.form['username'] uses unsupported operator 'contains'", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenFormBodyRegexOperatorPatternIsInvalid()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /login:
+                post:
+                  x-match:
+                    - body:
+                        form:
+                          username:
+                            regex: "["
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              message: ok
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].body.form['username'].regex must be a valid regex pattern", exception.Message);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_LoadsScenarioDefinitionFromResponseExtension()
     {
         using var workspace = TestWorkspace.Create(

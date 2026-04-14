@@ -13,6 +13,7 @@ namespace SemanticStub.Api.Controllers;
 [Route("{*path}")]
 public sealed class StubController : ControllerBase
 {
+    private const string FormUrlEncodedMediaType = "application/x-www-form-urlencoded";
     private readonly IStubService stubService;
     private readonly IStubInspectionService inspectionService;
 
@@ -192,7 +193,18 @@ public sealed class StubController : ControllerBase
     {
         try
         {
+            if (IsFormUrlEncoded(Request.ContentType))
+            {
+                var form = await Request.ReadFormAsync();
+                return SerializeFormBody(form);
+            }
+
             using var reader = new StreamReader(Request.Body, leaveOpen: true);
+            if (Request.Body.CanSeek)
+            {
+                Request.Body.Position = 0;
+            }
+
             var body = await reader.ReadToEndAsync();
 
             if (Request.Body.CanSeek)
@@ -210,5 +222,35 @@ public sealed class StubController : ControllerBase
         {
             return null;
         }
+    }
+
+    private static bool IsFormUrlEncoded(string? contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+        {
+            return false;
+        }
+
+        var mediaType = contentType.Split(';', count: 2)[0].Trim();
+        return string.Equals(mediaType, FormUrlEncodedMediaType, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string? SerializeFormBody(IFormCollection form)
+    {
+        if (form.Count == 0)
+        {
+            return null;
+        }
+
+        var pairs = new List<string>();
+        foreach (var field in form)
+        {
+            foreach (var value in field.Value)
+            {
+                pairs.Add($"{Uri.EscapeDataString(field.Key)}={Uri.EscapeDataString(value ?? string.Empty)}");
+            }
+        }
+
+        return string.Join("&", pairs);
     }
 }

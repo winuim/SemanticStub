@@ -286,6 +286,57 @@ paths:
               example:
                 result: invalid
 
+  /oauth/token:
+    post:
+      operationId: issueToken
+      x-match:
+        - body:
+            form:
+              grant_type:
+                equals: authorization_code
+              code:
+                regex: "^[A-Za-z0-9_-]+$"
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  access_token: token-123
+                  token_type: bearer
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                grant_type:
+                  type: string
+                code:
+                  type: string
+              required:
+                - grant_type
+                - code
+            example:
+              grant_type: authorization_code
+              code: abc_123
+      responses:
+        '400':
+          description: Invalid token request
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  error:
+                    type: string
+                required:
+                  - error
+              example:
+                error: invalid_grant
+
   /profile:
     put:
       operationId: replaceProfile

@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Globalization;
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Models;
 
@@ -8,6 +10,13 @@ namespace SemanticStub.Api.Services;
 internal sealed class FormBodyMatcher
 {
     private const string FormUrlEncodedMediaType = "application/x-www-form-urlencoded";
+    private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(100);
+    private readonly ILogger<FormBodyMatcher>? logger;
+
+    internal FormBodyMatcher(ILogger<FormBodyMatcher>? logger = null)
+    {
+        this.logger = logger;
+    }
 
     internal IReadOnlyDictionary<string, StringValues>? ParseRequestBody(string? body, string? contentType)
     {
@@ -64,15 +73,25 @@ internal sealed class FormBodyMatcher
 
         foreach (var expectedValue in expectedForm)
         {
-            if (!MatchOperatorDefinition.TryGetEquals(expectedValue.Value, out var equals) ||
-                !actualForm.TryGetValue(expectedValue.Key, out var actualValue) ||
-                !IsExactStringMatch(equals, actualValue))
+            if (!actualForm.TryGetValue(expectedValue.Key, out var actualValue) ||
+                !IsFormFieldMatch(expectedValue.Value, actualValue))
             {
                 return false;
             }
         }
 
         return true;
+    }
+
+    private bool IsFormFieldMatch(object? expected, StringValues actual)
+    {
+        if (MatchOperatorDefinition.TryGetEquals(expected, out var equals))
+        {
+            return IsExactStringMatch(equals, actual);
+        }
+
+        return MatchOperatorDefinition.TryGetRegex(expected, out var regex) &&
+               IsRegexStringMatch(regex, actual);
     }
 
     internal bool HasFormCondition(object? expectedBody)
@@ -108,6 +127,58 @@ internal sealed class FormBodyMatcher
         return actual.Count == 1 &&
                actual[0] is not null &&
                string.Equals(ConvertFormValueToString(expected), actual[0], StringComparison.Ordinal);
+    }
+
+    private bool IsRegexStringMatch(object? expected, StringValues actual)
+    {
+        if (expected is IEnumerable expectedSequence and not string)
+        {
+            var expectedValues = expectedSequence.Cast<object?>().ToArray();
+            var actualValues = actual.ToArray();
+
+            if (expectedValues.Length != actualValues.Length)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < expectedValues.Length; index++)
+            {
+                if (actualValues[index] is null ||
+                    !IsSingleRegexStringMatch(expectedValues[index], actualValues[index]!))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return actual.Count == 1 &&
+               actual[0] is not null &&
+               IsSingleRegexStringMatch(expected, actual[0]!);
+    }
+
+    private bool IsSingleRegexStringMatch(object? expected, string actual)
+    {
+        if (expected is not string pattern)
+        {
+            return false;
+        }
+
+        try
+        {
+            return Regex.IsMatch(actual, pattern, RegexOptions.CultureInvariant, RegexMatchTimeout);
+        }
+        catch (ArgumentException ex)
+        {
+            logger?.LogWarning(ex, "Invalid regex match pattern '{Pattern}' in stub definition — treating as non-match.", pattern);
+            return false;
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            logger?.LogWarning("Regex match pattern '{Pattern}' timed out after {TimeoutMs}ms — treating as non-match.", pattern, RegexMatchTimeout.TotalMilliseconds);
+            return false;
+        }
     }
 
     private static string ConvertFormValueToString(object? value)
