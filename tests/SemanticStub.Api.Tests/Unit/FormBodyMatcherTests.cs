@@ -60,6 +60,81 @@ public sealed class FormBodyMatcherTests
     }
 
     [Fact]
+    public void IsMatch_MatchesEqualsOperatorFormValue()
+    {
+        var matcher = new FormBodyMatcher();
+        var form = new Dictionary<string, StringValues>(StringComparer.Ordinal)
+        {
+            ["userId"] = "test001"
+        };
+
+        var matched = matcher.IsMatch(
+            new Dictionary<object, object>
+            {
+                ["form"] = new Dictionary<object, object>
+                {
+                    ["userId"] = new Dictionary<object, object>
+                    {
+                        ["equals"] = "test001"
+                    }
+                }
+            },
+            form);
+
+        Assert.True(matched);
+    }
+
+    [Fact]
+    public void IsMatch_MatchesRegexOperatorFormValue()
+    {
+        var matcher = new FormBodyMatcher();
+        var form = new Dictionary<string, StringValues>(StringComparer.Ordinal)
+        {
+            ["code"] = "abc_123"
+        };
+
+        var matched = matcher.IsMatch(
+            new Dictionary<object, object>
+            {
+                ["form"] = new Dictionary<object, object>
+                {
+                    ["code"] = new Dictionary<object, object>
+                    {
+                        ["regex"] = "^[A-Za-z0-9_]+$"
+                    }
+                }
+            },
+            form);
+
+        Assert.True(matched);
+    }
+
+    [Fact]
+    public void IsMatch_ReturnsFalseWhenRegexOperatorFormValueDiffers()
+    {
+        var matcher = new FormBodyMatcher();
+        var form = new Dictionary<string, StringValues>(StringComparer.Ordinal)
+        {
+            ["userId"] = "abc123"
+        };
+
+        var matched = matcher.IsMatch(
+            new Dictionary<object, object>
+            {
+                ["form"] = new Dictionary<object, object>
+                {
+                    ["userId"] = new Dictionary<object, object>
+                    {
+                        ["regex"] = "^[0-9]{6}$"
+                    }
+                }
+            },
+            form);
+
+        Assert.False(matched);
+    }
+
+    [Fact]
     public void IsMatch_RequiresRepeatedValuesToMatchInOrder()
     {
         var matcher = new FormBodyMatcher();
