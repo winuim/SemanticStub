@@ -17,14 +17,6 @@ public sealed class MatcherService
 
     internal MatcherService(
         JsonBodyMatcher jsonBodyMatcher,
-        QueryValueMatcher queryValueMatcher,
-        RegexQueryMatcher regexQueryMatcher)
-        : this(jsonBodyMatcher, new FormBodyMatcher(), queryValueMatcher, regexQueryMatcher)
-    {
-    }
-
-    internal MatcherService(
-        JsonBodyMatcher jsonBodyMatcher,
         FormBodyMatcher formBodyMatcher,
         QueryValueMatcher queryValueMatcher,
         RegexQueryMatcher regexQueryMatcher)

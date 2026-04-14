@@ -443,6 +443,21 @@ internal sealed class StubDefinitionValidator
             errors.Add(
                 $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].body.form cannot be combined with {string.Join(", ", conflicts)}.");
         }
+
+        if (TryGetBodyMap(bodyMap["form"], out var formMap))
+        {
+            foreach (var formKey in formMap.Keys)
+            {
+                ValidateMatchOperatorDefinition(
+                    path,
+                    method,
+                    index,
+                    "body.form",
+                    formKey,
+                    formMap[formKey],
+                    errors);
+            }
+        }
     }
 
     private static bool TryGetBodyMap(object? value, out Dictionary<string, object?> map)

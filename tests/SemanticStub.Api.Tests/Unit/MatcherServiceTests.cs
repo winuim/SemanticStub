@@ -10,7 +10,7 @@ public sealed class MatcherServiceTests
 {
     private static MatcherService CreateMatcherService()
     {
-        return new MatcherService(new JsonBodyMatcher(), new QueryValueMatcher(), new RegexQueryMatcher());
+        return new MatcherService(new JsonBodyMatcher(), new FormBodyMatcher(), new QueryValueMatcher(), new RegexQueryMatcher());
     }
 
     [Fact]
