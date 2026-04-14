@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Models;
 
@@ -10,6 +11,12 @@ internal sealed class FormBodyMatcher
 {
     private const string FormUrlEncodedMediaType = "application/x-www-form-urlencoded";
     private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(100);
+    private readonly ILogger<FormBodyMatcher>? logger;
+
+    internal FormBodyMatcher(ILogger<FormBodyMatcher>? logger = null)
+    {
+        this.logger = logger;
+    }
 
     internal IReadOnlyDictionary<string, StringValues>? ParseRequestBody(string? body, string? contentType)
     {
@@ -76,7 +83,7 @@ internal sealed class FormBodyMatcher
         return true;
     }
 
-    private static bool IsFormFieldMatch(object? expected, StringValues actual)
+    private bool IsFormFieldMatch(object? expected, StringValues actual)
     {
         if (MatchOperatorDefinition.TryGetEquals(expected, out var equals))
         {
@@ -122,7 +129,7 @@ internal sealed class FormBodyMatcher
                string.Equals(ConvertFormValueToString(expected), actual[0], StringComparison.Ordinal);
     }
 
-    private static bool IsRegexStringMatch(object? expected, StringValues actual)
+    private bool IsRegexStringMatch(object? expected, StringValues actual)
     {
         if (expected is IEnumerable expectedSequence and not string)
         {
@@ -151,7 +158,7 @@ internal sealed class FormBodyMatcher
                IsSingleRegexStringMatch(expected, actual[0]!);
     }
 
-    private static bool IsSingleRegexStringMatch(object? expected, string actual)
+    private bool IsSingleRegexStringMatch(object? expected, string actual)
     {
         if (expected is not string pattern)
         {
@@ -162,12 +169,14 @@ internal sealed class FormBodyMatcher
         {
             return Regex.IsMatch(actual, pattern, RegexOptions.CultureInvariant, RegexMatchTimeout);
         }
-        catch (ArgumentException)
+        catch (ArgumentException ex)
         {
+            logger?.LogWarning(ex, "Invalid regex match pattern '{Pattern}' in stub definition — treating as non-match.", pattern);
             return false;
         }
         catch (RegexMatchTimeoutException)
         {
+            logger?.LogWarning("Regex match pattern '{Pattern}' timed out after {TimeoutMs}ms — treating as non-match.", pattern, RegexMatchTimeout.TotalMilliseconds);
             return false;
         }
     }
