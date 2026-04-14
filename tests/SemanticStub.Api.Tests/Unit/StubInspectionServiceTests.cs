@@ -1023,16 +1023,12 @@ public sealed class StubInspectionServiceTests
                                 Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                                 {
                                     ["role"] = "admin",
+                                    ["region"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                                    {
+                                        ["regex"] = "^ap-.*$",
+                                    },
                                 },
-                                PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
-                                {
-                                    ["view"] = "summary",
-                                },
-                                RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
-                                {
-                                    ["region"] = "^ap-.*$",
-                                },
-                                Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                                Headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                                 {
                                     ["X-Env"] = "staging",
                                 },
@@ -1115,8 +1111,6 @@ public sealed class StubInspectionServiceTests
                 Assert.Equal(0, candidate.CandidateIndex);
                 Assert.True(candidate.HasExactQuery);
                 Assert.Equal(["role"], candidate.ExactQueryKeys);
-                Assert.True(candidate.HasPartialQuery);
-                Assert.Equal(["view"], candidate.PartialQueryKeys);
                 Assert.True(candidate.HasRegexQuery);
                 Assert.Equal(["region"], candidate.RegexQueryKeys);
                 Assert.Equal(["X-Env"], candidate.HeaderKeys);
@@ -1134,8 +1128,6 @@ public sealed class StubInspectionServiceTests
                 Assert.Equal(1, candidate.CandidateIndex);
                 Assert.False(candidate.HasExactQuery);
                 Assert.Empty(candidate.ExactQueryKeys);
-                Assert.False(candidate.HasPartialQuery);
-                Assert.Empty(candidate.PartialQueryKeys);
                 Assert.False(candidate.HasRegexQuery);
                 Assert.Empty(candidate.RegexQueryKeys);
                 Assert.Empty(candidate.HeaderKeys);

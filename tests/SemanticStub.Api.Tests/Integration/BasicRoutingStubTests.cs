@@ -167,7 +167,7 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
-    public async Task GetUsersWithPartialRoleQuery_ReturnsPartialMatchResponse()
+    public async Task GetUsersWithRegexRoleQuery_ReturnsRegexMatchResponse()
     {
         var response = await client.GetAsync("/users?role=super-admin");
 
@@ -175,8 +175,8 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
         var payload = await response.Content.ReadFromJsonAsync<UsersResponse>();
         Assert.NotNull(payload);
         Assert.Single(payload.Users);
-        Assert.Equal("Partial Alice", payload.Users[0].Name);
-        Assert.Equal("partial-admin", payload.Users[0].Role);
+        Assert.Equal("Regex Alice", payload.Users[0].Name);
+        Assert.Equal("regex-admin", payload.Users[0].Role);
     }
 
     [Fact]

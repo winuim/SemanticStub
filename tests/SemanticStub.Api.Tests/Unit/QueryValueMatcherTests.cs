@@ -73,18 +73,21 @@ public sealed class QueryValueMatcherTests
     }
 
     [Fact]
-    public void IsPartialMatch_UsesTypedEqualityForBooleanValues()
+    public void IsExactMatch_MatchesEqualsOperatorUsingDeclaredType()
     {
         var matcher = new QueryValueMatcher();
 
-        var matched = matcher.IsPartialMatch(
+        var matched = matcher.IsExactMatch(
             new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["enabled"] = true
+                ["enabled"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["equals"] = true
+                }
             },
             new Dictionary<string, StringValues>(StringComparer.Ordinal)
             {
-                ["enabled"] = new StringValues(["prefix-true", "true", "suffix"])
+                ["enabled"] = new StringValues("true")
             },
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -94,60 +97,4 @@ public sealed class QueryValueMatcherTests
         Assert.True(matched);
     }
 
-    [Fact]
-    public void IsPartialMatch_MatchesPlainStringAsSubstring()
-    {
-        var matcher = new QueryValueMatcher();
-
-        var matched = matcher.IsPartialMatch(
-            new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["role"] = "admin"
-            },
-            new Dictionary<string, StringValues>(StringComparer.Ordinal)
-            {
-                ["role"] = new StringValues("super-admin")
-            },
-            queryParameterTypes: new Dictionary<string, string>(StringComparer.Ordinal));
-
-        Assert.True(matched);
-    }
-
-    [Fact]
-    public void IsPartialMatch_ReturnsTrueWhenExpectedRepeatedValueSequenceIsEmpty()
-    {
-        var matcher = new QueryValueMatcher();
-
-        var matched = matcher.IsPartialMatch(
-            new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["tag"] = new List<object?>()
-            },
-            new Dictionary<string, StringValues>(StringComparer.Ordinal)
-            {
-                ["tag"] = new StringValues(["alpha", "beta"])
-            },
-            queryParameterTypes: new Dictionary<string, string>(StringComparer.Ordinal));
-
-        Assert.True(matched);
-    }
-
-    [Fact]
-    public void IsPartialMatch_ReturnsFalseWhenRepeatedValuesAppearOutOfOrder()
-    {
-        var matcher = new QueryValueMatcher();
-
-        var matched = matcher.IsPartialMatch(
-            new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                ["tag"] = new List<object?> { "alpha", "beta" }
-            },
-            new Dictionary<string, StringValues>(StringComparer.Ordinal)
-            {
-                ["tag"] = new StringValues(["beta-post", "alpha-pre"])
-            },
-            queryParameterTypes: new Dictionary<string, string>(StringComparer.Ordinal));
-
-        Assert.False(matched);
-    }
 }

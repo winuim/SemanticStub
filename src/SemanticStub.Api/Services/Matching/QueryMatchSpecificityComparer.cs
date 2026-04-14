@@ -28,7 +28,7 @@ internal sealed class QueryMatchSpecificityComparer : IComparer<QueryMatchDefini
             return -1;
         }
 
-        var exactQueryComparison = y.Query.Count.CompareTo(x.Query.Count);
+        var exactQueryComparison = GetEqualsSpecificity(y.Query).CompareTo(GetEqualsSpecificity(x.Query));
 
         if (exactQueryComparison != 0)
         {
@@ -42,12 +42,27 @@ internal sealed class QueryMatchSpecificityComparer : IComparer<QueryMatchDefini
             return overallComparison;
         }
 
-        return y.RegexQuery.Count.CompareTo(x.RegexQuery.Count);
+        return GetRegexSpecificity(y.Query).CompareTo(GetRegexSpecificity(x.Query));
     }
 
     private static int GetOverallSpecificity(QueryMatchDefinition match)
     {
-        return match.Query.Count + match.RegexQuery.Count + match.PartialQuery.Count + match.Headers.Count + GetBodySpecificity(match.Body);
+        return GetFieldSpecificity(match.Query) + GetFieldSpecificity(match.Headers) + GetBodySpecificity(match.Body);
+    }
+
+    private static int GetFieldSpecificity(IReadOnlyDictionary<string, object?> fields)
+    {
+        return GetEqualsSpecificity(fields) + GetRegexSpecificity(fields);
+    }
+
+    private static int GetEqualsSpecificity(IReadOnlyDictionary<string, object?> fields)
+    {
+        return fields.Count(field => MatchOperatorDefinition.TryGetEquals(field.Value, out _));
+    }
+
+    private static int GetRegexSpecificity(IReadOnlyDictionary<string, object?> fields)
+    {
+        return fields.Count(field => MatchOperatorDefinition.TryGetRegex(field.Value, out _));
     }
 
     private static int GetBodySpecificity(object? body)

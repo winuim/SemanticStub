@@ -1,11 +1,12 @@
 using System.Collections;
 using System.Globalization;
 using Microsoft.Extensions.Primitives;
+using SemanticStub.Api.Models;
 
 namespace SemanticStub.Api.Services;
 
 /// <summary>
-/// Evaluates exact and partial query value matches, including typed comparisons for declared query parameter schemas.
+/// Evaluates exact query value matches, including typed comparisons for declared query parameter schemas.
 /// </summary>
 internal sealed class QueryValueMatcher
 {
@@ -23,32 +24,13 @@ internal sealed class QueryValueMatcher
     {
         foreach (var pair in expected)
         {
-            if (!actual.TryGetValue(pair.Key, out var value) ||
-                !IsTypedQueryValueMatch(pair.Value, value, queryParameterTypes.GetValueOrDefault(pair.Key)))
+            if (!MatchOperatorDefinition.TryGetEquals(pair.Value, out var expectedValue))
             {
-                return false;
+                continue;
             }
-        }
 
-        return true;
-    }
-
-    /// <summary>
-    /// Determines whether every expected query value partially matches against the actual request query values.
-    /// </summary>
-    /// <param name="expected">Expected partial query values keyed by parameter name.</param>
-    /// <param name="actual">Actual request query values keyed by parameter name.</param>
-    /// <param name="queryParameterTypes">Declared OpenAPI query parameter types keyed by parameter name.</param>
-    /// <returns><see langword="true"/> when every expected query value partially matches; otherwise, <see langword="false"/>.</returns>
-    public bool IsPartialMatch(
-        IReadOnlyDictionary<string, object?> expected,
-        IReadOnlyDictionary<string, StringValues> actual,
-        IReadOnlyDictionary<string, string> queryParameterTypes)
-    {
-        foreach (var pair in expected)
-        {
             if (!actual.TryGetValue(pair.Key, out var value) ||
-                !IsTypedPartialQueryValueMatch(pair.Value, value, queryParameterTypes.GetValueOrDefault(pair.Key)))
+                !IsTypedQueryValueMatch(expectedValue, value, queryParameterTypes.GetValueOrDefault(pair.Key)))
             {
                 return false;
             }
@@ -69,18 +51,6 @@ internal sealed class QueryValueMatcher
                IsTypedSingleQueryValueMatch(expected, actual[0]!, parameterType);
     }
 
-    private static bool IsTypedPartialQueryValueMatch(object? expected, StringValues actual, string? parameterType)
-    {
-        if (expected is IEnumerable expectedSequence && expected is not string)
-        {
-            return IsTypedPartialQuerySequenceMatch(expectedSequence, actual, parameterType);
-        }
-
-        return actual.Any(actualValue =>
-            actualValue is not null &&
-            IsTypedSinglePartialQueryValueMatch(expected, actualValue!, parameterType));
-    }
-
     private static bool IsTypedQuerySequenceMatch(IEnumerable expectedSequence, StringValues actual, string? parameterType)
     {
         var expectedValues = expectedSequence.Cast<object?>().ToArray();
@@ -95,43 +65,6 @@ internal sealed class QueryValueMatcher
         {
             if (actualValues[index] is null ||
                 !IsTypedSingleQueryValueMatch(expectedValues[index], actualValues[index]!, parameterType))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool IsTypedPartialQuerySequenceMatch(IEnumerable expectedSequence, StringValues actual, string? parameterType)
-    {
-        var expectedValues = expectedSequence.Cast<object?>().ToArray();
-        var actualValues = actual.ToArray();
-
-        if (expectedValues.Length == 0)
-        {
-            return true;
-        }
-
-        var actualIndex = 0;
-
-        foreach (var expectedValue in expectedValues)
-        {
-            var matched = false;
-
-            while (actualIndex < actualValues.Length)
-            {
-                var actualValue = actualValues[actualIndex++];
-
-                if (actualValue is not null &&
-                    IsTypedSinglePartialQueryValueMatch(expectedValue, actualValue!, parameterType))
-                {
-                    matched = true;
-                    break;
-                }
-            }
-
-            if (!matched)
             {
                 return false;
             }
@@ -164,25 +97,6 @@ internal sealed class QueryValueMatcher
         }
 
         return string.Equals(ConvertQueryValueToString(expected), actual, StringComparison.Ordinal);
-    }
-
-    private static bool IsTypedSinglePartialQueryValueMatch(object? expected, string actual, string? parameterType)
-    {
-        if (string.Equals(parameterType, "integer", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(parameterType, "number", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(parameterType, "boolean", StringComparison.OrdinalIgnoreCase))
-        {
-            return IsTypedSingleQueryValueMatch(expected, actual, parameterType);
-        }
-
-        var expectedText = ConvertQueryValueToString(expected);
-
-        if (expectedText.Length == 0)
-        {
-            return string.Equals(expectedText, actual, StringComparison.Ordinal);
-        }
-
-        return actual.Contains(expectedText, StringComparison.Ordinal);
     }
 
     private static bool TryConvertInteger(object? value, out decimal integer)

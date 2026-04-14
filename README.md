@@ -112,6 +112,11 @@ paths:
       x-match:
         - query:
             role: admin
+            region:
+              regex: ^ap-.*
+          headers:
+            X-Env:
+              equals: staging
           response:
             statusCode: 200
             content:
@@ -132,10 +137,10 @@ paths:
 
 Each `x-match` entry may contain:
 
-- `query`: exact query-string matches.
-- `x-query-regex`: regex query-string matches.
-- `x-query-partial`: partial query-string matches.
-- `headers`: exact header matches.
+- `query`: query-string matches using scalar `equals` shorthand or explicit
+  `equals` / `regex` operators.
+- `headers`: header matches using scalar `equals` shorthand or explicit
+  `equals` / `regex` operators.
 - `body`: exact body match data.
 - `x-semantic-match`: natural-language description used for semantic fallback matching.
 - `response`: the response returned when the match succeeds.
@@ -149,12 +154,13 @@ Notes:
   single `x-match` entry.
 - Query and header keys used by `x-match` must reference parameters declared in
   OpenAPI when those parameters are present on the path or operation.
-- `query` supports exact single-value matches, ordered repeated values, and
-  typed comparison for declared OpenAPI query parameter types such as
+- Scalar `query` and `headers` values are shorthand for `equals`.
+- `query.equals` supports exact single-value matches, ordered repeated values,
+  and typed comparison for declared OpenAPI query parameter types such as
   `integer`, `number`, and `boolean`.
-- `x-query-regex` performs regex matching against query values.
-- `x-query-partial` performs substring matching. Exact `query` matches are
-  preferred over regex and partial matches when multiple candidates succeed.
+- `query.regex` and `headers.regex` perform regex matching. Use regex patterns
+  such as `.*value.*`, `^value`, or `value$` for contains, starts-with, or
+  ends-with matches.
 - `body` matching currently applies to JSON request bodies. Body matching is
   partial for objects, so a request may contain additional properties and still
   match.
@@ -162,7 +168,7 @@ Notes:
 - `x-semantic-match` entries are evaluated only after all deterministic
   conditions fail. They require semantic matching to be enabled in application
   configuration. An entry with `x-semantic-match` must not be combined with
-  `query`, `x-query-regex`, `x-query-partial`, `headers`, or `body`.
+  `query`, `headers`, or `body`.
 - When no `x-match` entry succeeds, SemanticStub falls back to the standard
   `responses` section.
 - When multiple `x-match` entries succeed, SemanticStub chooses the most

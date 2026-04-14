@@ -101,6 +101,11 @@ paths:
       x-match:
         - query:
             role: admin
+            region:
+              regex: ^ap-.*
+          headers:
+            X-Env:
+              equals: staging
           response:
             statusCode: 200
             content:
@@ -121,10 +126,8 @@ paths:
 
 各 `x-match` エントリには次を含められます。
 
-- `query`: 完全一致の query string 条件
-- `x-query-regex`: regex による query string 条件
-- `x-query-partial`: 部分一致の query string 条件
-- `headers`: 完全一致の header 条件
+- `query`: scalar の `equals` 省略形、または明示的な `equals` / `regex` operator による query string 条件
+- `headers`: scalar の `equals` 省略形、または明示的な `equals` / `regex` operator による header 条件
 - `body`: リクエストボディ条件
 - `x-semantic-match`: セマンティックフォールバックマッチングに使う自然言語の説明
 - `response`: 条件に一致したときに返すレスポンス
@@ -135,12 +138,12 @@ paths:
 - `x-match` のレスポンスは、通常レスポンスと同じく `content`、`headers`、`x-delay`、`x-response-file` をサポートします。
 - query、header、body 条件は、1 つの `x-match` 内では AND 条件として組み合わされます。
 - `x-match` で使う query と header のキーは、path または operation にパラメータ宣言がある場合、その OpenAPI 宣言を参照している必要があります。
-- `query` は単一値の完全一致、順序付きの繰り返し値、および `integer`、`number`、`boolean` など宣言済み OpenAPI query parameter type に対する型付き比較をサポートします。
-- `x-query-regex` は query 値に対して regex マッチを行います。
-- `x-query-partial` は部分文字列一致を行います。複数候補が成功した場合は、完全一致の `query` が regex や partial より優先されます。
+- scalar の `query` / `headers` 値は `equals` の省略形として扱われます。
+- `query.equals` は単一値の完全一致、順序付きの繰り返し値、および `integer`、`number`、`boolean` など宣言済み OpenAPI query parameter type に対する型付き比較をサポートします。
+- `query.regex` と `headers.regex` は regex マッチを行います。contains / starts-with / ends-with は `.*value.*`、`^value`、`value$` のような regex pattern で表現できます。
 - `body` マッチは現在 JSON リクエストボディに対して適用されます。object に対する body マッチは部分一致なので、追加プロパティを含んでいても一致できます。
 - 不正な JSON リクエストボディは `body` 条件に一致しません。
-- `x-semantic-match` エントリは、すべての決定的な条件が失敗したときのみ評価されます。アプリケーション設定でセマンティックマッチングを有効化する必要があります。`x-semantic-match` を含むエントリに `query`、`x-query-regex`、`x-query-partial`、`headers`、`body` を同時に指定することはできません。
+- `x-semantic-match` エントリは、すべての決定的な条件が失敗したときのみ評価されます。アプリケーション設定でセマンティックマッチングを有効化する必要があります。`x-semantic-match` を含むエントリに `query`、`headers`、`body` を同時に指定することはできません。
 - どの `x-match` も成功しない場合、SemanticStub は標準の `responses` セクションへフォールバックします。
 - 複数の `x-match` が成功した場合、SemanticStub はより具体的な候補を選び、狭い条件が広い条件より優先されます。
 
