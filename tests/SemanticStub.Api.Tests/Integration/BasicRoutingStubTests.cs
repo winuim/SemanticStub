@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Xunit;
 
@@ -277,6 +278,26 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
     }
 
     [Fact]
+    public async Task PostOAuthToken_WithMatchingFormBodyOperators_ReturnsToken()
+    {
+        using var content = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "authorization_code",
+            ["code"] = "abc_123"
+        });
+
+        var response = await client.PostAsync("/oauth/token", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+
+        var payload = await response.Content.ReadFromJsonAsync<TokenResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("token-123", payload.AccessToken);
+        Assert.Equal("bearer", payload.TokenType);
+    }
+
+    [Fact]
     public async Task PostCheckout_AdvancesScenarioStateAcrossRequests()
     {
         var firstResponse = await client.PostAsync("/checkout", content: null);
@@ -465,6 +486,15 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
         public string Result { get; init; } = string.Empty;
 
         public string? Token { get; init; }
+    }
+
+    public sealed class TokenResponse
+    {
+        [JsonPropertyName("access_token")]
+        public string AccessToken { get; init; } = string.Empty;
+
+        [JsonPropertyName("token_type")]
+        public string TokenType { get; init; } = string.Empty;
     }
 
     public sealed class ProfileRequest
