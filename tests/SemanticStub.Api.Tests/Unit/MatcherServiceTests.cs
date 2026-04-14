@@ -162,6 +162,44 @@ public sealed class MatcherServiceTests
     }
 
     [Fact]
+    public void FindBestMatch_MatchesFormUrlEncodedBodyRegexOperatorCondition()
+    {
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Body = new Dictionary<object, object>
+                    {
+                        ["form"] = new Dictionary<object, object>
+                        {
+                            ["userId"] = new Dictionary<object, object>
+                            {
+                                ["regex"] = "^[0-9]{6}$"
+                            }
+                        }
+                    }
+                }
+            ]
+        };
+
+        var matcher = CreateMatcherService();
+
+        var match = FindBestMatch(
+            matcher,
+            operation,
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = "application/x-www-form-urlencoded"
+            },
+            "userId=123456&extra=allowed");
+
+        Assert.NotNull(match);
+    }
+
+    [Fact]
     public void FindBestMatch_ReturnsNullWhenFormContentTypeIsMissing()
     {
         var operation = new OperationDefinition
