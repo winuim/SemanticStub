@@ -14,7 +14,7 @@ public sealed class StubServiceTests
 
     private static MatcherService CreateMatcherService()
     {
-        return new MatcherService(new JsonBodyMatcher(), new QueryValueMatcher(), new RegexQueryMatcher());
+        return new MatcherService(new JsonBodyMatcher(), new FormBodyMatcher(), new QueryValueMatcher(), new RegexQueryMatcher());
     }
 
     private static StubResponse AssertMatchedResponse(StubMatchResult matched, StubResponse? response)
