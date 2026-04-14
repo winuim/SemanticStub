@@ -1579,7 +1579,7 @@ public sealed class StubServiceTests
                         [
                             new QueryMatchDefinition
                             {
-                                Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                                Headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                                 {
                                     ["X-Env"] = "staging"
                                 },

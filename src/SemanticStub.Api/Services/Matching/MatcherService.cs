@@ -87,7 +87,7 @@ public sealed class MatcherService
             {
                 Candidate = candidate,
                 QueryMatched = IsQueryMatch(candidate, matchContext),
-                HeaderMatched = IsExactHeaderMatch(candidate.Headers, matchContext.Headers),
+                HeaderMatched = IsHeaderMatch(candidate.Headers, matchContext.Headers),
                 BodyMatched = jsonBodyMatcher.IsMatch(candidate.Body, matchContext.RequestBody),
             });
         }
@@ -119,7 +119,7 @@ public sealed class MatcherService
         MatchEvaluationContext matchContext)
     {
         return IsQueryMatch(candidate, matchContext) &&
-               IsExactHeaderMatch(candidate.Headers, matchContext.Headers) &&
+               IsHeaderMatch(candidate.Headers, matchContext.Headers) &&
                jsonBodyMatcher.IsMatch(candidate.Body, matchContext.RequestBody);
     }
 
@@ -128,8 +128,7 @@ public sealed class MatcherService
         MatchEvaluationContext matchContext)
     {
         return queryValueMatcher.IsExactMatch(match.Query, matchContext.Query, matchContext.QueryParameterTypes) &&
-               regexQueryMatcher.IsMatch(match.RegexQuery, matchContext.Query) &&
-               queryValueMatcher.IsPartialMatch(match.PartialQuery, matchContext.Query, matchContext.QueryParameterTypes);
+               regexQueryMatcher.IsMatch(match.Query, matchContext.Query);
     }
 
     private MatchEvaluationContext CreateMatchContext(
@@ -144,17 +143,15 @@ public sealed class MatcherService
         return new MatchEvaluationContext(query, headers, queryParameterTypes, bodyDocument);
     }
 
-    private static bool IsExactHeaderMatch(IReadOnlyDictionary<string, string> expected, IReadOnlyDictionary<string, string> actual)
+    private bool IsHeaderMatch(IReadOnlyDictionary<string, object?> expected, IReadOnlyDictionary<string, string> actual)
     {
-        foreach (var pair in expected)
-        {
-            if (!actual.TryGetValue(pair.Key, out var value) || value != pair.Value)
-            {
-                return false;
-            }
-        }
+        var actualValues = actual.ToDictionary(
+            entry => entry.Key,
+            entry => new StringValues(entry.Value),
+            StringComparer.OrdinalIgnoreCase);
 
-        return true;
+        return queryValueMatcher.IsExactMatch(expected, actualValues, new Dictionary<string, string>(StringComparer.Ordinal)) &&
+               regexQueryMatcher.IsMatch(expected, actualValues);
     }
 
     private readonly struct MatchEvaluationContext : IDisposable

@@ -11,11 +11,14 @@ public sealed class QueryMatchSpecificityComparerTests
     {
         var broaderOverallMatch = new QueryMatchDefinition
         {
-            PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+            Query = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["role"] = "admin"
+                ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["regex"] = ".*admin.*"
+                }
             },
-            Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            Headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["x-tenant"] = "alpha"
             }
@@ -41,11 +44,14 @@ public sealed class QueryMatchSpecificityComparerTests
     {
         var specificHeaderMatch = new QueryMatchDefinition
         {
-            PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+            Query = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["role"] = "admin"
+                ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["regex"] = ".*admin.*"
+                }
             },
-            Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            Headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["x-tenant"] = "alpha"
             }
@@ -53,9 +59,12 @@ public sealed class QueryMatchSpecificityComparerTests
 
         var broaderRegexMatch = new QueryMatchDefinition
         {
-            RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+            Query = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["role"] = "^admin-[0-9]+$"
+                ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["regex"] = "^admin-[0-9]+$"
+                }
             }
         };
 

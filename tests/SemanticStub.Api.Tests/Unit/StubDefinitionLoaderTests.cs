@@ -264,8 +264,6 @@ public sealed class StubDefinitionLoaderTests
 
     [Theory]
     [InlineData("query", "query:\n                        role: admin")]
-    [InlineData("x-query-partial", "x-query-partial:\n                        role: admin")]
-    [InlineData("x-query-regex", "x-query-regex:\n                        role: ^admin-[0-9]+$")]
     [InlineData("headers", "headers:\n                        X-Env: staging")]
     [InlineData("body", "body:\n                        role: admin")]
     public void LoadDefaultDefinition_ThrowsWhenSemanticMatchIsCombinedWithDeterministicCondition(
@@ -759,7 +757,7 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
-    public void LoadDefaultDefinition_PreservesPartialQueryMatch()
+    public void LoadDefaultDefinition_PreservesQueryEqualsOperatorMatch()
     {
         using var workspace = TestWorkspace.Create(
             """
@@ -773,8 +771,9 @@ public sealed class StubDefinitionLoaderTests
                       schema:
                         type: string
                   x-match:
-                    - x-query-partial:
-                        role: admin
+                    - query:
+                        role:
+                          equals: admin
                       response:
                         statusCode: 200
                         content:
@@ -795,12 +794,13 @@ public sealed class StubDefinitionLoaderTests
         var document = loader.LoadDefaultDefinition();
         var operation = Assert.IsType<OperationDefinition>(document.Paths["/users"].Get);
         var match = Assert.Single(operation.Matches);
+        var role = Assert.IsType<Dictionary<string, object?>>(match.Query["role"]);
 
-        Assert.Equal("admin", Assert.IsType<string>(match.PartialQuery["role"]));
+        Assert.Equal("admin", Assert.IsType<string>(role["equals"]));
     }
 
     [Fact]
-    public void LoadDefaultDefinition_PreservesRegexQueryMatch()
+    public void LoadDefaultDefinition_PreservesQueryRegexOperatorMatch()
     {
         using var workspace = TestWorkspace.Create(
             """
@@ -814,8 +814,9 @@ public sealed class StubDefinitionLoaderTests
                       schema:
                         type: string
                   x-match:
-                    - x-query-regex:
-                        role: ^admin-[0-9]+$
+                    - query:
+                        role:
+                          regex: ^admin-[0-9]+$
                       response:
                         statusCode: 200
                         content:
@@ -836,8 +837,9 @@ public sealed class StubDefinitionLoaderTests
         var document = loader.LoadDefaultDefinition();
         var operation = Assert.IsType<OperationDefinition>(document.Paths["/users"].Get);
         var match = Assert.Single(operation.Matches);
+        var role = Assert.IsType<Dictionary<string, object?>>(match.Query["role"]);
 
-        Assert.Equal("^admin-[0-9]+$", Assert.IsType<string>(match.RegexQuery["role"]));
+        Assert.Equal("^admin-[0-9]+$", Assert.IsType<string>(role["regex"]));
     }
 
     [Fact]
@@ -919,7 +921,7 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
-    public void LoadDefaultDefinition_ThrowsWhenPartialMatchedQueryIsNotDeclared()
+    public void LoadDefaultDefinition_ThrowsWhenLegacyPartialQueryIsUsed()
     {
         using var workspace = TestWorkspace.Create(
             """
@@ -928,7 +930,7 @@ public sealed class StubDefinitionLoaderTests
               /users:
                 get:
                   parameters:
-                    - name: status
+                    - name: role
                       in: query
                       schema:
                         type: string
@@ -954,11 +956,11 @@ public sealed class StubDefinitionLoaderTests
 
         var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
 
-        Assert.Contains("x-match[0].x-query-partial['role'] must reference a declared query parameter", exception.Message);
+        Assert.Contains("x-match[0].x-query-partial is no longer supported", exception.Message);
     }
 
     [Fact]
-    public void LoadDefaultDefinition_ThrowsWhenRegexMatchedQueryIsNotDeclared()
+    public void LoadDefaultDefinition_ThrowsWhenLegacyRegexQueryIsUsed()
     {
         using var workspace = TestWorkspace.Create(
             """
@@ -967,7 +969,7 @@ public sealed class StubDefinitionLoaderTests
               /users:
                 get:
                   parameters:
-                    - name: status
+                    - name: role
                       in: query
                       schema:
                         type: string
@@ -993,11 +995,11 @@ public sealed class StubDefinitionLoaderTests
 
         var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
 
-        Assert.Contains("x-match[0].x-query-regex['role'] must reference a declared query parameter", exception.Message);
+        Assert.Contains("x-match[0].x-query-regex is no longer supported", exception.Message);
     }
 
     [Fact]
-    public void LoadDefaultDefinition_ThrowsWhenRegexPatternIsInvalid()
+    public void LoadDefaultDefinition_ThrowsWhenRegexOperatorPatternIsInvalid()
     {
         using var workspace = TestWorkspace.Create(
             """
@@ -1011,8 +1013,9 @@ public sealed class StubDefinitionLoaderTests
                       schema:
                         type: string
                   x-match:
-                    - x-query-regex:
-                        role: "^(admin$"
+                    - query:
+                        role:
+                          regex: "^(admin$"
                       response:
                         statusCode: 200
                         content:
@@ -1032,11 +1035,11 @@ public sealed class StubDefinitionLoaderTests
 
         var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
 
-        Assert.Contains("x-match[0].x-query-regex['role'] must be a valid regex pattern", exception.Message);
+        Assert.Contains("x-match[0].query['role'].regex must be a valid regex pattern", exception.Message);
     }
 
     [Fact]
-    public void LoadDefaultDefinition_ThrowsWhenRegexPatternValueIsAnEmptyMap()
+    public void LoadDefaultDefinition_ThrowsWhenOperatorValueIsAnEmptyMap()
     {
         using var workspace = TestWorkspace.Create(
             """
@@ -1050,7 +1053,7 @@ public sealed class StubDefinitionLoaderTests
                       schema:
                         type: string
                   x-match:
-                    - x-query-regex:
+                    - query:
                         role: {}
                       response:
                         statusCode: 200
@@ -1071,7 +1074,88 @@ public sealed class StubDefinitionLoaderTests
 
         var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
 
-        Assert.Contains("x-match[0].x-query-regex['role'] must be a string pattern", exception.Message);
+        Assert.Contains("x-match[0].query['role'] must define at least one supported operator", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenMatchOperatorIsUnsupported()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  parameters:
+                    - name: role
+                      in: query
+                      schema:
+                        type: string
+                  x-match:
+                    - query:
+                        role:
+                          contains: admin
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              users: []
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            users: []
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].query['role'] uses unsupported operator 'contains'", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenMatchOperatorsAreMixed()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /users:
+                get:
+                  parameters:
+                    - name: role
+                      in: query
+                      schema:
+                        type: string
+                  x-match:
+                    - query:
+                        role:
+                          equals: admin
+                          regex: ^admin$
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              users: []
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            users: []
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].query['role'] must not combine equals and regex operators", exception.Message);
     }
 
     [Fact]

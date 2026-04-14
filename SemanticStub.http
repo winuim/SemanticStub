@@ -117,7 +117,7 @@ Accept: application/json
 GET {{host}}/users?role=guest
 Accept: application/json
 
-### Users stub filtered by partial query match
+### Users stub filtered by regex query match
 GET {{host}}/users?role=super-admin
 Accept: application/json
 
@@ -129,7 +129,7 @@ Accept: application/json
 GET {{host}}/search?tag=beta&tag=alpha
 Accept: application/json
 
-### Regex users stub filtered by x-query-regex
+### Regex users stub filtered by query regex operator
 GET {{host}}/regex-users?role=admin-123
 Accept: application/json
 

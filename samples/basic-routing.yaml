@@ -85,8 +85,9 @@ paths:
                       name: Bob
                       role: guest
 
-        - x-query-partial:
-            role: admin
+        - query:
+            role:
+              regex: .*admin.*
           response:
             statusCode: 200
             content:
@@ -94,8 +95,8 @@ paths:
                 example:
                   users:
                     - id: 5
-                      name: Partial Alice
-                      role: partial-admin
+                      name: Regex Alice
+                      role: regex-admin
 
       responses:
         '200':
@@ -161,8 +162,9 @@ paths:
           schema:
             type: string
       x-match:
-        - x-query-regex:
-            role: ^admin-[0-9]+$
+        - query:
+            role:
+              regex: ^admin-[0-9]+$
           response:
             statusCode: 200
             content:

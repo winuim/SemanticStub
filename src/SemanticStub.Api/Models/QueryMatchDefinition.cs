@@ -15,7 +15,7 @@ public sealed class QueryMatchDefinition
     [YamlMember(Alias = "x-semantic-match", ApplyNamingConventions = false)]
     public string? SemanticMatch { get; init; }
 
-    public Dictionary<string, string> Headers { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, object?> Headers { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 
     public object? Body { get; init; }
 
