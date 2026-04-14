@@ -571,6 +571,66 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenFormBodyIsCombinedWithOtherBodyMatchTypes()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /login:
+                post:
+                  x-match:
+                    - body:
+                        form:
+                          username: demo
+                        json:
+                          username: demo
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              message: ok
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].body.form cannot be combined with body.json", exception.Message);
+    }
+
+    [Fact]
+    public void LoadDefaultDefinition_ThrowsWhenFormBodyMatchOperatorsAreMixed()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /login:
+                post:
+                  x-match:
+                    - body:
+                        form:
+                          username:
+                            equals: demo
+                            regex: "^demo$"
+                      response:
+                        statusCode: 200
+                        content:
+                          application/json:
+                            example:
+                              message: ok
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => loader.LoadDefaultDefinition());
+
+        Assert.Contains("x-match[0].body.form['username'] must not combine equals and regex operators.", exception.Message);
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_LoadsScenarioDefinitionFromResponseExtension()
     {
         using var workspace = TestWorkspace.Create(
