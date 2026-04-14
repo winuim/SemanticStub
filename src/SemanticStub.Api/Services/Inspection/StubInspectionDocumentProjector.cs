@@ -127,12 +127,10 @@ internal static class StubInspectionDocumentProjector
             .Select((match, index) => new StubRouteConditionInfo
             {
                 CandidateIndex = index,
-                HasExactQuery = match.Query.Count > 0,
-                ExactQueryKeys = OrderKeys(match.Query.Keys),
-                HasPartialQuery = match.PartialQuery.Count > 0,
-                PartialQueryKeys = OrderKeys(match.PartialQuery.Keys),
-                HasRegexQuery = match.RegexQuery.Count > 0,
-                RegexQueryKeys = OrderKeys(match.RegexQuery.Keys),
+                HasExactQuery = GetEqualsKeys(match.Query).Count > 0,
+                ExactQueryKeys = GetEqualsKeys(match.Query),
+                HasRegexQuery = GetRegexKeys(match.Query).Count > 0,
+                RegexQueryKeys = GetRegexKeys(match.Query),
                 HeaderKeys = OrderKeys(match.Headers.Keys),
                 HasBody = match.Body is not null,
                 UsesSemanticMatching = match.SemanticMatch is not null,
@@ -157,6 +155,20 @@ internal static class StubInspectionDocumentProjector
 
     private static IReadOnlyList<string> OrderKeys(IEnumerable<string> keys)
         => keys.OrderBy(key => key, StringComparer.Ordinal).ToList();
+
+    private static IReadOnlyList<string> GetEqualsKeys(IReadOnlyDictionary<string, object?> fields)
+        => fields
+            .Where(field => MatchOperatorDefinition.TryGetEquals(field.Value, out _))
+            .Select(field => field.Key)
+            .OrderBy(key => key, StringComparer.Ordinal)
+            .ToList();
+
+    private static IReadOnlyList<string> GetRegexKeys(IReadOnlyDictionary<string, object?> fields)
+        => fields
+            .Where(field => MatchOperatorDefinition.TryGetRegex(field.Value, out _))
+            .Select(field => field.Key)
+            .OrderBy(key => key, StringComparer.Ordinal)
+            .ToList();
 
     private static string GetRouteId(string method, string path, OperationDefinition operation)
         => string.IsNullOrEmpty(operation.OperationId)

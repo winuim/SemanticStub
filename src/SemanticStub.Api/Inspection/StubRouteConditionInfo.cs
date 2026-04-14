@@ -14,12 +14,6 @@ public sealed class StubRouteConditionInfo
     /// <summary>Gets the exact query parameter names constrained by the candidate.</summary>
     public IReadOnlyList<string> ExactQueryKeys { get; init; } = [];
 
-    /// <summary>Gets whether the candidate defines partial query constraints.</summary>
-    public bool HasPartialQuery { get; init; }
-
-    /// <summary>Gets the partial query parameter names constrained by the candidate.</summary>
-    public IReadOnlyList<string> PartialQueryKeys { get; init; } = [];
-
     /// <summary>Gets whether the candidate defines regex query constraints.</summary>
     public bool HasRegexQuery { get; init; }
 

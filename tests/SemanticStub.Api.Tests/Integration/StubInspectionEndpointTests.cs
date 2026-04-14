@@ -108,7 +108,7 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
         Assert.True(route.ResponseCount >= 1);
         Assert.Contains(route.Responses, response => response.ResponseId == "200");
         Assert.Contains(route.ConditionalMatches, candidate => candidate.HasExactQuery);
-        Assert.Contains(route.ConditionalMatches, candidate => candidate.HasPartialQuery);
+        Assert.Contains(route.ConditionalMatches, candidate => candidate.HasRegexQuery);
     }
 
     [Fact]

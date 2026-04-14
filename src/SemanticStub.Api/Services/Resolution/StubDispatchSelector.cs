@@ -69,7 +69,7 @@ internal sealed class StubDispatchSelector
                 "Deterministic conditional match selected for '{Path}' {Method}. QueryKeys={QueryKeys}, HeaderKeys={HeaderKeys}, HasBody={HasBody}.",
                 path,
                 method.ToUpperInvariant(),
-                selectedDeterministicCandidate.Query.Count + selectedDeterministicCandidate.PartialQuery.Count + selectedDeterministicCandidate.RegexQuery.Count,
+                selectedDeterministicCandidate.Query.Count,
                 selectedDeterministicCandidate.Headers.Count,
                 selectedDeterministicCandidate.Body is not null);
 
@@ -171,8 +171,6 @@ internal sealed class StubDispatchSelector
     private static bool IsDeterministicCandidate(QueryMatchDefinition candidate)
     {
         return candidate.Query.Count > 0 ||
-               candidate.PartialQuery.Count > 0 ||
-               candidate.RegexQuery.Count > 0 ||
                candidate.Headers.Count > 0 ||
                candidate.Body is not null;
     }

@@ -15,7 +15,10 @@ public sealed class RegexQueryMatcherTests
         var matched = matcher.IsMatch(
             new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["role"] = "^admin-[0-9]+$"
+                ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["regex"] = "^admin-[0-9]+$"
+                }
             },
             new Dictionary<string, StringValues>(StringComparer.Ordinal)
             {
@@ -33,7 +36,10 @@ public sealed class RegexQueryMatcherTests
         var matched = matcher.IsMatch(
             new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["tag"] = new List<object?> { "^alpha$", "^beta$" }
+                ["tag"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["regex"] = new List<object?> { "^alpha$", "^beta$" }
+                }
             },
             new Dictionary<string, StringValues>(StringComparer.Ordinal)
             {
@@ -52,7 +58,10 @@ public sealed class RegexQueryMatcherTests
         var matched = matcher.IsMatch(
             new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["role"] = "["
+                ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["regex"] = "["
+                }
             },
             new Dictionary<string, StringValues>(StringComparer.Ordinal)
             {
@@ -62,7 +71,7 @@ public sealed class RegexQueryMatcherTests
         Assert.False(matched);
         Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Warning, logger.Entries[0].LogLevel);
-        Assert.Contains("Invalid x-regex-query pattern", logger.Entries[0].Message, StringComparison.Ordinal);
+        Assert.Contains("Invalid regex match pattern", logger.Entries[0].Message, StringComparison.Ordinal);
         Assert.IsAssignableFrom<ArgumentException>(logger.Entries[0].Exception);
     }
 
@@ -75,7 +84,10 @@ public sealed class RegexQueryMatcherTests
         var matched = matcher.IsMatch(
             new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["role"] = "^(a+)+$"
+                ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["regex"] = "^(a+)+$"
+                }
             },
             new Dictionary<string, StringValues>(StringComparer.Ordinal)
             {

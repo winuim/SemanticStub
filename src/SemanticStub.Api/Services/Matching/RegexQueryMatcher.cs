@@ -2,11 +2,12 @@ using System.Collections;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
+using SemanticStub.Api.Models;
 
 namespace SemanticStub.Api.Services;
 
 /// <summary>
-/// Evaluates <c>x-query-regex</c> constraints without changing matcher orchestration or precedence behavior.
+/// Evaluates regex match constraints without changing matcher orchestration behavior.
 /// </summary>
 internal sealed class RegexQueryMatcher
 {
@@ -27,6 +28,11 @@ internal sealed class RegexQueryMatcher
     {
         foreach (var pair in expected)
         {
+            if (!MatchOperatorDefinition.TryGetRegex(pair.Value, out _))
+            {
+                continue;
+            }
+
             if (!actual.TryGetValue(pair.Key, out var value) || !IsRegexQueryValueMatch(pair.Value, value))
             {
                 return false;
@@ -38,6 +44,13 @@ internal sealed class RegexQueryMatcher
 
     private bool IsRegexQueryValueMatch(object? expected, StringValues actual)
     {
+        if (!MatchOperatorDefinition.TryGetRegex(expected, out var regex))
+        {
+            return true;
+        }
+
+        expected = regex;
+
         if (expected is IEnumerable expectedSequence && expected is not string)
         {
             return IsRegexQuerySequenceMatch(expectedSequence, actual);
@@ -83,12 +96,12 @@ internal sealed class RegexQueryMatcher
         }
         catch (ArgumentException ex)
         {
-            logger?.LogWarning(ex, "Invalid x-regex-query pattern '{Pattern}' in stub definition — treating as non-match.", pattern);
+            logger?.LogWarning(ex, "Invalid regex match pattern '{Pattern}' in stub definition — treating as non-match.", pattern);
             return false;
         }
         catch (RegexMatchTimeoutException)
         {
-            logger?.LogWarning("x-regex-query pattern '{Pattern}' timed out after {TimeoutMs}ms — treating as non-match.", pattern, RegexMatchTimeout.TotalMilliseconds);
+            logger?.LogWarning("Regex match pattern '{Pattern}' timed out after {TimeoutMs}ms — treating as non-match.", pattern, RegexMatchTimeout.TotalMilliseconds);
             return false;
         }
     }

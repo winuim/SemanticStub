@@ -130,6 +130,8 @@ internal sealed class StubDefinitionValidator
 
             if (errors.Count == semanticMatchErrorCount)
             {
+                ValidateLegacyQueryMatchFields(path, method, index, match, errors);
+
                 foreach (var queryKey in match.Query.Keys)
                 {
                     if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
@@ -137,31 +139,14 @@ internal sealed class StubDefinitionValidator
                         errors.Add(
                             $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].query['{queryKey}'] must reference a declared query parameter.");
                     }
-                }
 
-                foreach (var queryKey in match.PartialQuery.Keys)
-                {
-                    if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
-                    {
-                        errors.Add(
-                            $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-partial['{queryKey}'] must reference a declared query parameter.");
-                    }
-                }
-
-                foreach (var queryKey in match.RegexQuery.Keys)
-                {
-                    if (queryParameters.Count > 0 && !queryParameters.Contains(queryKey))
-                    {
-                        errors.Add(
-                            $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex['{queryKey}'] must reference a declared query parameter.");
-                    }
-
-                    ValidateRegexQueryDefinition(
+                    ValidateMatchOperatorDefinition(
                         path,
                         method,
                         index,
+                        "query",
                         queryKey,
-                        match.RegexQuery[queryKey],
+                        match.Query[queryKey],
                         errors);
                 }
 
@@ -172,6 +157,15 @@ internal sealed class StubDefinitionValidator
                         errors.Add(
                             $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].headers['{headerKey}'] must reference a declared header parameter.");
                     }
+
+                    ValidateMatchOperatorDefinition(
+                        path,
+                        method,
+                        index,
+                        "headers",
+                        headerKey,
+                        match.Headers[headerKey],
+                        errors);
                 }
             }
 
@@ -401,11 +395,74 @@ internal sealed class StubDefinitionValidator
         }
     }
 
-    private static void ValidateRegexQueryDefinition(
+    private static void ValidateLegacyQueryMatchFields(
         string path,
         string method,
         int index,
-        string queryKey,
+        QueryMatchDefinition match,
+        ICollection<string> errors)
+    {
+        if (match.PartialQuery.Count > 0)
+        {
+            errors.Add($"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-partial is no longer supported; use query.<name>.regex instead.");
+        }
+
+        if (match.RegexQuery.Count > 0)
+        {
+            errors.Add($"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex is no longer supported; use query.<name>.regex instead.");
+        }
+    }
+
+    private static void ValidateMatchOperatorDefinition(
+        string path,
+        string method,
+        int index,
+        string fieldName,
+        string key,
+        object? value,
+        ICollection<string> errors)
+    {
+        var operatorKeys = MatchOperatorDefinition.GetKeys(value);
+
+        if (operatorKeys.Count == 0)
+        {
+            if (value is IDictionary)
+            {
+                errors.Add(
+                    $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].{fieldName}['{key}'] must define at least one supported operator: equals, regex.");
+            }
+
+            return;
+        }
+
+        foreach (var operatorKey in operatorKeys)
+        {
+            if (operatorKey is not MatchOperatorDefinition.EqualsOperator and not MatchOperatorDefinition.RegexOperator)
+            {
+                errors.Add(
+                    $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].{fieldName}['{key}'] uses unsupported operator '{operatorKey}'.");
+            }
+        }
+
+        if (operatorKeys.Contains(MatchOperatorDefinition.EqualsOperator) &&
+            operatorKeys.Contains(MatchOperatorDefinition.RegexOperator))
+        {
+            errors.Add(
+                $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].{fieldName}['{key}'] must not combine equals and regex operators.");
+        }
+
+        if (MatchOperatorDefinition.TryGetRegex(value, out var regex))
+        {
+            ValidateRegexDefinition(path, method, index, fieldName, key, regex, errors);
+        }
+    }
+
+    private static void ValidateRegexDefinition(
+        string path,
+        string method,
+        int index,
+        string fieldName,
+        string key,
         object? value,
         ICollection<string> errors)
     {
@@ -415,14 +472,14 @@ internal sealed class StubDefinitionValidator
             if (!enumerator.MoveNext())
             {
                 errors.Add(
-                    $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex['{queryKey}'] must be a string pattern.");
+                    $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].{fieldName}['{key}'].regex must be a string pattern.");
                 return;
             }
 
             var patternIndex = 0;
             do
             {
-                ValidateRegexPattern(path, method, index, queryKey, enumerator.Current, $"[{patternIndex}]", errors);
+                ValidateRegexPattern(path, method, index, fieldName, key, enumerator.Current, $"[{patternIndex}]", errors);
                 patternIndex++;
             }
             while (enumerator.MoveNext());
@@ -430,14 +487,15 @@ internal sealed class StubDefinitionValidator
             return;
         }
 
-        ValidateRegexPattern(path, method, index, queryKey, value, string.Empty, errors);
+        ValidateRegexPattern(path, method, index, fieldName, key, value, string.Empty, errors);
     }
 
     private static void ValidateRegexPattern(
         string path,
         string method,
         int index,
-        string queryKey,
+        string fieldName,
+        string key,
         object? value,
         string suffix,
         ICollection<string> errors)
@@ -445,7 +503,7 @@ internal sealed class StubDefinitionValidator
         if (value is not string pattern)
         {
             errors.Add(
-                $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex['{queryKey}']{suffix} must be a string pattern.");
+                $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].{fieldName}['{key}'].regex{suffix} must be a string pattern.");
             return;
         }
 
@@ -456,7 +514,7 @@ internal sealed class StubDefinitionValidator
         catch (ArgumentException)
         {
             errors.Add(
-                $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].x-query-regex['{queryKey}']{suffix} must be a valid regex pattern.");
+                $"Path '{path}' {method.ToUpperInvariant()} x-match[{index}].{fieldName}['{key}'].regex{suffix} must be a valid regex pattern.");
         }
     }
 }

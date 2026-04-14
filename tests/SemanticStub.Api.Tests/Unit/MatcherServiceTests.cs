@@ -192,7 +192,7 @@ public sealed class MatcherServiceTests
                     {
                         ["page"] = 2
                     },
-                    Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    Headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                     {
                         ["X-Env"] = "staging"
                     },
@@ -239,7 +239,7 @@ public sealed class MatcherServiceTests
                     {
                         ["role"] = "admin"
                     },
-                    Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    Headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                     {
                         ["X-Env"] = "staging"
                     }
@@ -336,7 +336,7 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    Headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                     {
                         ["X-Env"] = "staging"
                     }
@@ -682,14 +682,14 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    Headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                     {
                         ["X-Env"] = "staging"
                     }
                 },
                 new QueryMatchDefinition
                 {
-                    Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                    Headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                     {
                         ["X-Env"] = "staging",
                         ["X-Tenant"] = "alpha"
@@ -716,7 +716,7 @@ public sealed class MatcherServiceTests
     }
 
     [Fact]
-    public void FindBestMatch_MatchesPartialSingleQueryValue()
+    public void FindBestMatch_MatchesRegexQueryValueAsContainsReplacement()
     {
         var operation = new OperationDefinition
         {
@@ -724,9 +724,12 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
-                        ["role"] = "admin"
+                        ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["regex"] = ".*admin.*"
+                        }
                     }
                 }
             ]
@@ -745,11 +748,10 @@ public sealed class MatcherServiceTests
             body: null);
 
         Assert.NotNull(match);
-        Assert.Equal("admin", match.PartialQuery["role"]);
     }
 
     [Fact]
-    public void FindBestMatch_PrefersExactQueryOverPartialQuery()
+    public void FindBestMatch_PrefersEqualsQueryOverRegexQuery()
     {
         var operation = new OperationDefinition
         {
@@ -757,9 +759,12 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
-                        ["role"] = "admin"
+                        ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["regex"] = ".*admin.*"
+                        }
                     }
                 },
                 new QueryMatchDefinition
@@ -786,11 +791,10 @@ public sealed class MatcherServiceTests
 
         Assert.NotNull(match);
         Assert.Equal("admin", match.Query["role"]);
-        Assert.Empty(match.PartialQuery);
     }
 
     [Fact]
-    public void FindBestMatch_MatchesPartialRepeatedQueryValuesInOrder()
+    public void FindBestMatch_MatchesRepeatedRegexQueryValuesInOrder()
     {
         var operation = new OperationDefinition
         {
@@ -798,9 +802,12 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
-                        ["tag"] = new List<object?> { "alpha", "beta" }
+                        ["tag"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["regex"] = new List<object?> { ".*alpha.*", ".*beta.*" }
+                        }
                     }
                 }
             ]
@@ -813,7 +820,7 @@ public sealed class MatcherServiceTests
             operation,
             new Dictionary<string, StringValues>(StringComparer.Ordinal)
             {
-                ["tag"] = new StringValues(["pre-alpha", "middle", "beta-post"])
+                ["tag"] = new StringValues(["pre-alpha", "beta-post"])
             },
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body: null);
@@ -822,7 +829,7 @@ public sealed class MatcherServiceTests
     }
 
     [Fact]
-    public void FindBestMatch_DoesNotTreatNullPartialQueryValueAsWildcard()
+    public void FindBestMatch_MatchesEqualsOperatorQueryValue()
     {
         var operation = new OperationDefinition
         {
@@ -830,9 +837,12 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
-                        ["role"] = null
+                        ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["equals"] = "admin"
+                        }
                     }
                 }
             ]
@@ -850,11 +860,11 @@ public sealed class MatcherServiceTests
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body: null);
 
-        Assert.Null(match);
+        Assert.NotNull(match);
     }
 
     [Fact]
-    public void FindBestMatch_MatchesNullPartialQueryValueOnlyAgainstEmptyString()
+    public void FindBestMatch_ReturnsNullWhenEqualsOperatorQueryDoesNotMatch()
     {
         var operation = new OperationDefinition
         {
@@ -862,9 +872,12 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
-                        ["role"] = null
+                        ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["equals"] = "admin"
+                        }
                     }
                 }
             ]
@@ -877,12 +890,12 @@ public sealed class MatcherServiceTests
             operation,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["role"] = string.Empty
+                ["role"] = "guest"
             },
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body: null);
 
-        Assert.NotNull(match);
+        Assert.Null(match);
     }
 
     [Fact]
@@ -894,9 +907,12 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
-                        ["role"] = "^admin-[0-9]+$"
+                        ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["regex"] = "^admin-[0-9]+$"
+                        }
                     }
                 }
             ]
@@ -915,7 +931,6 @@ public sealed class MatcherServiceTests
             body: null);
 
         Assert.NotNull(match);
-        Assert.Equal("^admin-[0-9]+$", match.RegexQuery["role"]);
     }
 
     [Fact]
@@ -927,9 +942,12 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
-                        ["role"] = "^admin-[0-9]+$"
+                        ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["regex"] = "^admin-[0-9]+$"
+                        }
                     }
                 }
             ]
@@ -959,9 +977,12 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
                     {
-                        ["role"] = "^(a+)+$"
+                        ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["regex"] = "^(a+)+$"
+                        }
                     }
                 }
             ]
@@ -993,11 +1014,14 @@ public sealed class MatcherServiceTests
     {
         var specificHeaderMatch = new QueryMatchDefinition
         {
-            PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+            Query = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["role"] = "admin"
+                ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["regex"] = ".*admin.*"
+                }
             },
-            Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            Headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["x-tenant"] = "alpha"
             }
@@ -1005,9 +1029,12 @@ public sealed class MatcherServiceTests
 
         var broaderRegexMatch = new QueryMatchDefinition
         {
-            RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+            Query = new Dictionary<string, object?>(StringComparer.Ordinal)
             {
-                ["role"] = "^admin-[0-9]+$"
+                ["role"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                {
+                    ["regex"] = "^admin-[0-9]+$"
+                }
             }
         };
 
@@ -1032,13 +1059,11 @@ public sealed class MatcherServiceTests
             body: null);
 
         Assert.NotNull(match);
-        Assert.Equal("admin", match.PartialQuery["role"]);
         Assert.Equal("alpha", match.Headers["x-tenant"]);
-        Assert.Empty(match.RegexQuery);
     }
 
     [Fact]
-    public void FindBestMatch_PrefersRegexQueryOverPartialQuery()
+    public void FindBestMatch_MatchesRegexHeaders()
     {
         var operation = new OperationDefinition
         {
@@ -1046,16 +1071,12 @@ public sealed class MatcherServiceTests
             [
                 new QueryMatchDefinition
                 {
-                    PartialQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    Headers = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
                     {
-                        ["role"] = "admin"
-                    }
-                },
-                new QueryMatchDefinition
-                {
-                    RegexQuery = new Dictionary<string, object?>(StringComparer.Ordinal)
-                    {
-                        ["role"] = "^admin-[0-9]+$"
+                        ["X-Env"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["regex"] = "^stag.*$"
+                        }
                     }
                 }
             ]
@@ -1066,16 +1087,14 @@ public sealed class MatcherServiceTests
         var match = FindBestMatch(
             matcher,
             operation,
-            new Dictionary<string, string>(StringComparer.Ordinal)
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["role"] = "admin-42"
+                ["x-env"] = "staging"
             },
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body: null);
 
         Assert.NotNull(match);
-        Assert.Equal("^admin-[0-9]+$", match.RegexQuery["role"]);
-        Assert.Empty(match.PartialQuery);
     }
 
     private static QueryMatchDefinition? FindBestMatch(
