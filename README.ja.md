@@ -122,13 +122,31 @@ paths:
             application/json:
               example:
                 users: []
+  /oauth/token:
+    post:
+      x-match:
+        - body:
+            form:
+              grant_type:
+                equals: authorization_code
+              code:
+                regex: "^[A-Za-z0-9_-]+$"
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  access_token: token-123
+      responses:
+        '400':
+          description: Invalid token request
 ```
 
 各 `x-match` エントリには次を含められます。
 
 - `query`: scalar の `equals` 省略形、または明示的な `equals` / `regex` operator による query string 条件
 - `headers`: scalar の `equals` 省略形、または明示的な `equals` / `regex` operator による header 条件
-- `body`: リクエストボディ条件
+- `body`: JSON body 条件、または `body.form` による form-urlencoded body 条件
 - `x-semantic-match`: セマンティックフォールバックマッチングに使う自然言語の説明
 - `response`: 条件に一致したときに返すレスポンス
 
@@ -141,7 +159,9 @@ paths:
 - scalar の `query` / `headers` 値は `equals` の省略形として扱われます。
 - `query.equals` は単一値の完全一致、順序付きの繰り返し値、および `integer`、`number`、`boolean` など宣言済み OpenAPI query parameter type に対する型付き比較をサポートします。
 - `query.regex` と `headers.regex` は regex マッチを行います。contains / starts-with / ends-with は `.*value.*`、`^value`、`value$` のような regex pattern で表現できます。
-- `body` マッチは現在 JSON リクエストボディに対して適用されます。object に対する body マッチは部分一致なので、追加プロパティを含んでいても一致できます。
+- JSON `body` マッチは object に対して部分一致なので、追加プロパティを含んでいても一致できます。
+- `application/x-www-form-urlencoded` リクエストボディには `body.form` を使います。scalar の form 値は `equals` の省略形として扱われ、form field には明示的な `equals` / `regex` operator も使えます。設定した form key は存在する必要があり、追加の request form key は許可されます。
+- `body.form` は同じ match entry 内で `body.json` や `body.text` と併用できません。
 - 不正な JSON リクエストボディは `body` 条件に一致しません。
 - `x-semantic-match` エントリは、すべての決定的な条件が失敗したときのみ評価されます。アプリケーション設定でセマンティックマッチングを有効化する必要があります。`x-semantic-match` を含むエントリに `query`、`headers`、`body` を同時に指定することはできません。
 - どの `x-match` も成功しない場合、SemanticStub は標準の `responses` セクションへフォールバックします。

@@ -133,6 +133,24 @@ paths:
             application/json:
               example:
                 users: []
+  /oauth/token:
+    post:
+      x-match:
+        - body:
+            form:
+              grant_type:
+                equals: authorization_code
+              code:
+                regex: "^[A-Za-z0-9_-]+$"
+          response:
+            statusCode: 200
+            content:
+              application/json:
+                example:
+                  access_token: token-123
+      responses:
+        '400':
+          description: Invalid token request
 ```
 
 Each `x-match` entry may contain:
@@ -141,7 +159,7 @@ Each `x-match` entry may contain:
   `equals` / `regex` operators.
 - `headers`: header matches using scalar `equals` shorthand or explicit
   `equals` / `regex` operators.
-- `body`: exact body match data.
+- `body`: JSON body match data or `body.form` form-urlencoded match data.
 - `x-semantic-match`: natural-language description used for semantic fallback matching.
 - `response`: the response returned when the match succeeds.
 
@@ -161,9 +179,14 @@ Notes:
 - `query.regex` and `headers.regex` perform regex matching. Use regex patterns
   such as `.*value.*`, `^value`, or `value$` for contains, starts-with, or
   ends-with matches.
-- `body` matching currently applies to JSON request bodies. Body matching is
-  partial for objects, so a request may contain additional properties and still
-  match.
+- JSON `body` matching is partial for objects, so a request may contain
+  additional properties and still match.
+- Use `body.form` for `application/x-www-form-urlencoded` request bodies. Scalar
+  form values are shorthand for `equals`, and form fields may also use explicit
+  `equals` / `regex` operators. Configured form keys must exist, and additional
+  request form keys are allowed.
+- `body.form` cannot be combined with `body.json` or `body.text` in the same
+  match entry.
 - Invalid JSON request bodies do not satisfy `body` match conditions.
 - `x-semantic-match` entries are evaluated only after all deterministic
   conditions fail. They require semantic matching to be enabled in application
