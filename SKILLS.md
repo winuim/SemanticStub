@@ -15,17 +15,42 @@ Execute the full development workflow for an issue from planning to merge.
 2. Run `implement-issue`
 3. Run `review`
 4. Run `create-pr`
-5. Wait for review feedback (if provided)
-6. If review comments exist:
+
+5. **Pause and wait for review feedback**
+   - Do NOT proceed automatically beyond this point
+   - Resume only when explicit instruction or review comments are provided
+
+6. While review comments exist:
    - Run `plan-review-response`
    - Run `implement-review-response`
    - Run `update-pr-after-review`
+
+   - **Pause and wait for re-review feedback**
+     - Do NOT proceed automatically beyond this point
+     - Resume only when explicit instruction or further comments are provided
+
+   - Stop looping when all review comments are resolved or explicit approval is given
+
 7. Run `merge`
 
 ### Constraints
 - Follow AGENTS.md
 - Do not skip steps unless explicitly instructed
 - Ensure each step completes successfully before moving to the next
+- MUST pause after `create-pr` and wait for external input before continuing
+- MUST pause after `update-pr-after-review` and wait for re-review before continuing
+- MUST continue the review loop until all comments are resolved or explicit approval is given, then proceed to `merge`
+
+### Decision Handling
+- If critical decisions are required, pause and ask for confirmation before proceeding.
+
+Critical decisions include:
+- Ambiguous requirements not clearly defined in the issue
+- Multiple implementation approaches with different trade-offs
+- Changes affecting YAML schema, API behavior, or external contracts
+- Unclear test expectations
+
+- For non-critical implementation details, proceed autonomously.
 
 ### Output
 - Summary of each step execution
@@ -64,6 +89,10 @@ Understand a GitHub Issue and produce an implementation plan WITHOUT making any 
 ## Tests
 ## Assumptions
 
+### Decision Handling
+- If the issue is ambiguous or important assumptions are required, pause and ask for confirmation before finalizing the plan.
+- For minor implementation details, note the assumption and proceed.
+
 ---
 
 ## implement-issue
@@ -90,6 +119,8 @@ Implement the approved plan while preserving existing behavior, YAML compatibili
 - Do not make unrelated refactors
 - Maintain the existing architecture (Controller / Service / Infrastructure)
 - Do NOT create commits or PRs
+- MUST pause if no approved plan is available
+- MUST pause if implementation would require deviating from the approved plan
 
 ### Output format
 
@@ -117,7 +148,7 @@ Review code quality without modifying code.
 - Do NOT modify code
 - Follow AGENTS.md
 
-### Output
+### Output format
 - List issues or say "No issues found"
 
 ---
@@ -143,6 +174,9 @@ Create a review-ready pull request for the implemented changes.
 - Keep PR description concise and review-friendly
 - Follow AGENTS.md
 - Create PR as "Ready for review" (not Draft) unless explicitly instructed
+- Confirm working tree is clean except for intended changes
+- Confirm tests required by the issue have been executed
+- Confirm the target branch is correct before creating the PR
 
 ### PR body format
 
@@ -179,6 +213,10 @@ Review external review comments and organize a response plan WITHOUT modifying c
 - Keep the future fix scope minimal
 - Do NOT modify code yet
 
+### Decision Guidance
+- Mark as `not required` only when the comment is already satisfied, incorrect, or intentionally out of scope.
+- Mark as `needs confirmation` when the comment changes behavior, compatibility, or scope.
+
 ### Output format
 
 ## Review Summary
@@ -211,6 +249,7 @@ Apply fixes based on the approved review response plan while preserving existing
 - Do not make unrelated changes
 - Preserve existing behavior and YAML compatibility
 - Maintain existing architecture (Controller / Service / Infrastructure)
+- MUST pause if the approved review response plan is insufficient or needs to change
 
 ### Prohibitions
 - No opportunistic refactoring
@@ -254,6 +293,9 @@ Reflect approved review fixes in the existing pull request.
 - list of addressed comments and responses
 - PR URL
 
+### Completion Rule
+- After updating the PR, stop and wait for re-review or explicit approval.
+
 ---
 
 ## merge
@@ -271,6 +313,10 @@ Safely merge a reviewed pull request and synchronize local/remote states.
 - All tests pass
 - No unrelated diffs are included
 - Target branch is the reviewed PR branch
+
+### Merge Gate
+- Proceed only when review is complete and explicit approval to merge has been given
+- Do NOT merge while unresolved review comments remain
 
 ### Workflow
 1. Fetch latest from remote
