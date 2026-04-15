@@ -38,23 +38,6 @@ public interface IStubService
     /// <summary>
     /// Resolves a response while considering query-based match conditions so more specific stubs can override broad defaults.
     /// </summary>
-    /// <param name="query">Single-value query parameters keyed by parameter name. Missing or empty dictionaries mean no query conditions are available to match.</param>
-    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
-    /// <returns>The same result contract as the full overload, with headers omitted and the body treated as unspecified.</returns>
-    StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, out StubResponse? response)
-    {
-        return TryGetResponse(
-            method,
-            path,
-            query.ToDictionary(entry => entry.Key, entry => new StringValues(entry.Value), StringComparer.Ordinal),
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            body: null,
-            out response);
-    }
-
-    /// <summary>
-    /// Resolves a response while considering query-based match conditions so more specific stubs can override broad defaults.
-    /// </summary>
     /// <param name="query">Query parameters keyed by parameter name, including repeated values in request order.</param>
     /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
     /// <returns>The same result contract as the full overload, with headers omitted and the body treated as unspecified.</returns>
@@ -66,24 +49,6 @@ public interface IStubService
             query,
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body: null,
-            out response);
-    }
-
-    /// <summary>
-    /// Resolves a response while considering query and body match conditions so structured request payloads can select a narrower stub.
-    /// </summary>
-    /// <param name="query">Single-value query parameters keyed by parameter name.</param>
-    /// <param name="body">The request body used for JSON body matching. <see langword="null"/> means no body conditions can match.</param>
-    /// <param name="response">Receives the assembled response only when the return value is <see cref="StubMatchResult.Matched"/>.</param>
-    /// <returns>The same result contract as the full overload, with headers omitted.</returns>
-    StubMatchResult TryGetResponse(string method, string path, IReadOnlyDictionary<string, string> query, string? body, out StubResponse? response)
-    {
-        return TryGetResponse(
-            method,
-            path,
-            query.ToDictionary(entry => entry.Key, entry => new StringValues(entry.Value), StringComparer.Ordinal),
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            body,
             out response);
     }
 
