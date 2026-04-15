@@ -142,6 +142,7 @@ Create a review-ready pull request for the implemented changes.
 - Use Conventional Commits format for commit message and PR title
 - Keep PR description concise and review-friendly
 - Follow AGENTS.md
+- Create PR as "Ready for review" (not Draft) unless explicitly instructed
 
 ### PR body format
 
