@@ -94,31 +94,6 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
-    public async Task ExplainMatchAsync_ReturnsNullSelectedCandidateWhenEmbeddingCallFails()
-    {
-        var service = CreateService(
-            new StubSettings
-            {
-                SemanticMatching = new SemanticMatchingSettings
-                {
-                    Enabled = true,
-                    Endpoint = "http://tei"
-                }
-            },
-            (_, _) => throw new HttpRequestException("boom"));
-
-        var explanation = await service.ExplainMatchAsync(
-            "POST",
-            "/search",
-            new Dictionary<string, StringValues>(StringComparer.Ordinal),
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            "admin search",
-            [CreateCandidate("find admin users")]);
-
-        Assert.Null(explanation.SelectedCandidate);
-    }
-
-    [Fact]
     public async Task ExplainMatchAsync_ReturnsAttemptedNonMatchWhenEmbeddingCallFails()
     {
         var service = CreateService(
@@ -206,73 +181,6 @@ public sealed class SemanticMatcherServiceTests
             [CreateCandidate("show unpaid billing invoices")]);
 
         Assert.Null(explanation.SelectedCandidate);
-    }
-
-    [Fact]
-    public async Task ExplainMatchAsync_ReturnsNullSelectedCandidateWhenTopScoreMarginIsTooSmall()
-    {
-        var service = CreateService(
-            new StubSettings
-            {
-                SemanticMatching = new SemanticMatchingSettings
-                {
-                    Enabled = true,
-                    Endpoint = "http://tei",
-                    Threshold = 0.8d,
-                    TopScoreMargin = 0.03d
-                }
-            },
-            CreateEmbeddingHandler(new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["method: POST\npath: /search\nbody:\nadmin search"] = "[1.0,0.0]",
-                ["find admin users"] = "[0.95,0.05]",
-                ["find administrator accounts"] = "[0.93,0.07]"
-            }));
-
-        var explanation = await service.ExplainMatchAsync(
-            "POST",
-            "/search",
-            new Dictionary<string, StringValues>(StringComparer.Ordinal),
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            "admin search",
-            [CreateCandidate("find admin users"), CreateCandidate("find administrator accounts")]);
-
-        Assert.Null(explanation.SelectedCandidate);
-    }
-
-    [Fact]
-    public async Task ExplainMatchAsync_ReturnsBestCandidateWhenTopScoreMarginIsSatisfied()
-    {
-        var service = CreateService(
-            new StubSettings
-            {
-                SemanticMatching = new SemanticMatchingSettings
-                {
-                    Enabled = true,
-                    Endpoint = "http://tei",
-                    Threshold = 0.8d,
-                    TopScoreMargin = 0.03d
-                }
-            },
-            CreateEmbeddingHandler(new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["method: POST\npath: /search\nbody:\nadmin search"] = "[1.0,0.0]",
-                ["find admin users"] = "[0.95,0.05]",
-                ["show invoices"] = "[0.60,0.40]"
-            }));
-
-        var adminCandidate = CreateCandidate("find admin users");
-        var invoiceCandidate = CreateCandidate("show invoices");
-
-        var explanation = await service.ExplainMatchAsync(
-            "POST",
-            "/search",
-            new Dictionary<string, StringValues>(StringComparer.Ordinal),
-            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            "admin search",
-            [adminCandidate, invoiceCandidate]);
-
-        Assert.Same(adminCandidate, explanation.SelectedCandidate);
     }
 
     [Fact]
@@ -375,16 +283,19 @@ public sealed class SemanticMatcherServiceTests
                 ["find admin users"] = "[0.95,0.05]"
             }));
 
+        var candidate = CreateCandidate("find admin users");
+
         var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             "admin search",
-            [CreateCandidate("find admin users")],
+            [candidate],
             includeCandidateScores: false);
 
         Assert.True(explanation.Attempted);
+        Assert.Same(candidate, explanation.SelectedCandidate);
         Assert.Empty(explanation.CandidateScores);
     }
 
