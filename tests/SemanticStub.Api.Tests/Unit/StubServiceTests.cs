@@ -70,7 +70,7 @@ public sealed class StubServiceTests
             }
         };
 
-        IStubService service = CreateService(document);
+        StubService service = CreateService(document);
 
         var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -79,19 +79,21 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void InterfaceContract_DoesNotExposeStringDictionaryQueryOverloads()
+    public void InterfaceContract_OnlyExposesProductionUsedMembers()
     {
-        var removedQueryOverloads = typeof(IStubService)
+        var publicMethods = typeof(IStubService)
             .GetMethods()
-            .Where(method => method.Name == nameof(IStubService.TryGetResponse))
-            .Where(method =>
-            {
-                var parameters = method.GetParameters();
-                return parameters.Length is 4 or 5 &&
-                    parameters[2].ParameterType == typeof(IReadOnlyDictionary<string, string>);
-            });
+            .Select(method => method.Name)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 
-        Assert.Empty(removedQueryOverloads);
+        Assert.Equal(
+            [
+                nameof(IStubService.DispatchAsync),
+                nameof(IStubService.ExplainMatchAsync),
+                nameof(IStubService.GetAllowedMethods)
+            ],
+            publicMethods);
     }
 
     [Fact]
@@ -170,7 +172,7 @@ public sealed class StubServiceTests
             }
         };
 
-        IStubService service = CreateService(document);
+        StubService service = CreateService(document);
 
         var (result, response) = await service.TryGetResponseAsync(
             HttpMethods.Get,

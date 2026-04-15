@@ -258,8 +258,16 @@ public sealed class StubService : IStubService
         return await DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates);
     }
 
-    /// <inheritdoc/>
-    public async Task<(StubMatchResult Result, StubResponse? Response)> TryGetResponseAsync(
+    /// <summary>
+    /// Resolves the most specific stub response asynchronously and returns the legacy match tuple used by tests.
+    /// </summary>
+    /// <param name="method">The HTTP method to evaluate.</param>
+    /// <param name="path">The request path to match.</param>
+    /// <param name="query">The query-string values to evaluate.</param>
+    /// <param name="headers">The request headers to evaluate.</param>
+    /// <param name="body">The request body used for JSON body matching.</param>
+    /// <returns>A tuple of the match result and the assembled response, which is non-null only when the result is <see cref="StubMatchResult.Matched"/>.</returns>
+    internal async Task<(StubMatchResult Result, StubResponse? Response)> TryGetResponseAsync(
         string method,
         string path,
         IReadOnlyDictionary<string, StringValues> query,

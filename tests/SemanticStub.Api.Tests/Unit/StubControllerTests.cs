@@ -524,31 +524,6 @@ public sealed class StubControllerTests
             });
         }
 
-        public StubMatchResult TryGetResponse(
-            string method,
-            string path,
-            IReadOnlyDictionary<string, StringValues> query,
-            IReadOnlyDictionary<string, string> headers,
-            string? body,
-            out StubResponse? response)
-        {
-            Method = method;
-            Path = path;
-            Query = query;
-            Headers = headers;
-            Body = body;
-
-            if (matchResult == StubMatchResult.Matched)
-            {
-                response = this.response;
-            }
-            else
-            {
-                response = null!;
-            }
-
-            return matchResult;
-        }
     }
 
     private sealed class ThrowingReadStream : Stream
