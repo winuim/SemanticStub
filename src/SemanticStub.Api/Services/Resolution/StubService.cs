@@ -267,7 +267,7 @@ public sealed class StubService : IStubService
     /// <param name="headers">The request headers to evaluate.</param>
     /// <param name="body">The request body used for JSON body matching.</param>
     /// <returns>A tuple of the match result and the assembled response, which is non-null only when the result is <see cref="StubMatchResult.Matched"/>.</returns>
-    public async Task<(StubMatchResult Result, StubResponse? Response)> TryGetResponseAsync(
+    internal async Task<(StubMatchResult Result, StubResponse? Response)> TryGetResponseAsync(
         string method,
         string path,
         IReadOnlyDictionary<string, StringValues> query,
