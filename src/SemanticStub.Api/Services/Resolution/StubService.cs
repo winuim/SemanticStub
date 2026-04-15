@@ -1,7 +1,6 @@
 using SemanticStub.Api.Infrastructure.Yaml;
 using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Models;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 
 namespace SemanticStub.Api.Services;
@@ -32,37 +31,6 @@ public sealed class StubService : IStubService
         StubInspectionProjectionBuilder inspectionProjectionBuilder)
         : this(state.GetCurrentDocument, matcherService, scenarioService, dispatchSelector, inspectionProjectionBuilder)
     {
-    }
-
-    /// <summary>
-    /// Creates a service over an already loaded stub document.
-    /// </summary>
-    /// <param name="document">The validated stub document to evaluate.</param>
-    /// <param name="responseFileReader">Loads the contents of a relative response file selected by the matching stub. Use a throwing delegate when response files are not needed.</param>
-    /// <param name="matcherService">The matcher used to evaluate <c>x-match</c> candidates when a route and method have been resolved.</param>
-    /// <param name="scenarioService">Stores in-memory scenario transitions for responses that opt into <c>x-scenario</c>.</param>
-    /// <param name="semanticMatcherService">When supplied, enables semantic fallback matching for candidates that define <c>x-semantic-match</c>.</param>
-    /// <param name="logger">When supplied, emits structured log events for match selection and semantic scoring.</param>
-    public StubService(
-        StubDocument document,
-        Func<string, string> responseFileReader,
-        MatcherService matcherService,
-        ScenarioService scenarioService,
-        ISemanticMatcherService? semanticMatcherService = null,
-        ILogger<StubService>? logger = null)
-    {
-        this.documentAccessor = () => document;
-        var responseBuilder = new StubResponseBuilder(responseFileReader);
-        this.dispatchSelector = new StubDispatchSelector(
-            matcherService,
-            semanticMatcherService,
-            responseBuilder,
-            new StubDefaultResponseSelector(responseBuilder, scenarioService),
-            scenarioService,
-            logger);
-        this.inspectionProjectionBuilder = new StubInspectionProjectionBuilder(scenarioService);
-        this.matcherService = matcherService;
-        this.scenarioService = scenarioService;
     }
 
     private StubService(
