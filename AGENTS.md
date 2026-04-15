@@ -13,6 +13,11 @@
 - Do not rename or move files unless explicitly requested
 - Do not add dependencies unless necessary
 
+## Task Patterns
+
+Refer to SKILLS.md for reusable task patterns.
+When a task name is specified, follow the corresponding skill.
+
 ## Architecture Constraints
 - Preserve existing structure (Controller / Service / Infrastructure)
 - Do not move logic across layers
