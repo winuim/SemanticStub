@@ -139,18 +139,6 @@ public sealed class StubInspectionServiceTests
 
     private sealed class NoOpSemanticMatcherService : ISemanticMatcherService
     {
-        public Task<QueryMatchDefinition?> FindBestMatchAsync(
-            string method,
-            string path,
-            IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query,
-            IReadOnlyDictionary<string, string> headers,
-            string? body,
-            IReadOnlyCollection<QueryMatchDefinition> candidates,
-            Func<QueryMatchDefinition, bool>? candidateFilter = null)
-        {
-            return Task.FromResult<QueryMatchDefinition?>(null);
-        }
-
         public Task<SemanticMatchExplanation> ExplainMatchAsync(
             string method,
             string path,
@@ -167,18 +155,6 @@ public sealed class StubInspectionServiceTests
 
     private sealed class StubSemanticMatcherService(SemanticMatchExplanation explanation) : ISemanticMatcherService
     {
-        public Task<QueryMatchDefinition?> FindBestMatchAsync(
-            string method,
-            string path,
-            IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query,
-            IReadOnlyDictionary<string, string> headers,
-            string? body,
-            IReadOnlyCollection<QueryMatchDefinition> candidates,
-            Func<QueryMatchDefinition, bool>? candidateFilter = null)
-        {
-            return Task.FromResult(explanation.SelectedCandidate);
-        }
-
         public Task<SemanticMatchExplanation> ExplainMatchAsync(
             string method,
             string path,

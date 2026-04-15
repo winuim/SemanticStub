@@ -16,13 +16,13 @@ namespace SemanticStub.Api.Tests.Unit;
 public sealed class SemanticMatcherServiceTests
 {
     [Fact]
-    public async Task FindBestMatchAsync_ReturnsNullWhenSemanticMatchingIsDisabled()
+    public async Task ExplainMatchAsync_ReturnsNullSelectedCandidateWhenSemanticMatchingIsDisabled()
     {
         var service = CreateService(
             new StubSettings(),
             (_, _) => throw new InvalidOperationException("The HTTP client should not be called when semantic matching is disabled."));
 
-        var match = await service.FindBestMatchAsync(
+        var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -30,7 +30,7 @@ public sealed class SemanticMatcherServiceTests
             "admin search",
             [CreateCandidate("find admin users")]);
 
-        Assert.Null(match);
+        Assert.Null(explanation.SelectedCandidate);
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
-    public async Task FindBestMatchAsync_ReturnsHighestScoringCandidateAboveThreshold()
+    public async Task ExplainMatchAsync_ReturnsHighestScoringCandidateAboveThreshold()
     {
         var service = CreateService(
             new StubSettings
@@ -82,7 +82,7 @@ public sealed class SemanticMatcherServiceTests
         var adminCandidate = CreateCandidate("find admin users");
         var invoiceCandidate = CreateCandidate("show invoices");
 
-        var match = await service.FindBestMatchAsync(
+        var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -90,11 +90,11 @@ public sealed class SemanticMatcherServiceTests
             "admin search",
             [adminCandidate, invoiceCandidate]);
 
-        Assert.Same(adminCandidate, match);
+        Assert.Same(adminCandidate, explanation.SelectedCandidate);
     }
 
     [Fact]
-    public async Task FindBestMatchAsync_ReturnsNullWhenEmbeddingCallFails()
+    public async Task ExplainMatchAsync_ReturnsNullSelectedCandidateWhenEmbeddingCallFails()
     {
         var service = CreateService(
             new StubSettings
@@ -107,7 +107,7 @@ public sealed class SemanticMatcherServiceTests
             },
             (_, _) => throw new HttpRequestException("boom"));
 
-        var match = await service.FindBestMatchAsync(
+        var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -115,7 +115,7 @@ public sealed class SemanticMatcherServiceTests
             "admin search",
             [CreateCandidate("find admin users")]);
 
-        Assert.Null(match);
+        Assert.Null(explanation.SelectedCandidate);
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
-    public async Task FindBestMatchAsync_ReturnsNullWhenBestScoreIsBelowThreshold()
+    public async Task ExplainMatchAsync_ReturnsNullSelectedCandidateWhenBestScoreIsBelowThreshold()
     {
         var service = CreateService(
             new StubSettings
@@ -168,7 +168,7 @@ public sealed class SemanticMatcherServiceTests
                 ["find admin users"] = "[0.9,0.1]"
             }));
 
-        var match = await service.FindBestMatchAsync(
+        var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -176,11 +176,11 @@ public sealed class SemanticMatcherServiceTests
             "admin search",
             [CreateCandidate("find admin users")]);
 
-        Assert.Null(match);
+        Assert.Null(explanation.SelectedCandidate);
     }
 
     [Fact]
-    public async Task FindBestMatchAsync_UsesDefaultThresholdWhenNoneIsConfigured()
+    public async Task ExplainMatchAsync_UsesDefaultThresholdWhenNoneIsConfigured()
     {
         var service = CreateService(
             new StubSettings
@@ -197,7 +197,7 @@ public sealed class SemanticMatcherServiceTests
                 ["show unpaid billing invoices"] = "[0.84,0.5425863986500215]"
             }));
 
-        var match = await service.FindBestMatchAsync(
+        var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -205,11 +205,11 @@ public sealed class SemanticMatcherServiceTests
             "coffee shop search",
             [CreateCandidate("show unpaid billing invoices")]);
 
-        Assert.Null(match);
+        Assert.Null(explanation.SelectedCandidate);
     }
 
     [Fact]
-    public async Task FindBestMatchAsync_ReturnsNullWhenTopScoreMarginIsTooSmall()
+    public async Task ExplainMatchAsync_ReturnsNullSelectedCandidateWhenTopScoreMarginIsTooSmall()
     {
         var service = CreateService(
             new StubSettings
@@ -229,7 +229,7 @@ public sealed class SemanticMatcherServiceTests
                 ["find administrator accounts"] = "[0.93,0.07]"
             }));
 
-        var match = await service.FindBestMatchAsync(
+        var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -237,11 +237,11 @@ public sealed class SemanticMatcherServiceTests
             "admin search",
             [CreateCandidate("find admin users"), CreateCandidate("find administrator accounts")]);
 
-        Assert.Null(match);
+        Assert.Null(explanation.SelectedCandidate);
     }
 
     [Fact]
-    public async Task FindBestMatchAsync_ReturnsBestCandidateWhenTopScoreMarginIsSatisfied()
+    public async Task ExplainMatchAsync_ReturnsBestCandidateWhenTopScoreMarginIsSatisfied()
     {
         var service = CreateService(
             new StubSettings
@@ -264,7 +264,7 @@ public sealed class SemanticMatcherServiceTests
         var adminCandidate = CreateCandidate("find admin users");
         var invoiceCandidate = CreateCandidate("show invoices");
 
-        var match = await service.FindBestMatchAsync(
+        var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -272,7 +272,7 @@ public sealed class SemanticMatcherServiceTests
             "admin search",
             [adminCandidate, invoiceCandidate]);
 
-        Assert.Same(adminCandidate, match);
+        Assert.Same(adminCandidate, explanation.SelectedCandidate);
     }
 
     [Fact]
@@ -389,7 +389,7 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
-    public async Task FindBestMatchAsync_ReturnsNullWhenEmbeddingVectorHasZeroMagnitude()
+    public async Task ExplainMatchAsync_ReturnsNullSelectedCandidateWhenEmbeddingVectorHasZeroMagnitude()
     {
         var service = CreateService(
             new StubSettings
@@ -402,7 +402,7 @@ public sealed class SemanticMatcherServiceTests
             },
             (_, _) => CreateEmbeddingResponse("[[0.0,0.0],[0.9,0.1]]"));
 
-        var match = await service.FindBestMatchAsync(
+        var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -410,11 +410,11 @@ public sealed class SemanticMatcherServiceTests
             "admin search",
             [CreateCandidate("find admin users")]);
 
-        Assert.Null(match);
+        Assert.Null(explanation.SelectedCandidate);
     }
 
     [Fact]
-    public async Task FindBestMatchAsync_ReturnsNullWhenEmbeddingVectorDimensionsDoNotMatch()
+    public async Task ExplainMatchAsync_ReturnsNullSelectedCandidateWhenEmbeddingVectorDimensionsDoNotMatch()
     {
         var service = CreateService(
             new StubSettings
@@ -427,7 +427,7 @@ public sealed class SemanticMatcherServiceTests
             },
             (_, _) => CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1,0.2]]"));
 
-        var match = await service.FindBestMatchAsync(
+        var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -435,7 +435,7 @@ public sealed class SemanticMatcherServiceTests
             "admin search",
             [CreateCandidate("find admin users")]);
 
-        Assert.Null(match);
+        Assert.Null(explanation.SelectedCandidate);
     }
 
     [Theory]
@@ -443,7 +443,7 @@ public sealed class SemanticMatcherServiceTests
     [InlineData("http://tei/", "http://tei/embed")]
     [InlineData("http://tei/embed", "http://tei/embed")]
     [InlineData("http://tei/embed/", "http://tei/embed")]
-    public async Task FindBestMatchAsync_NormalizesEmbeddingEndpointWithoutChangingBehavior(string configuredEndpoint, string expectedEndpoint)
+    public async Task ExplainMatchAsync_NormalizesEmbeddingEndpointWithoutChangingBehavior(string configuredEndpoint, string expectedEndpoint)
     {
         Uri? actualRequestUri = null;
 
@@ -464,7 +464,7 @@ public sealed class SemanticMatcherServiceTests
 
         var candidate = CreateCandidate("find admin users");
 
-        var match = await service.FindBestMatchAsync(
+        var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -472,12 +472,12 @@ public sealed class SemanticMatcherServiceTests
             "admin search",
             [candidate]);
 
-        Assert.Same(candidate, match);
+        Assert.Same(candidate, explanation.SelectedCandidate);
         Assert.Equal(expectedEndpoint, actualRequestUri?.ToString());
     }
 
     [Fact]
-    public async Task FindBestMatchAsync_BuildsRequestTextFromMethodPathQueryHeadersAndTrimmedBody()
+    public async Task ExplainMatchAsync_BuildsRequestTextFromMethodPathQueryHeadersAndTrimmedBody()
     {
         string? capturedRequestText = null;
 
@@ -499,7 +499,7 @@ public sealed class SemanticMatcherServiceTests
 
         var candidate = CreateCandidate("find admin users");
 
-        var match = await service.FindBestMatchAsync(
+        var explanation = await service.ExplainMatchAsync(
             "post",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal)
@@ -515,14 +515,14 @@ public sealed class SemanticMatcherServiceTests
             "  admin search  ",
             [candidate]);
 
-        Assert.Same(candidate, match);
+        Assert.Same(candidate, explanation.SelectedCandidate);
         Assert.Equal(
             "method: POST\npath: /search\nquery:\n  a: first\n  z: last, value\nheaders:\n  Accept: application/json\n  x-tenant: tenant-a\nbody:\nadmin search",
             capturedRequestText);
     }
 
     [Fact]
-    public async Task FindBestMatchAsync_ReturnsNullWhenEmbeddingResponseShapeIsUnexpected()
+    public async Task ExplainMatchAsync_ReturnsNullSelectedCandidateWhenEmbeddingResponseShapeIsUnexpected()
     {
         var service = CreateService(
             new StubSettings
@@ -538,7 +538,7 @@ public sealed class SemanticMatcherServiceTests
                 Content = new StringContent("{\"embeddings\":[[1.0,0.0]]}", Encoding.UTF8, "application/json")
             });
 
-        var match = await service.FindBestMatchAsync(
+        var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -546,7 +546,7 @@ public sealed class SemanticMatcherServiceTests
             "admin search",
             [CreateCandidate("find admin users")]);
 
-        Assert.Null(match);
+        Assert.Null(explanation.SelectedCandidate);
     }
 
     private static QueryMatchDefinition CreateCandidate(string semanticMatch)
