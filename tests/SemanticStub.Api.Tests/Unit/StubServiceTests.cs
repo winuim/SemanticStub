@@ -79,6 +79,22 @@ public sealed class StubServiceTests
     }
 
     [Fact]
+    public void InterfaceContract_DoesNotExposeStringDictionaryQueryOverloads()
+    {
+        var removedQueryOverloads = typeof(IStubService)
+            .GetMethods()
+            .Where(method => method.Name == nameof(IStubService.TryGetResponse))
+            .Where(method =>
+            {
+                var parameters = method.GetParameters();
+                return parameters.Length is 4 or 5 &&
+                    parameters[2].ParameterType == typeof(IReadOnlyDictionary<string, string>);
+            });
+
+        Assert.Empty(removedQueryOverloads);
+    }
+
+    [Fact]
     public void InterfaceContract_ExposesFullConstructorForLoaderBackedDocuments()
     {
         var document = new StubDocument
