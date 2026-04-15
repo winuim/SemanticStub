@@ -23,6 +23,94 @@ public sealed class StubServiceTests
         return Assert.IsType<StubResponse>(response);
     }
 
+    private static (StubMatchResult Result, StubResponse? Response) Dispatch(
+        StubService service,
+        string method,
+        string path)
+    {
+        return Dispatch(
+            service,
+            method,
+            path,
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+    }
+
+    private static (StubMatchResult Result, StubResponse? Response) Dispatch(
+        StubService service,
+        string method,
+        string path,
+        IReadOnlyDictionary<string, string> query)
+    {
+        return Dispatch(
+            service,
+            method,
+            path,
+            query.ToDictionary(entry => entry.Key, entry => new StringValues(entry.Value), StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+    }
+
+    private static (StubMatchResult Result, StubResponse? Response) Dispatch(
+        StubService service,
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query)
+    {
+        return Dispatch(
+            service,
+            method,
+            path,
+            query,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body: null);
+    }
+
+    private static (StubMatchResult Result, StubResponse? Response) Dispatch(
+        StubService service,
+        string method,
+        string path,
+        IReadOnlyDictionary<string, string> query,
+        string? body)
+    {
+        return Dispatch(
+            service,
+            method,
+            path,
+            query.ToDictionary(entry => entry.Key, entry => new StringValues(entry.Value), StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body);
+    }
+
+    private static (StubMatchResult Result, StubResponse? Response) Dispatch(
+        StubService service,
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query,
+        string? body)
+    {
+        return Dispatch(
+            service,
+            method,
+            path,
+            query,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            body);
+    }
+
+    private static (StubMatchResult Result, StubResponse? Response) Dispatch(
+        StubService service,
+        string method,
+        string path,
+        IReadOnlyDictionary<string, StringValues> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
+    {
+        var dispatch = service.DispatchAsync(method, path, query, headers, body).GetAwaiter().GetResult();
+        return (dispatch.Result, dispatch.Response);
+    }
+
     private static StubService CreateService(
         StubDocument document,
         ScenarioService? scenarioService = null,
@@ -39,7 +127,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void InterfaceContract_ExposesConvenienceOverloadForMethodAndPathOnly()
+    public void DispatchAsync_ReturnsMatchedResponseForMethodAndPathOnly()
     {
         var document = new StubDocument
         {
@@ -72,7 +160,7 @@ public sealed class StubServiceTests
 
         StubService service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(200, matchedResponse.StatusCode);
@@ -134,14 +222,14 @@ public sealed class StubServiceTests
             responseFileReader: loader.LoadResponseFileContent,
             matcherService: CreateMatcherService());
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(200, matchedResponse.StatusCode);
     }
 
     [Fact]
-    public async Task TryGetResponseAsync_ReturnsSameMatchedResponseContractAsSyncPath()
+    public async Task DispatchAsync_ReturnsMatchedResponseContract()
     {
         var document = new StubDocument
         {
@@ -174,20 +262,20 @@ public sealed class StubServiceTests
 
         StubService service = CreateService(document);
 
-        var (result, response) = await service.TryGetResponseAsync(
+        var dispatch = await service.DispatchAsync(
             HttpMethods.Get,
             "/hello",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             body: null);
 
-        var matchedResponse = AssertMatchedResponse(result, response);
+        var matchedResponse = AssertMatchedResponse(dispatch.Result, dispatch.Response);
 
         Assert.Equal(200, matchedResponse.StatusCode);
     }
 
     [Fact]
-    public void TryGetResponse_QueryOnlyOverload_MatchesFullOverloadBehavior()
+    public void DispatchAsync_QueryOnlyOverload_MatchesFullOverloadBehavior()
     {
         var document = new StubDocument
         {
@@ -232,14 +320,14 @@ public sealed class StubServiceTests
             ["role"] = "admin"
         };
 
-        var queryOnlyResult = service.TryGetResponse(HttpMethods.Get, "/users", query, out var queryOnlyResponse);
-        var fullResult = service.TryGetResponse(
+        var (queryOnlyResult, queryOnlyResponse) = Dispatch(service, HttpMethods.Get, "/users", query);
+        var (fullResult, fullResponse) = Dispatch(
+            service,
             HttpMethods.Get,
             "/users",
             query.ToDictionary(entry => entry.Key, entry => new StringValues(entry.Value), StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
-            body: null,
-            out var fullResponse);
+            body: null);
 
         var queryOnlyMatchedResponse = AssertMatchedResponse(queryOnlyResult, queryOnlyResponse);
         var fullMatchedResponse = AssertMatchedResponse(fullResult, fullResponse);
@@ -249,7 +337,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_UsesStatusCodeDefinedInYamlResponses()
+    public void DispatchAsync_UsesStatusCodeDefinedInYamlResponses()
     {
         var document = new StubDocument
         {
@@ -282,7 +370,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(201, matchedResponse.StatusCode);
@@ -290,7 +378,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_ReturnsConfiguredDelayFromYamlResponses()
+    public void DispatchAsync_ReturnsConfiguredDelayFromYamlResponses()
     {
         var document = new StubDocument
         {
@@ -324,14 +412,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(250, matchedResponse.DelayMilliseconds);
     }
 
     [Fact]
-    public void TryGetResponse_ReturnsConfiguredDelayFromMatchedResponse()
+    public void DispatchAsync_ReturnsConfiguredDelayFromMatchedResponse()
     {
         var document = new StubDocument
         {
@@ -377,14 +465,14 @@ public sealed class StubServiceTests
             ["role"] = "admin"
         };
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(125, matchedResponse.DelayMilliseconds);
     }
 
     [Fact]
-    public void TryGetResponse_LeavesDelayNullWhenYamlResponseDelayIsNotConfigured()
+    public void DispatchAsync_LeavesDelayNullWhenYamlResponseDelayIsNotConfigured()
     {
         var document = new StubDocument
         {
@@ -417,14 +505,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Null(matchedResponse.DelayMilliseconds);
     }
 
     [Fact]
-    public void TryGetResponse_LeavesDelayNullWhenMatchedResponseDelayIsNotConfigured()
+    public void DispatchAsync_LeavesDelayNullWhenMatchedResponseDelayIsNotConfigured()
     {
         var document = new StubDocument
         {
@@ -469,14 +557,14 @@ public sealed class StubServiceTests
             ["role"] = "admin"
         };
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Null(matchedResponse.DelayMilliseconds);
     }
 
     [Fact]
-    public void TryGetResponse_MatchesMultiValueQueryParameter()
+    public void DispatchAsync_MatchesMultiValueQueryParameter()
     {
         var document = new StubDocument
         {
@@ -537,14 +625,14 @@ public sealed class StubServiceTests
             ["tag"] = new StringValues(["alpha", "beta"])
         };
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/search", query, out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/search", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"ordered\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void TryGetResponse_UsesResponseFileContentWhenConfigured()
+    public void DispatchAsync_UsesResponseFileContentWhenConfigured()
     {
         var document = new StubDocument
         {
@@ -575,7 +663,7 @@ public sealed class StubServiceTests
             responseFileReader: _ => "{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}",
             matcherService: CreateMatcherService());
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/users", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(200, matchedResponse.StatusCode);
@@ -583,7 +671,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_UsesFilePathForAbsoluteResponseFile()
+    public void DispatchAsync_UsesFilePathForAbsoluteResponseFile()
     {
         var filePath = Path.Combine(Path.GetTempPath(), $"semanticstub-{Guid.NewGuid():N}.bin");
         File.WriteAllBytes(filePath, [0x00, 0x01, 0x7F, 0xFF]);
@@ -619,7 +707,7 @@ public sealed class StubServiceTests
                 responseFileReader: _ => throw new InvalidOperationException("Response file reader should not be used for absolute paths."),
                 matcherService: CreateMatcherService());
 
-            var matched = service.TryGetResponse(HttpMethods.Get, "/download", out var response);
+            var (matched, response) = Dispatch(service, HttpMethods.Get, "/download");
             var matchedResponse = AssertMatchedResponse(matched, response);
 
             Assert.Equal(filePath, matchedResponse.FilePath);
@@ -633,7 +721,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_ReturnsConfiguredResponseHeaders()
+    public void DispatchAsync_ReturnsConfiguredResponseHeaders()
     {
         var document = new StubDocument
         {
@@ -680,7 +768,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("hello", matchedResponse.Headers["X-Stub-Source"].Single());
@@ -688,7 +776,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_ReturnsDateTimeHeaderExamplesWithoutJsonQuoting()
+    public void DispatchAsync_ReturnsDateTimeHeaderExamplesWithoutJsonQuoting()
     {
         var document = new StubDocument
         {
@@ -728,14 +816,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("2026-03-26T00:00:00.0000000+00:00", matchedResponse.Headers["Last-Modified"].Single());
     }
 
     [Fact]
-    public void TryGetResponse_JoinsArrayHeaderExamplesUsingHttpHeaderFormatting()
+    public void DispatchAsync_JoinsArrayHeaderExamplesUsingHttpHeaderFormatting()
     {
         var document = new StubDocument
         {
@@ -778,14 +866,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("Accept-Encoding, Origin", matchedResponse.Headers["Vary"].Single());
     }
 
     [Fact]
-    public void TryGetResponse_PreservesSeparateSetCookieHeaderValues()
+    public void DispatchAsync_PreservesSeparateSetCookieHeaderValues()
     {
         var document = new StubDocument
         {
@@ -828,14 +916,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(new[] { "a=1; Path=/", "b=2; Path=/" }, matchedResponse.Headers["Set-Cookie"].ToArray());
     }
 
     [Fact]
-    public void TryGetResponse_ReturnsConfiguredHeadersFromMatchedResponse()
+    public void DispatchAsync_ReturnsConfiguredHeadersFromMatchedResponse()
     {
         var document = new StubDocument
         {
@@ -887,14 +975,14 @@ public sealed class StubServiceTests
             ["role"] = "admin"
         };
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("admin", matchedResponse.Headers["X-User-Role"].Single());
     }
 
     [Fact]
-    public void TryGetResponse_UsesPutOperationWhenConfigured()
+    public void DispatchAsync_UsesPutOperationWhenConfigured()
     {
         var document = new StubDocument
         {
@@ -927,14 +1015,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Put, "/profile", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Put, "/profile");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"replaced\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void TryGetResponse_UsesDeleteOperationWhenConfigured()
+    public void DispatchAsync_UsesDeleteOperationWhenConfigured()
     {
         var document = new StubDocument
         {
@@ -967,14 +1055,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Delete, "/profile", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Delete, "/profile");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"deleted\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void TryGetResponse_PrefersMoreSpecificQueryMatch()
+    public void DispatchAsync_PrefersMoreSpecificQueryMatch()
     {
         var document = new StubDocument
         {
@@ -1042,14 +1130,14 @@ public sealed class StubServiceTests
             ["view"] = "summary"
         };
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"message\":\"admin-summary\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void TryGetResponse_FallsBackToDefaultResponseWhenNoQueryMatchExists()
+    public void DispatchAsync_FallsBackToDefaultResponseWhenNoQueryMatchExists()
     {
         var document = new StubDocument
         {
@@ -1110,14 +1198,14 @@ public sealed class StubServiceTests
             ["role"] = "guest"
         };
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"message\":\"default\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void TryGetResponse_ReturnsResponseNotConfigured_WhenMatchedQueryResponseIsInvalid()
+    public void DispatchAsync_ReturnsResponseNotConfigured_WhenMatchedQueryResponseIsInvalid()
     {
         var document = new StubDocument
         {
@@ -1178,13 +1266,13 @@ public sealed class StubServiceTests
             ["role"] = "admin"
         };
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out _);
+        var (matched, _) = Dispatch(service, HttpMethods.Get, "/users", query);
 
         Assert.Equal(StubMatchResult.ResponseNotConfigured, matched);
     }
 
     [Fact]
-    public void TryGetResponse_ReturnsTextPlainBodyWithCorrectContentType()
+    public void DispatchAsync_ReturnsTextPlainBodyWithCorrectContentType()
     {
         var document = new StubDocument
         {
@@ -1214,7 +1302,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/hello", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("text/plain", matchedResponse.ContentType);
@@ -1222,7 +1310,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_ReturnsXmlContentTypeForResponseFile()
+    public void DispatchAsync_ReturnsXmlContentTypeForResponseFile()
     {
         var document = new StubDocument
         {
@@ -1253,7 +1341,7 @@ public sealed class StubServiceTests
             responseFileReader: _ => "<root><item>1</item></root>",
             matcherService: CreateMatcherService());
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/data", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/data");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("application/xml", matchedResponse.ContentType);
@@ -1261,7 +1349,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_ReturnsNonJsonContentTypeFromXMatch()
+    public void DispatchAsync_ReturnsNonJsonContentTypeFromXMatch()
     {
         var document = new StubDocument
         {
@@ -1300,7 +1388,7 @@ public sealed class StubServiceTests
         var service = CreateService(document);
         var query = new Dictionary<string, string>(StringComparer.Ordinal) { ["format"] = "csv" };
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/report", query, out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/report", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("text/csv", matchedResponse.ContentType);
@@ -1308,7 +1396,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_ReturnsResponseNotConfigured_WhenFallbackJsonExampleIsMissing()
+    public void DispatchAsync_ReturnsResponseNotConfigured_WhenFallbackJsonExampleIsMissing()
     {
         var document = new StubDocument
         {
@@ -1363,13 +1451,13 @@ public sealed class StubServiceTests
             ["role"] = "guest"
         };
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out _);
+        var (matched, _) = Dispatch(service, HttpMethods.Get, "/users", query);
 
         Assert.Equal(StubMatchResult.ResponseNotConfigured, matched);
     }
 
     [Fact]
-    public void TryGetResponse_MatchesResponseUsingRequestBody()
+    public void DispatchAsync_MatchesResponseUsingRequestBody()
     {
         var document = new StubDocument
         {
@@ -1427,19 +1515,19 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(
+        var (matched, response) = Dispatch(
+            service,
             HttpMethods.Post,
             "/login",
             new Dictionary<string, string>(StringComparer.Ordinal),
-            "{\"username\":\"demo\",\"password\":\"secret\",\"rememberMe\":true}",
-            out var response);
+            "{\"username\":\"demo\",\"password\":\"secret\",\"rememberMe\":true}");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"ok\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void TryGetResponse_PrefersMoreSpecificBodyMatch()
+    public void DispatchAsync_PrefersMoreSpecificBodyMatch()
     {
         var document = new StubDocument
         {
@@ -1502,19 +1590,19 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(
+        var (matched, response) = Dispatch(
+            service,
             HttpMethods.Post,
             "/login",
             new Dictionary<string, string>(StringComparer.Ordinal),
-            "{\"username\":\"demo\",\"password\":\"secret\"}",
-            out var response);
+            "{\"username\":\"demo\",\"password\":\"secret\"}");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"specific\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void TryGetResponse_FallsBackToDefaultResponseWhenBodyIsInvalidJson()
+    public void DispatchAsync_FallsBackToDefaultResponseWhenBodyIsInvalidJson()
     {
         var document = new StubDocument
         {
@@ -1571,19 +1659,19 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(
+        var (matched, response) = Dispatch(
+            service,
             HttpMethods.Post,
             "/login",
             new Dictionary<string, string>(StringComparer.Ordinal),
-            "{not-json",
-            out var response);
+            "{not-json");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"fallback\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void TryGetResponse_MatchesResponseUsingHeaders()
+    public void DispatchAsync_MatchesResponseUsingHeaders()
     {
         var document = new StubDocument
         {
@@ -1640,7 +1728,8 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(
+        var (matched, response) = Dispatch(
+            service,
             HttpMethods.Get,
             "/users",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -1648,15 +1737,14 @@ public sealed class StubServiceTests
             {
                 ["x-env"] = "staging"
             },
-            body: null,
-            out var response);
+            body: null);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"message\":\"staging\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void TryGetResponse_MatchesOpenApiPathTemplateWhenExactPathIsMissing()
+    public void DispatchAsync_MatchesOpenApiPathTemplateWhenExactPathIsMissing()
     {
         var document = new StubDocument
         {
@@ -1689,14 +1777,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/orders/123", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/orders/123");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"pattern\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void TryGetResponse_PrefersExactPathOverMatchingTemplatePath()
+    public void DispatchAsync_PrefersExactPathOverMatchingTemplatePath()
     {
         var document = new StubDocument
         {
@@ -1751,14 +1839,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/orders/special", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/orders/special");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"exact\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void TryGetResponse_ReturnsMethodNotAllowedForMatchingTemplatePathWithUnsupportedMethod()
+    public void DispatchAsync_ReturnsMethodNotAllowedForMatchingTemplatePathWithUnsupportedMethod()
     {
         var document = new StubDocument
         {
@@ -1791,7 +1879,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Post, "/orders/123", out _);
+        var (matched, _) = Dispatch(service, HttpMethods.Post, "/orders/123");
 
         Assert.Equal(StubMatchResult.MethodNotAllowed, matched);
     }
@@ -1916,7 +2004,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_UsesSemanticFallbackWhenDeterministicMatchFails()
+    public void DispatchAsync_UsesSemanticFallbackWhenDeterministicMatchFails()
     {
         var semanticCandidate = new QueryMatchDefinition
         {
@@ -1967,7 +2055,7 @@ public sealed class StubServiceTests
             ["role"] = "guest"
         };
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(1, semanticMatcher.CallCount);
@@ -1976,7 +2064,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_DoesNotUseSemanticFallbackWhenDeterministicMatchSucceeds()
+    public void DispatchAsync_DoesNotUseSemanticFallbackWhenDeterministicMatchSucceeds()
     {
         var semanticCandidate = new QueryMatchDefinition
         {
@@ -2027,7 +2115,7 @@ public sealed class StubServiceTests
             ["role"] = "admin"
         };
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/users", query, out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(0, semanticMatcher.CallCount);
@@ -2036,7 +2124,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_DoesNotTreatSemanticOnlyCandidateAsDeterministicMatch()
+    public void DispatchAsync_DoesNotTreatSemanticOnlyCandidateAsDeterministicMatch()
     {
         var document = new StubDocument
         {
@@ -2090,7 +2178,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var matched = service.TryGetResponse(HttpMethods.Get, "/users", out var response);
+        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(404, matchedResponse.StatusCode);
@@ -2098,7 +2186,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_AdvancesScenarioStateAcrossRequests()
+    public void DispatchAsync_AdvancesScenarioStateAcrossRequests()
     {
         var document = new StubDocument
         {
@@ -2155,9 +2243,9 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var firstMatch = service.TryGetResponse(HttpMethods.Post, "/checkout", out var firstResponse);
+        var (firstMatch, firstResponse) = Dispatch(service, HttpMethods.Post, "/checkout");
         var firstMatchedResponse = AssertMatchedResponse(firstMatch, firstResponse);
-        var secondMatch = service.TryGetResponse(HttpMethods.Post, "/checkout", out var secondResponse);
+        var (secondMatch, secondResponse) = Dispatch(service, HttpMethods.Post, "/checkout");
         var secondMatchedResponse = AssertMatchedResponse(secondMatch, secondResponse);
 
         Assert.Equal(409, firstMatchedResponse.StatusCode);
@@ -2167,7 +2255,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void TryGetResponse_FiltersMatchedConditionalResponsesByScenarioState()
+    public void DispatchAsync_FiltersMatchedConditionalResponsesByScenarioState()
     {
         var document = new StubDocument
         {
@@ -2244,9 +2332,9 @@ public sealed class StubServiceTests
             ["step"] = "1"
         };
 
-        var firstMatch = service.TryGetResponse(HttpMethods.Post, "/checkout", query, out var firstResponse);
+        var (firstMatch, firstResponse) = Dispatch(service, HttpMethods.Post, "/checkout", query);
         var firstMatchedResponse = AssertMatchedResponse(firstMatch, firstResponse);
-        var secondMatch = service.TryGetResponse(HttpMethods.Post, "/checkout", query, out var secondResponse);
+        var (secondMatch, secondResponse) = Dispatch(service, HttpMethods.Post, "/checkout", query);
         var secondMatchedResponse = AssertMatchedResponse(secondMatch, secondResponse);
 
         Assert.Equal(409, firstMatchedResponse.StatusCode);
