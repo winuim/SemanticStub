@@ -246,18 +246,6 @@ public sealed class StubDispatchSelectorTests
 
     private sealed class StubSemanticMatcherService(SemanticMatchExplanation explanation) : ISemanticMatcherService
     {
-        public Task<QueryMatchDefinition?> FindBestMatchAsync(
-            string method,
-            string path,
-            IReadOnlyDictionary<string, StringValues> query,
-            IReadOnlyDictionary<string, string> headers,
-            string? body,
-            IReadOnlyCollection<QueryMatchDefinition> candidates,
-            Func<QueryMatchDefinition, bool>? candidateFilter = null)
-        {
-            return Task.FromResult(explanation.SelectedCandidate);
-        }
-
         public Task<SemanticMatchExplanation> ExplainMatchAsync(
             string method,
             string path,

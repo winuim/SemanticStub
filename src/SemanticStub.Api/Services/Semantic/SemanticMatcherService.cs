@@ -25,31 +25,6 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         this.logger = logger;
     }
 
-    /// <summary>
-    /// Finds the best semantic match among the supplied conditional candidates.
-    /// </summary>
-    public async Task<QueryMatchDefinition?> FindBestMatchAsync(
-        string method,
-        string path,
-        IReadOnlyDictionary<string, StringValues> query,
-        IReadOnlyDictionary<string, string> headers,
-        string? body,
-        IReadOnlyCollection<QueryMatchDefinition> candidates,
-        Func<QueryMatchDefinition, bool>? candidateFilter = null)
-    {
-        var explanation = await ExplainMatchAsync(
-            method,
-            path,
-            query,
-            headers,
-            body,
-            candidates,
-            candidateFilter,
-            includeCandidateScores: false);
-
-        return explanation.SelectedCandidate;
-    }
-
     /// <inheritdoc/>
     public async Task<SemanticMatchExplanation> ExplainMatchAsync(
         string method,
