@@ -1967,29 +1967,6 @@ public sealed class StubServiceTests
     {
         public int CallCount { get; private set; }
 
-        public Task<QueryMatchDefinition?> FindBestMatchAsync(
-            string method,
-            string path,
-            IReadOnlyDictionary<string, StringValues> query,
-            IReadOnlyDictionary<string, string> headers,
-            string? body,
-            IReadOnlyCollection<QueryMatchDefinition> candidates,
-            Func<QueryMatchDefinition, bool>? candidateFilter = null)
-        {
-            CallCount++;
-
-            if (nextMatch is null)
-            {
-                return Task.FromResult<QueryMatchDefinition?>(null);
-            }
-
-            var result = candidateFilter is null || candidateFilter(nextMatch)
-                ? nextMatch
-                : null;
-
-            return Task.FromResult<QueryMatchDefinition?>(result);
-        }
-
         public Task<SemanticMatchExplanation> ExplainMatchAsync(
             string method,
             string path,
