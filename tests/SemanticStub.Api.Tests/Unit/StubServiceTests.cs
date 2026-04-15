@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Primitives;
+using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
@@ -118,12 +120,24 @@ public sealed class StubServiceTests
         MatcherService? matcherService = null,
         ISemanticMatcherService? semanticMatcherService = null)
     {
+        var resolvedScenarioService = scenarioService ?? new ScenarioService();
+        var resolvedMatcherService = matcherService ?? CreateMatcherService();
+        var loader = new TestStubDefinitionLoader(document, responseFileReader ?? ThrowingResponseFileReader);
+        var state = new StubDefinitionState(loader, resolvedScenarioService, NullLogger<StubDefinitionState>.Instance);
+        var responseBuilder = new StubResponseBuilder(state.LoadResponseFileContent);
+
         return new StubService(
-            document,
-            responseFileReader ?? ThrowingResponseFileReader,
-            matcherService ?? CreateMatcherService(),
-            scenarioService ?? new ScenarioService(),
-            semanticMatcherService);
+            state,
+            resolvedMatcherService,
+            resolvedScenarioService,
+            new StubDispatchSelector(
+                resolvedMatcherService,
+                semanticMatcherService,
+                responseBuilder,
+                new StubDefaultResponseSelector(responseBuilder, resolvedScenarioService),
+                resolvedScenarioService,
+                NullLogger<StubDispatchSelector>.Instance),
+            new StubInspectionProjectionBuilder(resolvedScenarioService));
     }
 
     [Fact]
@@ -185,7 +199,13 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void InterfaceContract_ExposesFullConstructorForLoaderBackedDocuments()
+    public void ConstructorContract_DoesNotExposePublicConstructors()
+    {
+        Assert.Empty(typeof(StubService).GetConstructors());
+    }
+
+    [Fact]
+    public void ConstructorContract_UsesLoaderBackedDocumentState()
     {
         var document = new StubDocument
         {
@@ -216,11 +236,7 @@ public sealed class StubServiceTests
             }
         };
 
-        var loader = new TestStubDefinitionLoader(document);
-        var service = CreateService(
-            loader.LoadDefaultDefinition(),
-            responseFileReader: loader.LoadResponseFileContent,
-            matcherService: CreateMatcherService());
+        var service = CreateService(document, matcherService: CreateMatcherService());
 
         var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
@@ -1929,7 +1945,7 @@ public sealed class StubServiceTests
         Assert.Equal([HttpMethods.Get, HttpMethods.Patch], allowedMethods);
     }
 
-    private sealed class TestStubDefinitionLoader(StubDocument document) : IStubDefinitionLoader
+    private sealed class TestStubDefinitionLoader(StubDocument document, Func<string, string> responseFileReader) : IStubDefinitionLoader
     {
         public string GetDefinitionsDirectoryPath()
         {
@@ -1943,7 +1959,7 @@ public sealed class StubServiceTests
 
         public string LoadResponseFileContent(string fileName)
         {
-            throw new InvalidOperationException("Response-file loading is not used in this test.");
+            return responseFileReader(fileName);
         }
     }
 
@@ -2044,12 +2060,7 @@ public sealed class StubServiceTests
         };
 
         var semanticMatcher = new SpySemanticMatcherService(semanticCandidate);
-        var service = new StubService(
-            document,
-            _ => throw new InvalidOperationException("No response file loading expected."),
-            CreateMatcherService(),
-            new ScenarioService(),
-            semanticMatcher);
+        var service = CreateService(document, semanticMatcherService: semanticMatcher);
         var query = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["role"] = "guest"
@@ -2104,12 +2115,7 @@ public sealed class StubServiceTests
         };
 
         var semanticMatcher = new SpySemanticMatcherService(semanticCandidate);
-        var service = new StubService(
-            document,
-            _ => throw new InvalidOperationException("No response file loading expected."),
-            CreateMatcherService(),
-            new ScenarioService(),
-            semanticMatcher);
+        var service = CreateService(document, semanticMatcherService: semanticMatcher);
         var query = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["role"] = "admin"
