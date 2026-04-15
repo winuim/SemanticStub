@@ -212,14 +212,6 @@ public sealed class StubService : IStubService
             selection.SelectionReason);
     }
 
-    private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string> query)
-    {
-        return query.ToDictionary(
-            entry => entry.Key,
-            entry => new StringValues(entry.Value),
-            StringComparer.Ordinal);
-    }
-
     private static IReadOnlyDictionary<string, StringValues> ConvertQueryValues(IReadOnlyDictionary<string, string[]> query)
     {
         return query.ToDictionary(
