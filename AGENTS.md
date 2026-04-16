@@ -68,3 +68,15 @@ Ask before:
 - Follow Conventional Commits in English (e.g. feat:, fix:, refactor:)
 - Inline code comments may be written in Japanese if it improves clarity
 - Do not mix Japanese and English in the same commit message or PR description
+
+## Development Guides
+
+Follow the detailed development guidelines in the following documents when relevant:
+
+- docs/development/testing-strategy.md
+- docs/development/naming-conventions.md
+- docs/development/dependency-injection.md
+- docs/development/tech-stack.md
+- docs/development/project-structure.md
+
+These documents define project-specific standards for testing, naming, dependency injection, technology choices, and structure. Always follow them when making related changes.
