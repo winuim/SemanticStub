@@ -1,5 +1,3 @@
-
-
 ## Project Structure
 
 This project follows a layered structure to keep responsibilities clear and maintainable.
@@ -67,6 +65,7 @@ Example structure:
 Disallowed:
 - Application must not depend on Infrastructure implementations
 - Domain must not depend on Application or Infrastructure
+- Avoid circular dependencies between layers.
 
 ### Test Project Structure
 
@@ -86,6 +85,8 @@ Guidelines:
 - Group files by feature or responsibility rather than by technical type when appropriate
 - Avoid overly deep folder nesting
 - Keep related classes close together
+- Prefer grouping related interfaces and implementations together.
+- Avoid creating separate `Interfaces` and `Implementations` folders by default.
 
 Examples:
 - Route-related logic grouped together
@@ -102,9 +103,21 @@ Examples:
 - Do not introduce cross-layer dependencies that violate the rules
 - Follow existing folder patterns and naming conventions
 
+### Feature Organization
+
+- Prefer organizing code by feature within each layer.
+- Keep related types (services, models, helpers) close together.
+- Avoid scattering related logic across multiple unrelated folders.
+
+Examples:
+- Matching feature (matcher, related models, helpers)
+- Scenario feature (state, transitions, services)
+
 ### Design Goals
 
 - Clear separation of concerns
 - Maintainable and scalable structure
 - Easy navigation for both humans and tools
 - Predictable placement of new code
+- Minimize cross-layer coupling
+- Encourage feature-level cohesion

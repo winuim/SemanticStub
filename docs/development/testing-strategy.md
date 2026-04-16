@@ -1,5 +1,3 @@
-
-
 ## Test Strategy
 
 ### Principles
@@ -17,6 +15,8 @@ Guidelines:
 - Avoid unnecessary mocking of internal collaborators.
 - Add regression tests for bug fixes.
 - Cover edge cases and failure cases when they affect observable behavior.
+- Avoid testing private methods directly; test through public behavior.
+- Keep tests independent; they should not rely on execution order.
 
 Examples of code that should usually be covered by unit tests:
 - matchers
@@ -34,6 +34,8 @@ Guidelines:
 - Verify routing, model binding, filters, middleware interaction, status codes, and response shapes.
 - Prefer real application wiring unless isolation is required for external systems.
 - Replace only truly external dependencies when needed.
+- Use realistic configuration and data where possible.
+- Avoid excessive mocking in integration tests.
 
 Examples of code that should usually be covered by integration tests:
 - admin or inspection endpoints
@@ -70,14 +72,30 @@ Guidelines:
 - Critical user flows should have selective end-to-end coverage.
 - Bug fixes should include regression tests when practical.
 
+### Test Data
+
+- Use clear and minimal test data focused on the behavior being tested.
+- Avoid large or overly complex test fixtures.
+- Prefer inline test data when it improves readability.
+- Use builders or helpers when setup becomes repetitive.
+
 ### Test Design Guidelines
 - Write tests that describe behavior clearly.
 - Keep each test focused on one behavior.
 - Avoid brittle assertions tied to incidental implementation details.
 - Name tests so the intended behavior is easy to understand.
 - Prefer readable test setup over overly clever reuse.
+- Prefer Arrange-Act-Assert structure.
+- Avoid excessive assertions in a single test.
+- Tests should fail for a single clear reason.
 
 ### Preferred Libraries
 - xUnit
 - Moq
 - Shouldly
+
+### Naming Conventions for Tests
+
+- Follow naming patterns defined in `naming-conventions.md`.
+- Test names should clearly describe behavior and expected outcome.
+- Avoid vague test names such as `Test1` or `ShouldWork`.

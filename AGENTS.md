@@ -78,5 +78,10 @@ Follow the detailed development guidelines in the following documents when relev
 - docs/development/dependency-injection.md
 - docs/development/tech-stack.md
 - docs/development/project-structure.md
+- docs/development/error-handling.md
+- docs/development/logging.md
+- docs/development/api-design.md
+- docs/development/configuration.md
+- docs/development/async-guidelines.md
 
-These documents define project-specific standards for testing, naming, dependency injection, technology choices, and structure. Always follow them when making related changes.
+These documents define project-specific standards for testing, naming, dependency injection, technology choices, and structure. Always follow them when making related changes. If multiple guidelines apply, prioritize correctness, safety, and consistency.

@@ -12,6 +12,8 @@ This project uses dependency injection to keep composition explicit, support tes
 - Do not introduce interfaces for every class by default.
 - Do not add interfaces solely for naming symmetry or speculative future reuse.
 
+- Prefer constructor injection over property injection.
+
 ### When to Introduce an Interface
 Introduce an interface when at least one of the following is true:
 - The implementation depends on an external system or process boundary.
@@ -24,12 +26,18 @@ Do not introduce an interface when:
 - The class is an internal implementation detail with no real abstraction value.
 - The only reason is to satisfy a blanket rule that every service must have an interface.
 
+
+### Service Resolution
+- Do not resolve services manually using IServiceProvider (avoid Service Locator pattern).
+
 ### Service Lifetimes
 - Use `Scoped` by default.
 - Use `Singleton` for stateless shared services that are safe to reuse across the application lifetime.
 - Use `Transient` for lightweight, short-lived processing components.
 - Do not inject `Scoped` services into `Singleton` services.
   - Avoid captive dependencies.
+
+- Avoid constructors with too many dependencies (consider refactoring responsibilities).
 
 ### Lifetime Guidelines
 #### Scoped
@@ -79,6 +87,8 @@ This keeps dependencies explicit and makes startup code easier to maintain.
 - Prefer mocking external dependencies rather than internal business logic.
 - Do not introduce extra interfaces solely to satisfy mocking preferences.
 - Prefer real implementations for simple internal services when that keeps tests clearer.
+
+- Inject configuration via Options classes instead of passing raw values.
 
 ### Design Principles
 - Prefer explicit, purposeful abstractions.

@@ -7,6 +7,7 @@ This project follows Microsoft C# naming conventions as the baseline, with a few
 - Prefer full words over unclear abbreviations.
 - Avoid ambiguous or overly generic names such as `data`, `value`, or `item`.
 - Keep naming consistent across the codebase.
+- Avoid unnecessary abbreviations unless they are domain-specific and well understood.
 
 ### Casing Rules
 - Use PascalCase for:
@@ -34,6 +35,9 @@ Examples:
 - Properties use PascalCase and should be nouns or adjectives.
 - Boolean members should read naturally (e.g., `IsEnabled`, `HasRoutes`).
 
+- Asynchronous methods should use the `Async` suffix.
+- Avoid negative boolean names when possible (prefer `IsEnabled` over `IsNotDisabled`).
+
 Examples:
 - `GetEffectiveConfiguration()`
 - `TryMatchRoute()`
@@ -51,6 +55,14 @@ Examples:
 - `requestPath`
 - `matchedRoute`
 
+### Constants and Static Members
+- Use PascalCase for constants and static readonly fields.
+- Avoid ALL_CAPS naming.
+
+Examples:
+- `MaxRetryCount`
+- `DefaultTimeout`
+
 ### Test Naming
 - Test class names should match the target type and end with `Tests`.
 - Test method names should clearly describe behavior.
@@ -60,6 +72,14 @@ Examples:
 Examples:
 - `TryMatchRoute_WhenPatternMatches_ReturnsTrue`
 - `Next_WhenScenarioHasNoResponses_ReturnsNull`
+
+### File Naming
+- File names should match the primary type defined in the file.
+- Avoid multiple unrelated types in a single file.
+
+Examples:
+- `RouteMatcher.cs`
+- `ScenarioService.cs`
 
 ### Common Suffixes
 Use consistent suffixes when they improve clarity:
