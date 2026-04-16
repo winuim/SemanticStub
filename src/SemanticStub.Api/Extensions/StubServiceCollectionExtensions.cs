@@ -17,6 +17,18 @@ public static class StubServiceCollectionExtensions
     /// <returns>The same service collection for chaining.</returns>
     public static IServiceCollection AddStubServices(this IServiceCollection services)
     {
+        return services
+            .AddSemanticMatchingServices()
+            .AddYamlInfrastructureServices()
+            .AddInspectionServices()
+            .AddHostedReloadServices()
+            .AddMatchingServices()
+            .AddScenarioServices()
+            .AddResolutionServices();
+    }
+
+    private static IServiceCollection AddSemanticMatchingServices(this IServiceCollection services)
+    {
         services.AddHttpClient("SemanticEmbedding", (serviceProvider, client) =>
         {
             var settings = serviceProvider.GetRequiredService<IOptions<StubSettings>>().Value;
@@ -27,8 +39,20 @@ public static class StubServiceCollectionExtensions
             serviceProvider.GetRequiredService<SemanticEmbeddingClient>(),
             serviceProvider.GetRequiredService<IOptions<StubSettings>>(),
             serviceProvider.GetRequiredService<ILogger<SemanticMatcherService>>()));
+
+        return services;
+    }
+
+    private static IServiceCollection AddYamlInfrastructureServices(this IServiceCollection services)
+    {
         services.AddSingleton<IStubDefinitionLoader, StubDefinitionLoader>();
         services.AddSingleton<StubDefinitionState>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddInspectionServices(this IServiceCollection services)
+    {
         services.AddSingleton<StubInspectionRuntimeStore>();
         services.AddSingleton<StubInspectionScenarioCoordinator>();
         services.AddSingleton<IStubInspectionService>(serviceProvider => new StubInspectionService(
@@ -38,7 +62,19 @@ public static class StubServiceCollectionExtensions
             serviceProvider.GetRequiredService<IStubService>(),
             serviceProvider.GetRequiredService<StubInspectionRuntimeStore>(),
             serviceProvider.GetRequiredService<StubInspectionScenarioCoordinator>()));
+
+        return services;
+    }
+
+    private static IServiceCollection AddHostedReloadServices(this IServiceCollection services)
+    {
         services.AddHostedService<StubDefinitionWatcher>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddMatchingServices(this IServiceCollection services)
+    {
         services.AddSingleton(serviceProvider => new JsonBodyMatcher(
             serviceProvider.GetRequiredService<ILogger<JsonBodyMatcher>>()));
         services.AddSingleton(serviceProvider => new FormBodyMatcher(
@@ -51,7 +87,19 @@ public static class StubServiceCollectionExtensions
             serviceProvider.GetRequiredService<FormBodyMatcher>(),
             serviceProvider.GetRequiredService<QueryValueMatcher>(),
             serviceProvider.GetRequiredService<RegexQueryMatcher>()));
+
+        return services;
+    }
+
+    private static IServiceCollection AddScenarioServices(this IServiceCollection services)
+    {
         services.AddSingleton<ScenarioService>();
+
+        return services;
+    }
+
+    private static IServiceCollection AddResolutionServices(this IServiceCollection services)
+    {
         services.AddSingleton<Func<string, string>>(serviceProvider =>
             serviceProvider.GetRequiredService<StubDefinitionState>().LoadResponseFileContent);
         services.AddSingleton<StubResponseBuilder>(serviceProvider => new StubResponseBuilder(
