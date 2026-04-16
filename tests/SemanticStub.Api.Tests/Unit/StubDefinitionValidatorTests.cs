@@ -199,28 +199,24 @@ public sealed class StubDefinitionValidatorTests
         Assert.Contains("Path '/hello' GET x-match[0].x-semantic-match must not be empty.", exception.Message);
     }
 
-    [Fact]
-    public void ValidateDocument_ThrowsWhenSemanticMatchIsCombinedWithDeterministicCondition()
+    [Theory]
+    [MemberData(nameof(SemanticMatchDeterministicConditions))]
+    public void ValidateDocument_ThrowsWhenSemanticMatchIsCombinedWithDeterministicCondition(
+        QueryMatchDefinition match,
+        string deterministicField)
     {
         var validator = new StubDefinitionValidator();
+        match = WithResponse(match, CreateMatchResponse());
         var document = CreateDocument(
             CreateOperation(matches:
             [
-                new()
-                {
-                    SemanticMatch = "find users",
-                    Query = new(StringComparer.Ordinal)
-                    {
-                        ["role"] = "admin"
-                    },
-                    Response = CreateMatchResponse()
-                }
+                match
             ]));
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => validator.ValidateDocument(document, Directory.GetCurrentDirectory()));
 
-        Assert.Contains("Path '/hello' GET x-match[0].x-semantic-match cannot be combined with query.", exception.Message);
+        Assert.Contains($"Path '/hello' GET x-match[0].x-semantic-match cannot be combined with {deterministicField}.", exception.Message);
         Assert.DoesNotContain("x-match[0].query['role'] must reference a declared query parameter", exception.Message);
     }
 
@@ -365,6 +361,151 @@ public sealed class StubDefinitionValidatorTests
     }
 
     [Fact]
+    public void ValidateDocument_ThrowsWhenFormBodyIsCombinedWithJsonBody()
+    {
+        var validator = new StubDefinitionValidator();
+        var document = CreateDocument(
+            CreateOperation(matches:
+            [
+                new()
+                {
+                    Body = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["form"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["username"] = "demo"
+                        },
+                        ["json"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["username"] = "demo"
+                        }
+                    },
+                    Response = CreateMatchResponse()
+                }
+            ]));
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => validator.ValidateDocument(document, Directory.GetCurrentDirectory()));
+
+        Assert.Contains("Path '/hello' GET x-match[0].body.form cannot be combined with body.json.", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateDocument_ThrowsWhenFormBodyIsCombinedWithTextBody()
+    {
+        var validator = new StubDefinitionValidator();
+        var document = CreateDocument(
+            CreateOperation(matches:
+            [
+                new()
+                {
+                    Body = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["form"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["username"] = "demo"
+                        },
+                        ["text"] = "demo"
+                    },
+                    Response = CreateMatchResponse()
+                }
+            ]));
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => validator.ValidateDocument(document, Directory.GetCurrentDirectory()));
+
+        Assert.Contains("Path '/hello' GET x-match[0].body.form cannot be combined with body.text.", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateDocument_ThrowsWhenFormBodyMatchOperatorIsUnsupported()
+    {
+        var validator = new StubDefinitionValidator();
+        var document = CreateDocument(
+            CreateOperation(matches:
+            [
+                new()
+                {
+                    Body = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["form"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["username"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                            {
+                                ["contains"] = "demo"
+                            }
+                        }
+                    },
+                    Response = CreateMatchResponse()
+                }
+            ]));
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => validator.ValidateDocument(document, Directory.GetCurrentDirectory()));
+
+        Assert.Contains("Path '/hello' GET x-match[0].body.form['username'] uses unsupported operator 'contains'.", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateDocument_ThrowsWhenFormBodyMatchOperatorsAreMixed()
+    {
+        var validator = new StubDefinitionValidator();
+        var document = CreateDocument(
+            CreateOperation(matches:
+            [
+                new()
+                {
+                    Body = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["form"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["username"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                            {
+                                ["equals"] = "demo",
+                                ["regex"] = "^demo$"
+                            }
+                        }
+                    },
+                    Response = CreateMatchResponse()
+                }
+            ]));
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => validator.ValidateDocument(document, Directory.GetCurrentDirectory()));
+
+        Assert.Contains("Path '/hello' GET x-match[0].body.form['username'] must not combine equals and regex operators.", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateDocument_ThrowsWhenFormBodyRegexPatternIsInvalid()
+    {
+        var validator = new StubDefinitionValidator();
+        var document = CreateDocument(
+            CreateOperation(matches:
+            [
+                new()
+                {
+                    Body = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["form"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["username"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                            {
+                                ["regex"] = "["
+                            }
+                        }
+                    },
+                    Response = CreateMatchResponse()
+                }
+            ]));
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => validator.ValidateDocument(document, Directory.GetCurrentDirectory()));
+
+        Assert.Contains("Path '/hello' GET x-match[0].body.form['username'].regex must be a valid regex pattern.", exception.Message);
+    }
+
+    [Fact]
     public void ValidateDocument_ThrowsWhenMatchedResponseStatusCodeIsNotPositive()
     {
         var validator = new StubDefinitionValidator();
@@ -478,6 +619,87 @@ public sealed class StubDefinitionValidatorTests
                         ["message"] = "matched"
                     }
                 }
+            }
+        };
+    }
+
+    private static QueryMatchDefinition WithResponse(
+        QueryMatchDefinition match,
+        QueryMatchResponseDefinition response)
+    {
+        return new()
+        {
+            Query = match.Query,
+            PartialQuery = match.PartialQuery,
+            RegexQuery = match.RegexQuery,
+            SemanticMatch = match.SemanticMatch,
+            Headers = match.Headers,
+            Body = match.Body,
+            Response = response
+        };
+    }
+
+    public static TheoryData<QueryMatchDefinition, string> SemanticMatchDeterministicConditions()
+    {
+        return new()
+        {
+            {
+                new()
+                {
+                    SemanticMatch = "find users",
+                    Query = new(StringComparer.Ordinal)
+                    {
+                        ["role"] = "admin"
+                    }
+                },
+                "query"
+            },
+            {
+                new()
+                {
+                    SemanticMatch = "find users",
+                    PartialQuery = new(StringComparer.Ordinal)
+                    {
+                        ["role"] = "admin"
+                    }
+                },
+                "x-query-partial"
+            },
+            {
+                new()
+                {
+                    SemanticMatch = "find users",
+                    RegexQuery = new(StringComparer.Ordinal)
+                    {
+                        ["role"] = "^admin$"
+                    }
+                },
+                "x-query-regex"
+            },
+            {
+                new()
+                {
+                    SemanticMatch = "find users",
+                    Headers = new(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["X-Env"] = "staging"
+                    }
+                },
+                "headers"
+            },
+            {
+                new()
+                {
+                    SemanticMatch = "find users",
+                    Body = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["json"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["role"] = "admin"
+                        }
+                    }
+                },
+                "body"
             }
         };
     }

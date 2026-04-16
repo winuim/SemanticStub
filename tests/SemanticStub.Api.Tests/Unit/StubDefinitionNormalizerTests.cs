@@ -128,6 +128,36 @@ public sealed class StubDefinitionNormalizerTests
     }
 
     [Fact]
+    public void NormalizeDocument_DoesNotCarryLegacyQueryMatchFields()
+    {
+        var normalizer = new StubDefinitionNormalizer();
+        var document = CreateDocument(new()
+        {
+            Matches =
+            [
+                new()
+                {
+                    PartialQuery = new(StringComparer.Ordinal)
+                    {
+                        ["role"] = "admin"
+                    },
+                    RegexQuery = new(StringComparer.Ordinal)
+                    {
+                        ["tag"] = "^beta$"
+                    },
+                    Response = CreateMatchResponse()
+                }
+            ]
+        });
+
+        var normalized = normalizer.NormalizeDocument(document, Directory.GetCurrentDirectory());
+        var match = Assert.Single(normalized.Paths["/hello"].Get!.Matches);
+
+        Assert.Empty(match.PartialQuery);
+        Assert.Empty(match.RegexQuery);
+    }
+
+    [Fact]
     public void NormalizeDocument_PreservesSemanticMatchAndMatchResponseDetails()
     {
         var normalizer = new StubDefinitionNormalizer();
