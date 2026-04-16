@@ -22,8 +22,22 @@ This project uses a modern, pragmatic .NET-based technology stack. The goal is t
 - Microsoft.Extensions.Logging (baseline)
 - Optional: Serilog (for structured logging when needed)
 
+
 ### HTTP / Networking
 - HttpClient via IHttpClientFactory
+
+### API Documentation
+- Swagger / OpenAPI (Swashbuckle) → API documentation and testing
+
+### Validation
+- Built-in model validation (DataAnnotations)
+- Optional: FluentValidation
+
+### Resilience (Optional)
+- Polly → retry, circuit breaker, timeout handling
+
+### Utilities
+- Time abstraction (e.g., IClock) when needed for testing
 
 ### Development Tools
 - Visual Studio / VS Code
