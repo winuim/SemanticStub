@@ -11,12 +11,12 @@ namespace SemanticStub.Api.Services;
 /// </summary>
 public sealed class SemanticMatcherService : ISemanticMatcherService
 {
-    private readonly SemanticEmbeddingClient embeddingClient;
+    private readonly ISemanticEmbeddingClient embeddingClient;
     private readonly StubSettings settings;
     private readonly ILogger<SemanticMatcherService> logger;
 
     internal SemanticMatcherService(
-        SemanticEmbeddingClient embeddingClient,
+        ISemanticEmbeddingClient embeddingClient,
         IOptions<StubSettings> settings,
         ILogger<SemanticMatcherService> logger)
     {
@@ -62,7 +62,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
         try
         {
-            var endpoint = SemanticEmbeddingClient.NormalizeEndpoint(semanticSettings.Endpoint!);
+            var endpoint = SemanticEmbeddingEndpoint.Normalize(semanticSettings.Endpoint!);
 
             logger.LogInformation(
                 "Semantic matching started for '{Path}' {Method}. Endpoint={Endpoint}, Threshold={Threshold}, TopScoreMargin={TopScoreMargin}, Candidates={CandidateCount}.",
@@ -233,4 +233,5 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             RequiredMargin = semanticSettings.TopScoreMargin,
         };
     }
+
 }

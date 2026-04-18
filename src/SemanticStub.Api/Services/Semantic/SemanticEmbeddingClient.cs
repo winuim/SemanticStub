@@ -8,7 +8,7 @@ namespace SemanticStub.Api.Services;
 /// <summary>
 /// Calls the configured embedding endpoint and validates the returned embedding payloads.
 /// </summary>
-internal sealed class SemanticEmbeddingClient
+internal sealed class SemanticEmbeddingClient : ISemanticEmbeddingClient
 {
     private const string HttpClientName = "SemanticEmbedding";
     private readonly IHttpClientFactory httpClientFactory;
@@ -36,7 +36,7 @@ internal sealed class SemanticEmbeddingClient
     public async Task<IReadOnlyList<float[]>> GetEmbeddingsAsync(IReadOnlyList<string> inputs)
     {
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
-        var endpoint = NormalizeEndpoint(settings.Endpoint!);
+        var endpoint = SemanticEmbeddingEndpoint.Normalize(settings.Endpoint!);
         var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs));
         response.EnsureSuccessStatusCode();
 
@@ -49,14 +49,6 @@ internal sealed class SemanticEmbeddingClient
         }
 
         throw new InvalidOperationException("The embedding endpoint returned an unexpected response shape.");
-    }
-
-    internal static string NormalizeEndpoint(string endpoint)
-    {
-        var normalized = endpoint.TrimEnd('/');
-        return normalized.EndsWith("/embed", StringComparison.OrdinalIgnoreCase)
-            ? normalized
-            : normalized + "/embed";
     }
 
     private static bool TryReadEmbeddings(JsonElement root, int expectedCount, out IReadOnlyList<float[]> embeddings)

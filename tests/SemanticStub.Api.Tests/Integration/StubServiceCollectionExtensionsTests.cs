@@ -43,6 +43,7 @@ public sealed class StubServiceCollectionExtensionsTests
         AssertServiceLifetime<ScenarioService>(services, ServiceLifetime.Singleton);
         AssertServiceLifetime<StubDefinitionState>(services, ServiceLifetime.Singleton);
         AssertServiceLifetime<StubInspectionRuntimeStore>(services, ServiceLifetime.Singleton);
+        AssertServiceLifetime<ISemanticEmbeddingClient>(services, ServiceLifetime.Singleton);
 
         using var serviceProvider = services.BuildServiceProvider(new ServiceProviderOptions
         {
