@@ -16,68 +16,68 @@ namespace SemanticStub.Api.Controllers;
 [Route("_semanticstub/runtime")]
 public sealed class StubInspectionController : ControllerBase
 {
-    private readonly IStubInspectionService inspectionService;
+    private readonly IStubInspectionService _inspectionService;
 
     public StubInspectionController(IStubInspectionService inspectionService)
     {
-        this.inspectionService = inspectionService;
+        _inspectionService = inspectionService;
     }
 
     /// <summary>Returns a point-in-time snapshot of the active configuration metadata.</summary>
     [HttpGet("config")]
-    public IActionResult GetConfig() => Ok(inspectionService.GetConfigSnapshot());
+    public IActionResult GetConfig() => Ok(_inspectionService.GetConfigSnapshot());
 
     /// <summary>Returns the list of all routes currently defined in the loaded stub definitions.</summary>
     [HttpGet("routes")]
-    public IActionResult GetRoutes() => Ok(inspectionService.GetRoutes());
+    public IActionResult GetRoutes() => Ok(_inspectionService.GetRoutes());
 
     /// <summary>Returns the effective runtime details for a single active route.</summary>
     [HttpGet("routes/{**routeId}")]
     public IActionResult GetRoute(string routeId)
     {
-        var route = inspectionService.GetRoute(routeId);
+        var route = _inspectionService.GetRoute(routeId);
         return route is null ? NotFound() : Ok(route);
     }
 
     /// <summary>Returns the current runtime state for all configured scenarios.</summary>
     [HttpGet("scenarios")]
-    public IActionResult GetScenarios() => Ok(inspectionService.GetScenarioStates());
+    public IActionResult GetScenarios() => Ok(_inspectionService.GetScenarioStates());
 
     /// <summary>Returns aggregate runtime metrics for real requests handled by the current process.</summary>
     [HttpGet("metrics")]
-    public IActionResult GetMetrics() => Ok(inspectionService.GetRuntimeMetrics());
+    public IActionResult GetMetrics() => Ok(_inspectionService.GetRuntimeMetrics());
 
     /// <summary>Resets aggregate runtime metrics and recent request history for the current process.</summary>
     [HttpPost("metrics/reset")]
     public IActionResult ResetMetrics()
     {
-        inspectionService.ResetRuntimeMetrics();
+        _inspectionService.ResetRuntimeMetrics();
         return NoContent();
     }
 
     /// <summary>Returns the bounded recent request history for real requests handled by the current process.</summary>
     [HttpGet("requests")]
-    public IActionResult GetRecentRequests([FromQuery] int limit = 20) => Ok(inspectionService.GetRecentRequests(limit));
+    public IActionResult GetRecentRequests([FromQuery] int limit = 20) => Ok(_inspectionService.GetRecentRequests(limit));
 
     /// <summary>Simulates how the runtime would match a virtual request without executing a response.</summary>
     [HttpPost("test-match")]
     public async Task<IActionResult> TestMatch([FromBody] MatchRequestInfo request)
     {
-        return Ok(await inspectionService.TestMatchAsync(request));
+        return Ok(await _inspectionService.TestMatchAsync(request));
     }
 
     /// <summary>Explains how the runtime evaluated a virtual request without executing a response.</summary>
     [HttpPost("explain")]
     public async Task<IActionResult> ExplainMatch([FromBody] MatchRequestInfo request)
     {
-        return Ok(await inspectionService.ExplainMatchAsync(request));
+        return Ok(await _inspectionService.ExplainMatchAsync(request));
     }
 
     /// <summary>Returns the explanation captured for the most recent real request.</summary>
     [HttpGet("explain/last")]
     public IActionResult ExplainLastMatch()
     {
-        var explanation = inspectionService.GetLastMatchExplanation();
+        var explanation = _inspectionService.GetLastMatchExplanation();
         return explanation is null ? NotFound() : Ok(explanation);
     }
 
@@ -85,7 +85,7 @@ public sealed class StubInspectionController : ControllerBase
     [HttpPost("scenarios/reset")]
     public IActionResult ResetScenarios()
     {
-        inspectionService.ResetScenarioStates();
+        _inspectionService.ResetScenarioStates();
         return NoContent();
     }
 
@@ -93,7 +93,7 @@ public sealed class StubInspectionController : ControllerBase
     [HttpPost("scenarios/{name}/reset")]
     public IActionResult ResetScenario(string name)
     {
-        return inspectionService.ResetScenarioState(name)
+        return _inspectionService.ResetScenarioState(name)
             ? NoContent()
             : NotFound();
     }
