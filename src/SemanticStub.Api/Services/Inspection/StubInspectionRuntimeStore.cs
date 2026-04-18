@@ -2,6 +2,9 @@ using SemanticStub.Api.Inspection;
 
 namespace SemanticStub.Api.Services;
 
+/// <summary>
+/// Stores process-wide runtime inspection state such as metrics, recent requests, and the latest match explanation.
+/// </summary>
 internal sealed class StubInspectionRuntimeStore
 {
     private const int MaxRecentRequestCount = 100;

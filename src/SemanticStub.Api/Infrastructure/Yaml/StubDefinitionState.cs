@@ -3,6 +3,9 @@ using SemanticStub.Api.Services;
 
 namespace SemanticStub.Api.Infrastructure.Yaml;
 
+/// <summary>
+/// Holds the current process-wide YAML definition snapshot and swaps it atomically during reloads.
+/// </summary>
 internal sealed class StubDefinitionState
 {
     private readonly IStubDefinitionLoader loader;

@@ -4,6 +4,7 @@ namespace SemanticStub.Api.Services;
 
 /// <summary>
 /// Stores scenario state transitions in memory so YAML-defined stateful flows can advance deterministically across requests.
+/// The state is intentionally shared for the current process lifetime.
 /// </summary>
 public sealed class ScenarioService
 {

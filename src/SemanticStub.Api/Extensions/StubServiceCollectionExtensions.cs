@@ -47,6 +47,7 @@ public static class StubServiceCollectionExtensions
     private static IServiceCollection AddYamlInfrastructureServices(this IServiceCollection services)
     {
         services.AddSingleton<IStubDefinitionLoader, StubDefinitionLoader>();
+        // The loaded YAML definition is process-wide runtime state and is replaced atomically on reload.
         services.AddSingleton<StubDefinitionState>();
 
         return services;
@@ -54,6 +55,7 @@ public static class StubServiceCollectionExtensions
 
     private static IServiceCollection AddInspectionServices(this IServiceCollection services)
     {
+        // Runtime inspection metrics and recent request history are process-wide by design.
         services.AddSingleton<StubInspectionRuntimeStore>();
         services.AddSingleton<StubInspectionScenarioCoordinator>();
         services.AddSingleton<IStubInspectionService>(serviceProvider => new StubInspectionService(
@@ -94,6 +96,7 @@ public static class StubServiceCollectionExtensions
 
     private static IServiceCollection AddScenarioServices(this IServiceCollection services)
     {
+        // YAML scenario progress is shared across requests for the current process.
         services.AddSingleton<ScenarioService>();
 
         return services;
