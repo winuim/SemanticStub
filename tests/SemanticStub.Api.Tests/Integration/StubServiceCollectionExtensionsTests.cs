@@ -16,6 +16,53 @@ public sealed class StubServiceCollectionExtensionsTests
     public void AddStubServices_RegistersProductionCompositionGraph()
     {
         using var workspace = StubWorkspace.Create();
+        var services = CreateServiceCollection(workspace);
+
+        services.AddStubServices();
+
+        using var serviceProvider = services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateOnBuild = true,
+            ValidateScopes = true
+        });
+
+        Assert.NotNull(serviceProvider.GetRequiredService<IStubService>());
+        Assert.NotNull(serviceProvider.GetRequiredService<IStubInspectionService>());
+        Assert.NotNull(serviceProvider.GetRequiredService<IStubDefinitionLoader>());
+        Assert.NotEmpty(serviceProvider.GetServices<IHostedService>());
+    }
+
+    [Fact]
+    public void AddStubServices_RegistersProcessWideStateServicesAsSingletons()
+    {
+        using var workspace = StubWorkspace.Create();
+        var services = CreateServiceCollection(workspace);
+
+        services.AddStubServices();
+
+        AssertServiceLifetime<ScenarioService>(services, ServiceLifetime.Singleton);
+        AssertServiceLifetime<StubDefinitionState>(services, ServiceLifetime.Singleton);
+        AssertServiceLifetime<StubInspectionRuntimeStore>(services, ServiceLifetime.Singleton);
+
+        using var serviceProvider = services.BuildServiceProvider(new ServiceProviderOptions
+        {
+            ValidateOnBuild = true,
+            ValidateScopes = true
+        });
+
+        Assert.Same(
+            serviceProvider.GetRequiredService<ScenarioService>(),
+            serviceProvider.GetRequiredService<ScenarioService>());
+        Assert.Same(
+            serviceProvider.GetRequiredService<StubDefinitionState>(),
+            serviceProvider.GetRequiredService<StubDefinitionState>());
+        Assert.Same(
+            serviceProvider.GetRequiredService<StubInspectionRuntimeStore>(),
+            serviceProvider.GetRequiredService<StubInspectionRuntimeStore>());
+    }
+
+    private static ServiceCollection CreateServiceCollection(StubWorkspace workspace)
+    {
         var services = new ServiceCollection();
 
         services.AddLogging();
@@ -29,18 +76,15 @@ public sealed class StubServiceCollectionExtensionsTests
             WebRootPath = workspace.RootPath,
             WebRootFileProvider = new PhysicalFileProvider(workspace.RootPath)
         });
-        services.AddStubServices();
 
-        using var serviceProvider = services.BuildServiceProvider(new ServiceProviderOptions
-        {
-            ValidateOnBuild = true,
-            ValidateScopes = true
-        });
+        return services;
+    }
 
-        Assert.NotNull(serviceProvider.GetRequiredService<IStubService>());
-        Assert.NotNull(serviceProvider.GetRequiredService<IStubInspectionService>());
-        Assert.NotNull(serviceProvider.GetRequiredService<IStubDefinitionLoader>());
-        Assert.NotEmpty(serviceProvider.GetServices<IHostedService>());
+    private static void AssertServiceLifetime<TService>(IServiceCollection services, ServiceLifetime expectedLifetime)
+    {
+        var descriptor = Assert.Single(services, descriptor => descriptor.ServiceType == typeof(TService));
+
+        Assert.Equal(expectedLifetime, descriptor.Lifetime);
     }
 
     private sealed class StubWorkspace(string rootPath, string samplesPath) : IDisposable
