@@ -1,7 +1,7 @@
 using SemanticStub.Api.Services;
 using Xunit;
 
-namespace SemanticStub.Api.Tests.Unit;
+namespace SemanticStub.Application.Tests.Unit;
 
 public sealed class JsonBodyMatcherTests
 {

@@ -4,7 +4,7 @@ using SemanticStub.Api.Services;
 using System.Diagnostics;
 using Xunit;
 
-namespace SemanticStub.Api.Tests.Unit;
+namespace SemanticStub.Application.Tests.Unit;
 
 public sealed class MatcherServiceTests
 {

@@ -3,7 +3,7 @@ using SemanticStub.Api.Models;
 using System.Threading;
 using Xunit;
 
-namespace SemanticStub.Api.Tests.Unit;
+namespace SemanticStub.Application.Tests.Unit;
 
 public sealed class ScenarioServiceTests
 {
