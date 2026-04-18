@@ -5,18 +5,18 @@ namespace SemanticStub.Api.Services;
 
 internal sealed class StubInspectionScenarioCoordinator
 {
-    private readonly StubDefinitionState state;
-    private readonly ScenarioService scenarioService;
+    private readonly StubDefinitionState _state;
+    private readonly ScenarioService _scenarioService;
 
     public StubInspectionScenarioCoordinator(StubDefinitionState state, ScenarioService scenarioService)
     {
-        this.state = state;
-        this.scenarioService = scenarioService;
+        _state = state;
+        _scenarioService = scenarioService;
     }
 
     public IReadOnlyList<ScenarioStateInfo> GetScenarioStates()
     {
-        return scenarioService.ExecuteLocked(() =>
+        return _scenarioService.ExecuteLocked(() =>
         {
             var scenarioNames = GetCurrentScenarioNames();
 
@@ -28,16 +28,16 @@ internal sealed class StubInspectionScenarioCoordinator
 
     public void ResetScenarioStates()
     {
-        scenarioService.ExecuteLocked(() =>
+        _scenarioService.ExecuteLocked(() =>
         {
-            scenarioService.ResetScenariosWithinLock(GetCurrentScenarioNames(), DateTimeOffset.UtcNow);
+            _scenarioService.ResetScenariosWithinLock(GetCurrentScenarioNames(), DateTimeOffset.UtcNow);
             return 0;
         });
     }
 
     public bool ResetScenarioState(string scenarioName)
     {
-        return scenarioService.ExecuteLocked(() =>
+        return _scenarioService.ExecuteLocked(() =>
         {
             var scenarioNames = GetCurrentScenarioNames();
 
@@ -46,19 +46,19 @@ internal sealed class StubInspectionScenarioCoordinator
                 return false;
             }
 
-            scenarioService.ResetScenarioWithinLock(scenarioName, DateTimeOffset.UtcNow);
+            _scenarioService.ResetScenarioWithinLock(scenarioName, DateTimeOffset.UtcNow);
             return true;
         });
     }
 
     private IReadOnlyList<string> GetCurrentScenarioNames()
     {
-        return StubInspectionDocumentProjector.GetScenarioNames(state.GetCurrentDocument());
+        return StubInspectionDocumentProjector.GetScenarioNames(_state.GetCurrentDocument());
     }
 
     private ScenarioStateInfo CreateScenarioState(string scenarioName)
     {
-        var snapshot = scenarioService.GetSnapshotWithinLock(scenarioName);
+        var snapshot = _scenarioService.GetSnapshotWithinLock(scenarioName);
 
         return new ScenarioStateInfo
         {

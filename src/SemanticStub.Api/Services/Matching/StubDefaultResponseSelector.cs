@@ -4,15 +4,15 @@ namespace SemanticStub.Api.Services;
 
 internal sealed class StubDefaultResponseSelector
 {
-    private readonly StubResponseBuilder responseBuilder;
-    private readonly ScenarioService scenarioService;
+    private readonly StubResponseBuilder _responseBuilder;
+    private readonly ScenarioService _scenarioService;
 
     public StubDefaultResponseSelector(
         StubResponseBuilder responseBuilder,
         ScenarioService scenarioService)
     {
-        this.responseBuilder = responseBuilder;
-        this.scenarioService = scenarioService;
+        _responseBuilder = responseBuilder;
+        _scenarioService = scenarioService;
     }
 
     public bool TrySelect(
@@ -30,14 +30,14 @@ internal sealed class StubDefaultResponseSelector
             return false;
         }
 
-        if (!responseBuilder.TryBuild(statusCode, matchedResponse.Value, out var response))
+        if (!_responseBuilder.TryBuild(statusCode, matchedResponse.Value, out var response))
         {
             return false;
         }
 
         if (mutateScenarioState)
         {
-            scenarioService.Advance(matchedResponse.Value.Scenario);
+            _scenarioService.Advance(matchedResponse.Value.Scenario);
         }
 
         selection = new StubDefaultResponseSelection(
@@ -50,7 +50,7 @@ internal sealed class StubDefaultResponseSelector
     private bool IsEligibleDefaultResponse(string statusCode, ResponseDefinition responseDefinition)
     {
         return int.TryParse(statusCode, out _) &&
-               scenarioService.IsMatch(responseDefinition.Scenario) &&
+               _scenarioService.IsMatch(responseDefinition.Scenario) &&
                (responseDefinition.Content.Count > 0 || !string.IsNullOrEmpty(responseDefinition.ResponseFile));
     }
 }

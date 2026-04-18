@@ -10,10 +10,10 @@ namespace SemanticStub.Api.Services;
 public sealed class MatcherService
 {
     private static readonly QueryMatchSpecificityComparer MatchSpecificityComparer = QueryMatchSpecificityComparer.Instance;
-    private readonly FormBodyMatcher formBodyMatcher;
-    private readonly JsonBodyMatcher jsonBodyMatcher;
-    private readonly QueryValueMatcher queryValueMatcher;
-    private readonly RegexQueryMatcher regexQueryMatcher;
+    private readonly FormBodyMatcher _formBodyMatcher;
+    private readonly JsonBodyMatcher _jsonBodyMatcher;
+    private readonly QueryValueMatcher _queryValueMatcher;
+    private readonly RegexQueryMatcher _regexQueryMatcher;
 
     internal MatcherService(
         JsonBodyMatcher jsonBodyMatcher,
@@ -21,10 +21,10 @@ public sealed class MatcherService
         QueryValueMatcher queryValueMatcher,
         RegexQueryMatcher regexQueryMatcher)
     {
-        this.jsonBodyMatcher = jsonBodyMatcher;
-        this.formBodyMatcher = formBodyMatcher;
-        this.queryValueMatcher = queryValueMatcher;
-        this.regexQueryMatcher = regexQueryMatcher;
+        _jsonBodyMatcher = jsonBodyMatcher;
+        _formBodyMatcher = formBodyMatcher;
+        _queryValueMatcher = queryValueMatcher;
+        _regexQueryMatcher = regexQueryMatcher;
     }
 
     /// <summary>
@@ -128,17 +128,17 @@ public sealed class MatcherService
 
     private bool IsBodyMatch(object? expectedBody, MatchEvaluationContext matchContext)
     {
-        return matchContext.RequestForm is not null && formBodyMatcher.HasFormCondition(expectedBody)
-            ? formBodyMatcher.IsMatch(expectedBody, matchContext.RequestForm)
-            : jsonBodyMatcher.IsMatch(expectedBody, matchContext.RequestBody);
+        return matchContext.RequestForm is not null && _formBodyMatcher.HasFormCondition(expectedBody)
+            ? _formBodyMatcher.IsMatch(expectedBody, matchContext.RequestForm)
+            : _jsonBodyMatcher.IsMatch(expectedBody, matchContext.RequestBody);
     }
 
     private bool IsQueryMatch(
         QueryMatchDefinition match,
         MatchEvaluationContext matchContext)
     {
-        return queryValueMatcher.IsExactMatch(match.Query, matchContext.Query, matchContext.QueryParameterTypes) &&
-               regexQueryMatcher.IsMatch(match.Query, matchContext.Query);
+        return _queryValueMatcher.IsExactMatch(match.Query, matchContext.Query, matchContext.QueryParameterTypes) &&
+               _regexQueryMatcher.IsMatch(match.Query, matchContext.Query);
     }
 
     private MatchEvaluationContext CreateMatchContext(
@@ -149,8 +149,8 @@ public sealed class MatcherService
         string? body)
     {
         var queryParameterTypes = QueryParameterTypeMapBuilder.Build(pathParameters, operation.Parameters);
-        var bodyDocument = jsonBodyMatcher.ParseRequestBody(body);
-        var requestForm = formBodyMatcher.ParseRequestBody(body, GetContentType(headers));
+        var bodyDocument = _jsonBodyMatcher.ParseRequestBody(body);
+        var requestForm = _formBodyMatcher.ParseRequestBody(body, GetContentType(headers));
         return new MatchEvaluationContext(query, headers, queryParameterTypes, bodyDocument, requestForm);
     }
 
@@ -174,8 +174,8 @@ public sealed class MatcherService
             entry => new StringValues(entry.Value),
             StringComparer.OrdinalIgnoreCase);
 
-        return queryValueMatcher.IsExactMatch(expected, actualValues, new Dictionary<string, string>(StringComparer.Ordinal)) &&
-               regexQueryMatcher.IsMatch(expected, actualValues);
+        return _queryValueMatcher.IsExactMatch(expected, actualValues, new Dictionary<string, string>(StringComparer.Ordinal)) &&
+               _regexQueryMatcher.IsMatch(expected, actualValues);
     }
 
     private readonly struct MatchEvaluationContext : IDisposable
@@ -190,7 +190,7 @@ public sealed class MatcherService
             Query = query;
             Headers = headers;
             QueryParameterTypes = queryParameterTypes;
-            this.bodyDocument = bodyDocument;
+            _bodyDocument = bodyDocument;
             RequestBody = bodyDocument?.RootElement;
             RequestForm = requestForm;
         }
@@ -205,11 +205,11 @@ public sealed class MatcherService
 
         public IReadOnlyDictionary<string, StringValues>? RequestForm { get; }
 
-        private readonly JsonDocument? bodyDocument;
+        private readonly JsonDocument? _bodyDocument;
 
         public void Dispose()
         {
-            bodyDocument?.Dispose();
+            _bodyDocument?.Dispose();
         }
     }
 

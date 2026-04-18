@@ -11,18 +11,18 @@ namespace SemanticStub.Api.Services;
 /// </summary>
 public sealed class SemanticMatcherService : ISemanticMatcherService
 {
-    private readonly ISemanticEmbeddingClient embeddingClient;
-    private readonly StubSettings settings;
-    private readonly ILogger<SemanticMatcherService> logger;
+    private readonly ISemanticEmbeddingClient _embeddingClient;
+    private readonly StubSettings _settings;
+    private readonly ILogger<SemanticMatcherService> _logger;
 
     internal SemanticMatcherService(
         ISemanticEmbeddingClient embeddingClient,
         IOptions<StubSettings> settings,
         ILogger<SemanticMatcherService> logger)
     {
-        this.settings = settings.Value;
-        this.embeddingClient = embeddingClient;
-        this.logger = logger;
+        _settings = settings.Value;
+        _embeddingClient = embeddingClient;
+        _logger = logger;
     }
 
     /// <inheritdoc/>
@@ -36,12 +36,12 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         Func<QueryMatchDefinition, bool>? candidateFilter = null,
         bool includeCandidateScores = false)
     {
-        var semanticSettings = settings.SemanticMatching;
+        var semanticSettings = _settings.SemanticMatching;
         var normalizedMethod = method.ToUpperInvariant();
 
         if (!IsEnabled(out var disabledReason))
         {
-            logger.LogDebug(
+            _logger.LogDebug(
                 "Semantic matching skipped for '{Path}' {Method}: {Reason}",
                 path,
                 normalizedMethod,
@@ -53,7 +53,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
         if (semanticCandidates.Count == 0)
         {
-            logger.LogDebug(
+            _logger.LogDebug(
                 "Semantic matching skipped for '{Path}' {Method}: no eligible candidates define x-semantic-match.",
                 path,
                 normalizedMethod);
@@ -64,7 +64,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         {
             var endpoint = SemanticEmbeddingEndpoint.Normalize(semanticSettings.Endpoint!);
 
-            logger.LogInformation(
+            _logger.LogInformation(
                 "Semantic matching started for '{Path}' {Method}. Endpoint={Endpoint}, Threshold={Threshold}, TopScoreMargin={TopScoreMargin}, Candidates={CandidateCount}.",
                 path,
                 normalizedMethod,
@@ -92,7 +92,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         }
         catch (HttpRequestException ex)
         {
-            logger.LogWarning(
+            _logger.LogWarning(
                 ex,
                 "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request failed. Treating the request as a non-match.",
                 path,
@@ -101,7 +101,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         }
         catch (TaskCanceledException ex)
         {
-            logger.LogWarning(
+            _logger.LogWarning(
                 ex,
                 "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request timed out. Treating the request as a non-match.",
                 path,
@@ -110,7 +110,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         }
         catch (Exception ex)
         {
-            logger.LogError(
+            _logger.LogError(
                 ex,
                 "Semantic matching encountered an unexpected error for '{Path}' {Method}. Treating the request as a non-match.",
                 path,
@@ -121,7 +121,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
     private bool IsEnabled(out string reason)
     {
-        var semanticSettings = settings.SemanticMatching;
+        var semanticSettings = _settings.SemanticMatching;
 
         if (!semanticSettings.Enabled)
         {
@@ -163,7 +163,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         };
 
         allTexts.AddRange(semanticCandidates.Select(candidate => candidate.SemanticMatch!));
-        return await embeddingClient.GetEmbeddingsAsync(allTexts);
+        return await _embeddingClient.GetEmbeddingsAsync(allTexts);
     }
 
     private SemanticMatchExplanation ScoreAndLogExplanation(
@@ -183,7 +183,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             includeCandidateScores,
             (candidate, score) =>
             {
-                logger.LogDebug(
+                _logger.LogDebug(
                     "Semantic candidate scored for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}, Threshold={Threshold}.",
                     path,
                     normalizedMethod,
@@ -196,7 +196,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
         if (explanation.SelectedCandidate is null && explanation.SelectedScore is null)
         {
-            logger.LogDebug(
+            _logger.LogDebug(
                 "Semantic matching did not select a candidate for '{Path}' {Method}. Best score stayed below the threshold.",
                 path,
                 normalizedMethod);
@@ -205,7 +205,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
         if (explanation.SelectedCandidate is null && explanation.SelectedScore is not null)
         {
-            logger.LogDebug(
+            _logger.LogDebug(
                 "Semantic matching did not select a candidate for '{Path}' {Method}. Top score margin {Margin} was below the required {RequiredMargin}.",
                 path,
                 normalizedMethod,
@@ -214,7 +214,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             return explanation;
         }
 
-        logger.LogInformation(
+        _logger.LogInformation(
             "Semantic matching selected candidate for '{Path}' {Method}. Candidate='{SemanticMatch}', Score={Score}.",
             path,
             normalizedMethod,

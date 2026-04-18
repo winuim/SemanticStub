@@ -8,8 +8,8 @@ namespace SemanticStub.Api.Services;
 /// </summary>
 public sealed class ScenarioService
 {
-    private readonly ScenarioStateStore stateStore = new();
-    private readonly SemaphoreSlim semaphore = new(1, 1);
+    private readonly ScenarioStateStore _stateStore = new();
+    private readonly SemaphoreSlim _semaphore = new(1, 1);
 
     /// <summary>
     /// Returns whether the supplied scenario definition is eligible for the current in-memory state.
@@ -22,7 +22,7 @@ public sealed class ScenarioService
             return true;
         }
 
-        return stateStore.IsMatch(scenario);
+        return _stateStore.IsMatch(scenario);
     }
 
     /// <summary>
@@ -31,7 +31,7 @@ public sealed class ScenarioService
     /// <param name="scenario">The scenario definition attached to the selected response.</param>
     public void Advance(ScenarioDefinition? scenario)
     {
-        stateStore.Advance(scenario, DateTimeOffset.UtcNow);
+        _stateStore.Advance(scenario, DateTimeOffset.UtcNow);
     }
 
     /// <summary>
@@ -44,7 +44,7 @@ public sealed class ScenarioService
 
     internal void ResetWithinLock()
     {
-        stateStore.Clear();
+        _stateStore.Clear();
     }
 
     /// <summary>
@@ -95,17 +95,17 @@ public sealed class ScenarioService
 
     internal ScenarioStateSnapshot GetSnapshotWithinLock(string scenarioName)
     {
-        return stateStore.GetSnapshot(scenarioName);
+        return _stateStore.GetSnapshot(scenarioName);
     }
 
     internal void ResetScenarioWithinLock(string scenarioName, DateTimeOffset timestamp)
     {
-        stateStore.ResetScenario(scenarioName, timestamp);
+        _stateStore.ResetScenario(scenarioName, timestamp);
     }
 
     internal void ResetScenariosWithinLock(IEnumerable<string> scenarioNames, DateTimeOffset timestamp)
     {
-        stateStore.ResetScenarios(scenarioNames, timestamp);
+        _stateStore.ResetScenarios(scenarioNames, timestamp);
     }
 
     /// <summary>
@@ -127,14 +127,14 @@ public sealed class ScenarioService
     /// <param name="action">The scenario-aware operation to run atomically.</param>
     public T ExecuteLocked<T>(Func<T> action)
     {
-        semaphore.Wait();
+        _semaphore.Wait();
         try
         {
             return action();
         }
         finally
         {
-            semaphore.Release();
+            _semaphore.Release();
         }
     }
 
@@ -144,14 +144,14 @@ public sealed class ScenarioService
     /// <param name="action">The scenario-aware async operation to run atomically.</param>
     public async Task<T> ExecuteLockedAsync<T>(Func<Task<T>> action)
     {
-        await semaphore.WaitAsync();
+        await _semaphore.WaitAsync();
         try
         {
             return await action();
         }
         finally
         {
-            semaphore.Release();
+            _semaphore.Release();
         }
     }
 

@@ -6,11 +6,11 @@ namespace SemanticStub.Api.Services;
 
 internal sealed class StubInspectionProjectionBuilder
 {
-    private readonly ScenarioService scenarioService;
+    private readonly ScenarioService _scenarioService;
 
     public StubInspectionProjectionBuilder(ScenarioService scenarioService)
     {
-        this.scenarioService = scenarioService;
+        _scenarioService = scenarioService;
     }
 
     public MatchRequestInfo CreateInspectionRequest(
@@ -59,7 +59,7 @@ internal sealed class StubInspectionProjectionBuilder
 
         return scenarioNames.ToDictionary(
             scenarioName => scenarioName,
-            scenarioName => scenarioService.GetSnapshotWithinLock(scenarioName),
+            scenarioName => _scenarioService.GetSnapshotWithinLock(scenarioName),
             StringComparer.Ordinal);
     }
 

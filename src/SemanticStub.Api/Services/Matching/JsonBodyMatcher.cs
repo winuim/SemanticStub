@@ -9,14 +9,14 @@ namespace SemanticStub.Api.Services;
 /// </summary>
 internal sealed class JsonBodyMatcher
 {
-    private readonly ILogger<JsonBodyMatcher>? logger;
+    private readonly ILogger<JsonBodyMatcher>? _logger;
 
     /// <summary>
     /// Creates a body matcher with optional warning logging for invalid stub body definitions.
     /// </summary>
     internal JsonBodyMatcher(ILogger<JsonBodyMatcher>? logger = null)
     {
-        this.logger = logger;
+        _logger = logger;
     }
 
     internal JsonDocument? ParseRequestBody(string? body)
@@ -58,12 +58,12 @@ internal sealed class JsonBodyMatcher
         }
         catch (JsonException ex)
         {
-            logger?.LogWarning(ex, "Invalid body match definition in stub YAML — treating as non-match.");
+            _logger?.LogWarning(ex, "Invalid body match definition in stub YAML — treating as non-match.");
             return false;
         }
         catch (NotSupportedException ex)
         {
-            logger?.LogWarning(ex, "Unsupported body match definition in stub YAML — treating as non-match.");
+            _logger?.LogWarning(ex, "Unsupported body match definition in stub YAML — treating as non-match.");
             return false;
         }
     }

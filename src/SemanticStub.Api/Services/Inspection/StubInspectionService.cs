@@ -7,12 +7,12 @@ namespace SemanticStub.Api.Services;
 
 internal sealed class StubInspectionService : IStubInspectionService
 {
-    private readonly StubDefinitionState state;
-    private readonly IStubDefinitionLoader loader;
-    private readonly IOptions<StubSettings> settings;
-    private readonly IStubService stubService;
-    private readonly StubInspectionRuntimeStore runtimeStore;
-    private readonly StubInspectionScenarioCoordinator scenarioCoordinator;
+    private readonly StubDefinitionState _state;
+    private readonly IStubDefinitionLoader _loader;
+    private readonly IOptions<StubSettings> _settings;
+    private readonly IStubService _stubService;
+    private readonly StubInspectionRuntimeStore _runtimeStore;
+    private readonly StubInspectionScenarioCoordinator _scenarioCoordinator;
 
     internal StubInspectionService(
         StubDefinitionState state,
@@ -22,12 +22,12 @@ internal sealed class StubInspectionService : IStubInspectionService
         StubInspectionRuntimeStore runtimeStore,
         StubInspectionScenarioCoordinator scenarioCoordinator)
     {
-        this.state = state;
-        this.loader = loader;
-        this.settings = settings;
-        this.stubService = stubService;
-        this.runtimeStore = runtimeStore;
-        this.scenarioCoordinator = scenarioCoordinator;
+        _state = state;
+        _loader = loader;
+        _settings = settings;
+        _stubService = stubService;
+        _runtimeStore = runtimeStore;
+        _scenarioCoordinator = scenarioCoordinator;
     }
 
     /// <inheritdoc/>
@@ -40,9 +40,9 @@ internal sealed class StubInspectionService : IStubInspectionService
         {
             SnapshotTimestamp = DateTimeOffset.UtcNow,
             ConfigurationHash = StubInspectionDocumentProjector.ComputeDocumentHash(document),
-            DefinitionsDirectoryPath = loader.GetDefinitionsDirectoryPath(),
+            DefinitionsDirectoryPath = _loader.GetDefinitionsDirectoryPath(),
             RouteCount = routes.Count,
-            SemanticMatchingEnabled = settings.Value.SemanticMatching.Enabled,
+            SemanticMatchingEnabled = _settings.Value.SemanticMatching.Enabled,
         };
     }
 
@@ -63,78 +63,78 @@ internal sealed class StubInspectionService : IStubInspectionService
     /// <inheritdoc/>
     public IReadOnlyList<ScenarioStateInfo> GetScenarioStates()
     {
-        return scenarioCoordinator.GetScenarioStates();
+        return _scenarioCoordinator.GetScenarioStates();
     }
 
     /// <inheritdoc/>
     public RuntimeMetricsSummaryInfo GetRuntimeMetrics()
     {
-        return runtimeStore.GetRuntimeMetrics();
+        return _runtimeStore.GetRuntimeMetrics();
     }
 
     /// <inheritdoc/>
     public IReadOnlyList<RecentRequestInfo> GetRecentRequests(int limit)
     {
-        return runtimeStore.GetRecentRequests(limit);
+        return _runtimeStore.GetRecentRequests(limit);
     }
 
     /// <inheritdoc/>
     public async Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request)
     {
-        var explanation = await stubService.ExplainMatchAsync(request);
+        var explanation = await _stubService.ExplainMatchAsync(request);
         return explanation.Result;
     }
 
     /// <inheritdoc/>
     public Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request)
     {
-        return stubService.ExplainMatchAsync(request);
+        return _stubService.ExplainMatchAsync(request);
     }
 
     /// <inheritdoc/>
     public MatchExplanationInfo? GetLastMatchExplanation()
     {
-        return runtimeStore.GetLastMatchExplanation();
+        return _runtimeStore.GetLastMatchExplanation();
     }
 
     /// <inheritdoc/>
     public void RecordLastMatchExplanation(MatchExplanationInfo explanation)
     {
-        runtimeStore.RecordLastMatchExplanation(explanation);
+        _runtimeStore.RecordLastMatchExplanation(explanation);
     }
 
     /// <inheritdoc/>
     public void RecordRequestMetrics(MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
     {
-        runtimeStore.RecordRequestMetrics(explanation, statusCode, elapsed);
+        _runtimeStore.RecordRequestMetrics(explanation, statusCode, elapsed);
     }
 
     /// <inheritdoc/>
     public void RecordRecentRequest(DateTimeOffset timestamp, string method, string path, MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
     {
-        runtimeStore.RecordRecentRequest(timestamp, method, path, explanation, statusCode, elapsed);
+        _runtimeStore.RecordRecentRequest(timestamp, method, path, explanation, statusCode, elapsed);
     }
 
     /// <inheritdoc/>
     public void ResetRuntimeMetrics()
     {
-        runtimeStore.ResetMetrics();
+        _runtimeStore.ResetMetrics();
     }
 
     /// <inheritdoc/>
     public void ResetScenarioStates()
     {
-        scenarioCoordinator.ResetScenarioStates();
+        _scenarioCoordinator.ResetScenarioStates();
     }
 
     /// <inheritdoc/>
     public bool ResetScenarioState(string scenarioName)
     {
-        return scenarioCoordinator.ResetScenarioState(scenarioName);
+        return _scenarioCoordinator.ResetScenarioState(scenarioName);
     }
 
     private StubDocument GetCurrentDocument()
     {
-        return state.GetCurrentDocument();
+        return _state.GetCurrentDocument();
     }
 }

@@ -9,7 +9,7 @@ namespace SemanticStub.Api.Services;
 internal sealed class ScenarioStateStore
 {
     private const string InitialState = "initial";
-    private readonly ConcurrentDictionary<string, ScenarioStateSnapshot> currentStates = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ScenarioStateSnapshot> _currentStates = new(StringComparer.Ordinal);
 
     public bool IsMatch(ScenarioDefinition scenario)
     {
@@ -24,36 +24,36 @@ internal sealed class ScenarioStateStore
             return;
         }
 
-        currentStates[scenario.Name] = CreateSnapshot(scenario.Next, timestamp);
+        _currentStates[scenario.Name] = CreateSnapshot(scenario.Next, timestamp);
     }
 
     public ScenarioStateSnapshot GetSnapshot(string scenarioName)
     {
-        return currentStates.TryGetValue(scenarioName, out var snapshot)
+        return _currentStates.TryGetValue(scenarioName, out var snapshot)
             ? snapshot
             : CreateSnapshot(InitialState, timestamp: null);
     }
 
     public void ResetScenario(string scenarioName, DateTimeOffset timestamp)
     {
-        currentStates[scenarioName] = CreateSnapshot(InitialState, timestamp);
+        _currentStates[scenarioName] = CreateSnapshot(InitialState, timestamp);
     }
 
     public void ResetScenarios(IEnumerable<string> scenarioNames, DateTimeOffset timestamp)
     {
         var scenarioNameSet = new HashSet<string>(scenarioNames, StringComparer.Ordinal);
 
-        currentStates.Clear();
+        _currentStates.Clear();
 
         foreach (var scenarioName in scenarioNameSet)
         {
-            currentStates[scenarioName] = CreateSnapshot(InitialState, timestamp);
+            _currentStates[scenarioName] = CreateSnapshot(InitialState, timestamp);
         }
     }
 
     public void Clear()
     {
-        currentStates.Clear();
+        _currentStates.Clear();
     }
 
     private static ScenarioStateSnapshot CreateSnapshot(string state, DateTimeOffset? timestamp)

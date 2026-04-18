@@ -12,14 +12,14 @@ namespace SemanticStub.Api.Services;
 internal sealed class RegexQueryMatcher
 {
     private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(100);
-    private readonly ILogger<RegexQueryMatcher>? logger;
+    private readonly ILogger<RegexQueryMatcher>? _logger;
 
     /// <summary>
     /// Creates a regex query matcher with optional warning logging for invalid or slow regex patterns.
     /// </summary>
     internal RegexQueryMatcher(ILogger<RegexQueryMatcher>? logger = null)
     {
-        this.logger = logger;
+        _logger = logger;
     }
 
     internal bool IsMatch(
@@ -96,12 +96,12 @@ internal sealed class RegexQueryMatcher
         }
         catch (ArgumentException ex)
         {
-            logger?.LogWarning(ex, "Invalid regex match pattern '{Pattern}' in stub definition — treating as non-match.", pattern);
+            _logger?.LogWarning(ex, "Invalid regex match pattern '{Pattern}' in stub definition — treating as non-match.", pattern);
             return false;
         }
         catch (RegexMatchTimeoutException)
         {
-            logger?.LogWarning("Regex match pattern '{Pattern}' timed out after {TimeoutMs}ms — treating as non-match.", pattern, RegexMatchTimeout.TotalMilliseconds);
+            _logger?.LogWarning("Regex match pattern '{Pattern}' timed out after {TimeoutMs}ms — treating as non-match.", pattern, RegexMatchTimeout.TotalMilliseconds);
             return false;
         }
     }

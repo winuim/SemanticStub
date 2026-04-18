@@ -11,8 +11,8 @@ namespace SemanticStub.Api.Services;
 internal sealed class SemanticEmbeddingClient : ISemanticEmbeddingClient
 {
     private const string HttpClientName = "SemanticEmbedding";
-    private readonly IHttpClientFactory httpClientFactory;
-    private readonly SemanticMatchingSettings settings;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly SemanticMatchingSettings _settings;
 
     /// <summary>
     /// Creates a client over the configured embedding endpoint settings.
@@ -21,8 +21,8 @@ internal sealed class SemanticEmbeddingClient : ISemanticEmbeddingClient
     /// <param name="settings">The stub runtime settings that provide the semantic endpoint configuration.</param>
     public SemanticEmbeddingClient(IHttpClientFactory httpClientFactory, IOptions<StubSettings> settings)
     {
-        this.httpClientFactory = httpClientFactory;
-        this.settings = settings.Value.SemanticMatching;
+        _httpClientFactory = httpClientFactory;
+        _settings = settings.Value.SemanticMatching;
     }
 
     /// <summary>
@@ -35,8 +35,8 @@ internal sealed class SemanticEmbeddingClient : ISemanticEmbeddingClient
     /// <exception cref="InvalidOperationException">Thrown when the response shape is invalid.</exception>
     public async Task<IReadOnlyList<float[]>> GetEmbeddingsAsync(IReadOnlyList<string> inputs)
     {
-        var httpClient = httpClientFactory.CreateClient(HttpClientName);
-        var endpoint = SemanticEmbeddingEndpoint.Normalize(settings.Endpoint!);
+        var httpClient = _httpClientFactory.CreateClient(HttpClientName);
+        var endpoint = SemanticEmbeddingEndpoint.Normalize(_settings.Endpoint!);
         var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs));
         response.EnsureSuccessStatusCode();
 
