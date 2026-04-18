@@ -62,7 +62,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
 
         try
         {
-            var endpoint = NormalizeEndpoint(semanticSettings.Endpoint!);
+            var endpoint = SemanticEmbeddingEndpoint.Normalize(semanticSettings.Endpoint!);
 
             logger.LogInformation(
                 "Semantic matching started for '{Path}' {Method}. Endpoint={Endpoint}, Threshold={Threshold}, TopScoreMargin={TopScoreMargin}, Candidates={CandidateCount}.",
@@ -234,11 +234,4 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         };
     }
 
-    private static string NormalizeEndpoint(string endpoint)
-    {
-        var normalized = endpoint.TrimEnd('/');
-        return normalized.EndsWith("/embed", StringComparison.OrdinalIgnoreCase)
-            ? normalized
-            : normalized + "/embed";
-    }
 }

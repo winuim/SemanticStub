@@ -36,7 +36,7 @@ internal sealed class SemanticEmbeddingClient : ISemanticEmbeddingClient
     public async Task<IReadOnlyList<float[]>> GetEmbeddingsAsync(IReadOnlyList<string> inputs)
     {
         var httpClient = httpClientFactory.CreateClient(HttpClientName);
-        var endpoint = NormalizeEndpoint(settings.Endpoint!);
+        var endpoint = SemanticEmbeddingEndpoint.Normalize(settings.Endpoint!);
         var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs));
         response.EnsureSuccessStatusCode();
 
@@ -49,14 +49,6 @@ internal sealed class SemanticEmbeddingClient : ISemanticEmbeddingClient
         }
 
         throw new InvalidOperationException("The embedding endpoint returned an unexpected response shape.");
-    }
-
-    internal static string NormalizeEndpoint(string endpoint)
-    {
-        var normalized = endpoint.TrimEnd('/');
-        return normalized.EndsWith("/embed", StringComparison.OrdinalIgnoreCase)
-            ? normalized
-            : normalized + "/embed";
     }
 
     private static bool TryReadEmbeddings(JsonElement root, int expectedCount, out IReadOnlyList<float[]> embeddings)
