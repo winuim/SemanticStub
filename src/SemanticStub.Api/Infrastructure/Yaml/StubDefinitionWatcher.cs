@@ -3,53 +3,53 @@ namespace SemanticStub.Api.Infrastructure.Yaml;
 internal sealed class StubDefinitionWatcher : IHostedService, IDisposable
 {
     private static readonly TimeSpan ReloadDebounceDelay = TimeSpan.FromMilliseconds(250);
-    private readonly IStubDefinitionLoader loader;
-    private readonly StubDefinitionState state;
-    private readonly ILogger<StubDefinitionWatcher> logger;
-    private readonly object syncRoot = new();
-    private FileSystemWatcher? watcher;
-    private Timer? reloadTimer;
-    private string? pendingPath;
+    private readonly IStubDefinitionLoader _loader;
+    private readonly StubDefinitionState _state;
+    private readonly ILogger<StubDefinitionWatcher> _logger;
+    private readonly object _syncRoot = new();
+    private FileSystemWatcher? _watcher;
+    private Timer? _reloadTimer;
+    private string? _pendingPath;
 
     public StubDefinitionWatcher(
         IStubDefinitionLoader loader,
         StubDefinitionState state,
         ILogger<StubDefinitionWatcher> logger)
     {
-        this.loader = loader;
-        this.state = state;
-        this.logger = logger;
+        _loader = loader;
+        _state = state;
+        _logger = logger;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        var definitionsPath = loader.GetDefinitionsDirectoryPath();
-        watcher = new FileSystemWatcher(definitionsPath)
+        var definitionsPath = _loader.GetDefinitionsDirectoryPath();
+        _watcher = new FileSystemWatcher(definitionsPath)
         {
             IncludeSubdirectories = true,
             NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime | NotifyFilters.DirectoryName
         };
 
-        watcher.Changed += OnFileChanged;
-        watcher.Created += OnFileChanged;
-        watcher.Deleted += OnFileChanged;
-        watcher.Renamed += OnFileRenamed;
-        watcher.EnableRaisingEvents = true;
+        _watcher.Changed += OnFileChanged;
+        _watcher.Created += OnFileChanged;
+        _watcher.Deleted += OnFileChanged;
+        _watcher.Renamed += OnFileRenamed;
+        _watcher.EnableRaisingEvents = true;
 
-        logger.LogInformation("Watching stub definitions under '{DefinitionsPath}'.", definitionsPath);
+        _logger.LogInformation("Watching stub definitions under '{DefinitionsPath}'.", definitionsPath);
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        if (watcher is not null)
+        if (_watcher is not null)
         {
-            watcher.EnableRaisingEvents = false;
+            _watcher.EnableRaisingEvents = false;
         }
 
-        lock (syncRoot)
+        lock (_syncRoot)
         {
-            reloadTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _reloadTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
 
         return Task.CompletedTask;
@@ -57,18 +57,18 @@ internal sealed class StubDefinitionWatcher : IHostedService, IDisposable
 
     public void Dispose()
     {
-        if (watcher is not null)
+        if (_watcher is not null)
         {
-            watcher.Changed -= OnFileChanged;
-            watcher.Created -= OnFileChanged;
-            watcher.Deleted -= OnFileChanged;
-            watcher.Renamed -= OnFileRenamed;
-            watcher.Dispose();
+            _watcher.Changed -= OnFileChanged;
+            _watcher.Created -= OnFileChanged;
+            _watcher.Deleted -= OnFileChanged;
+            _watcher.Renamed -= OnFileRenamed;
+            _watcher.Dispose();
         }
 
-        lock (syncRoot)
+        lock (_syncRoot)
         {
-            reloadTimer?.Dispose();
+            _reloadTimer?.Dispose();
         }
     }
 
@@ -95,11 +95,11 @@ internal sealed class StubDefinitionWatcher : IHostedService, IDisposable
 
     private void ScheduleReload(string path)
     {
-        lock (syncRoot)
+        lock (_syncRoot)
         {
-            pendingPath = path;
-            reloadTimer ??= new Timer(_ => ReloadDefinitions(), state: null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-            reloadTimer.Change(ReloadDebounceDelay, Timeout.InfiniteTimeSpan);
+            _pendingPath = path;
+            _reloadTimer ??= new Timer(_ => ReloadDefinitions(), state: null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _reloadTimer.Change(ReloadDebounceDelay, Timeout.InfiniteTimeSpan);
         }
     }
 
@@ -107,14 +107,14 @@ internal sealed class StubDefinitionWatcher : IHostedService, IDisposable
     {
         string? changedPath;
 
-        lock (syncRoot)
+        lock (_syncRoot)
         {
-            changedPath = pendingPath;
-            pendingPath = null;
+            changedPath = _pendingPath;
+            _pendingPath = null;
         }
 
-        logger.LogInformation("Detected stub definition change at '{ChangedPath}'. Reloading definitions.", changedPath);
-        state.TryReload();
+        _logger.LogInformation("Detected stub definition change at '{ChangedPath}'. Reloading definitions.", changedPath);
+        _state.TryReload();
     }
 
     private static bool IsRelevantDefinitionPath(string path)
