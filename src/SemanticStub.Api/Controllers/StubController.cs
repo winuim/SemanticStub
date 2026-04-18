@@ -14,15 +14,15 @@ namespace SemanticStub.Api.Controllers;
 [Route("{*path}")]
 public sealed class StubController : ControllerBase
 {
-    private readonly IStubService stubService;
-    private readonly IStubInspectionService inspectionService;
-    private readonly ILogger<StubController> logger;
+    private readonly IStubService _stubService;
+    private readonly IStubInspectionService _inspectionService;
+    private readonly ILogger<StubController> _logger;
 
     public StubController(IStubService stubService, IStubInspectionService inspectionService, ILogger<StubController> logger)
     {
-        this.stubService = stubService;
-        this.inspectionService = inspectionService;
-        this.logger = logger;
+        _stubService = stubService;
+        _inspectionService = inspectionService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -101,15 +101,15 @@ public sealed class StubController : ControllerBase
     {
         var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
         var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
-        var requestBody = await StubRequestBodyReader.ReadAsync(Request, logger);
-        return await stubService.DispatchAsync(method, requestPath, query, headers, requestBody);
+        var requestBody = await StubRequestBodyReader.ReadAsync(Request, _logger);
+        return await _stubService.DispatchAsync(method, requestPath, query, headers, requestBody);
     }
 
     private async Task<IActionResult> CreateActionResultAsync(StubDispatchResult dispatch, string requestPath, Action<int> setStatusCode)
     {
         if (dispatch.Result == StubMatchResult.Matched)
         {
-            inspectionService.RecordLastMatchExplanation(dispatch.Explanation);
+            _inspectionService.RecordLastMatchExplanation(dispatch.Explanation);
         }
 
         if (dispatch.Result == StubMatchResult.PathNotFound)
@@ -157,7 +157,7 @@ public sealed class StubController : ControllerBase
 
     private void ApplyAllowHeader(string requestPath)
     {
-        var allowedMethods = stubService.GetAllowedMethods(requestPath);
+        var allowedMethods = _stubService.GetAllowedMethods(requestPath);
 
         if (allowedMethods.Count > 0)
         {
@@ -180,8 +180,8 @@ public sealed class StubController : ControllerBase
 
     private void RecordRequestObservation(StubDispatchResult dispatch, string method, string requestPath, int statusCode, TimeSpan elapsed)
     {
-        inspectionService.RecordRequestMetrics(dispatch.Explanation, statusCode, elapsed);
-        inspectionService.RecordRecentRequest(
+        _inspectionService.RecordRequestMetrics(dispatch.Explanation, statusCode, elapsed);
+        _inspectionService.RecordRecentRequest(
             DateTimeOffset.UtcNow,
             method,
             requestPath,
