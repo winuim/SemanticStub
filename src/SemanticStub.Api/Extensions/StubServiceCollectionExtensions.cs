@@ -17,6 +17,7 @@ public static class StubServiceCollectionExtensions
     /// <returns>The same service collection for chaining.</returns>
     public static IServiceCollection AddStubServices(this IServiceCollection services)
     {
+        // Keep resolution registration in this chain because inspection resolves IStubService lazily.
         return services
             .AddSemanticMatchingServices()
             .AddYamlInfrastructureServices()
