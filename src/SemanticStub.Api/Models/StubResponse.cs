@@ -7,17 +7,17 @@ namespace SemanticStub.Api.Models;
 /// </summary>
 public sealed class StubResponse
 {
-    private int statusCode = 200;
-    private int? delayMilliseconds;
-    private string body = string.Empty;
-    private string? filePath;
+    private int _statusCode = 200;
+    private int? _delayMilliseconds;
+    private string _body = string.Empty;
+    private string? _filePath;
 
     /// <summary>
     /// Gets the HTTP status code configured on the selected YAML response.
     /// </summary>
     public int StatusCode
     {
-        get => statusCode;
+        get => _statusCode;
         init
         {
             if (value is < 100 or > 599)
@@ -25,7 +25,7 @@ public sealed class StubResponse
                 throw new ArgumentOutOfRangeException(nameof(value), "StatusCode must be between 100 and 599.");
             }
 
-            statusCode = value;
+            _statusCode = value;
         }
     }
 
@@ -34,7 +34,7 @@ public sealed class StubResponse
     /// </summary>
     public int? DelayMilliseconds
     {
-        get => delayMilliseconds;
+        get => _delayMilliseconds;
         init
         {
             if (value < 0)
@@ -42,7 +42,7 @@ public sealed class StubResponse
                 throw new ArgumentOutOfRangeException(nameof(value), "DelayMilliseconds cannot be negative.");
             }
 
-            delayMilliseconds = value;
+            _delayMilliseconds = value;
         }
     }
 
@@ -61,15 +61,15 @@ public sealed class StubResponse
     /// </summary>
     public string Body
     {
-        get => body;
+        get => _body;
         init
         {
-            if (!string.IsNullOrEmpty(filePath) && !string.IsNullOrEmpty(value))
+            if (!string.IsNullOrEmpty(_filePath) && !string.IsNullOrEmpty(value))
             {
                 throw new InvalidOperationException("Body and FilePath cannot both be set on StubResponse.");
             }
 
-            body = value;
+            _body = value;
         }
     }
 
@@ -78,15 +78,15 @@ public sealed class StubResponse
     /// </summary>
     public string? FilePath
     {
-        get => filePath;
+        get => _filePath;
         init
         {
-            if (!string.IsNullOrEmpty(body) && !string.IsNullOrEmpty(value))
+            if (!string.IsNullOrEmpty(_body) && !string.IsNullOrEmpty(value))
             {
                 throw new InvalidOperationException("Body and FilePath cannot both be set on StubResponse.");
             }
 
-            filePath = value;
+            _filePath = value;
         }
     }
 }
