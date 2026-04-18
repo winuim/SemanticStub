@@ -19,6 +19,7 @@ internal static class StubRequestBodyReader
                 return SerializeFormBody(form);
             }
 
+            // Keep the request body open so it can be rewound for downstream readers after matching.
             using var reader = new StreamReader(request.Body, leaveOpen: true);
             if (request.Body.CanSeek)
             {
