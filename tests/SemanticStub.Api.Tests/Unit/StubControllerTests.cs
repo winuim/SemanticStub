@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Controllers;
@@ -346,7 +347,7 @@ public sealed class StubControllerTests
         controllerInspectionService.LastRecentRequestMethod = null;
         controllerInspectionService.LastRecentRequestPath = null;
 
-        return new StubController(stubService, inspectionService ?? controllerInspectionService)
+        return new StubController(stubService, inspectionService ?? controllerInspectionService, NullLogger<StubController>.Instance)
         {
             ControllerContext = new ControllerContext
             {

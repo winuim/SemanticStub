@@ -1,5 +1,7 @@
 using System.Text;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using SemanticStub.Api.Controllers;
 using Xunit;
 
@@ -12,7 +14,7 @@ public sealed class StubRequestBodyReaderTests
     {
         var request = CreateRequest("name=Ada%20Lovelace&tag=alpha&tag=beta&empty=", "application/x-www-form-urlencoded; charset=utf-8");
 
-        var body = await StubRequestBodyReader.ReadAsync(request);
+        var body = await StubRequestBodyReader.ReadAsync(request, NullLogger.Instance);
 
         Assert.Equal("name=Ada%20Lovelace&tag=alpha&tag=beta&empty=", body);
     }
@@ -22,7 +24,7 @@ public sealed class StubRequestBodyReaderTests
     {
         var request = CreateRequest(string.Empty, "application/x-www-form-urlencoded");
 
-        var body = await StubRequestBodyReader.ReadAsync(request);
+        var body = await StubRequestBodyReader.ReadAsync(request, NullLogger.Instance);
 
         Assert.Null(body);
     }
@@ -32,10 +34,14 @@ public sealed class StubRequestBodyReaderTests
     {
         var context = new DefaultHttpContext();
         context.Request.Body = new ThrowingReadStream();
+        var logger = new ListLogger();
 
-        var body = await StubRequestBodyReader.ReadAsync(context.Request);
+        var body = await StubRequestBodyReader.ReadAsync(context.Request, logger);
 
         Assert.Null(body);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Warning, entry.LogLevel);
+        Assert.IsType<IOException>(entry.Exception);
     }
 
     [Fact]
@@ -43,7 +49,7 @@ public sealed class StubRequestBodyReaderTests
     {
         var request = CreateRequest("{\"username\":\"demo\"}", "application/json");
 
-        var body = await StubRequestBodyReader.ReadAsync(request);
+        var body = await StubRequestBodyReader.ReadAsync(request, NullLogger.Instance);
 
         Assert.Equal("{\"username\":\"demo\"}", body);
         Assert.Equal(0, request.Body.Position);
@@ -85,4 +91,27 @@ public sealed class StubRequestBodyReaderTests
 
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
+
+    private sealed class ListLogger : ILogger
+    {
+        public List<LogEntry> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add(new LogEntry(logLevel, exception));
+        }
+    }
+
+    private sealed record LogEntry(LogLevel LogLevel, Exception? Exception);
+
 }

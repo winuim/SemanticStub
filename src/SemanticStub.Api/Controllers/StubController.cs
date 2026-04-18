@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
@@ -15,11 +16,13 @@ public sealed class StubController : ControllerBase
 {
     private readonly IStubService stubService;
     private readonly IStubInspectionService inspectionService;
+    private readonly ILogger<StubController> logger;
 
-    public StubController(IStubService stubService, IStubInspectionService inspectionService)
+    public StubController(IStubService stubService, IStubInspectionService inspectionService, ILogger<StubController> logger)
     {
         this.stubService = stubService;
         this.inspectionService = inspectionService;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -98,7 +101,7 @@ public sealed class StubController : ControllerBase
     {
         var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
         var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
-        var requestBody = await StubRequestBodyReader.ReadAsync(Request);
+        var requestBody = await StubRequestBodyReader.ReadAsync(Request, logger);
         return await stubService.DispatchAsync(method, requestPath, query, headers, requestBody);
     }
 
