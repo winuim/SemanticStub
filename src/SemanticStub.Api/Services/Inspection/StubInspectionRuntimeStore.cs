@@ -8,24 +8,24 @@ namespace SemanticStub.Api.Services;
 internal sealed class StubInspectionRuntimeStore
 {
     private const int MaxRecentRequestCount = 100;
-    private readonly object lastMatchSyncRoot = new();
-    private readonly object metricsSyncRoot = new();
-    private readonly Dictionary<int, long> statusCodeCounts = [];
-    private readonly Dictionary<string, long> routeRequestCounts = new(StringComparer.Ordinal);
-    private readonly Queue<RecentRequestInfo> recentRequests = [];
-    private MatchExplanationInfo? lastMatchExplanation;
-    private long totalRequestCount;
-    private long matchedRequestCount;
-    private long unmatchedRequestCount;
-    private long fallbackResponseCount;
-    private long semanticMatchCount;
-    private double totalLatencyMilliseconds;
+    private readonly object _lastMatchSyncRoot = new();
+    private readonly object _metricsSyncRoot = new();
+    private readonly Dictionary<int, long> _statusCodeCounts = [];
+    private readonly Dictionary<string, long> _routeRequestCounts = new(StringComparer.Ordinal);
+    private readonly Queue<RecentRequestInfo> _recentRequests = [];
+    private MatchExplanationInfo? _lastMatchExplanation;
+    private long _totalRequestCount;
+    private long _matchedRequestCount;
+    private long _unmatchedRequestCount;
+    private long _fallbackResponseCount;
+    private long _semanticMatchCount;
+    private double _totalLatencyMilliseconds;
 
     public MatchExplanationInfo? GetLastMatchExplanation()
     {
-        lock (lastMatchSyncRoot)
+        lock (_lastMatchSyncRoot)
         {
-            return lastMatchExplanation;
+            return _lastMatchExplanation;
         }
     }
 
@@ -33,27 +33,27 @@ internal sealed class StubInspectionRuntimeStore
     {
         ArgumentNullException.ThrowIfNull(explanation);
 
-        lock (lastMatchSyncRoot)
+        lock (_lastMatchSyncRoot)
         {
-            lastMatchExplanation = explanation;
+            _lastMatchExplanation = explanation;
         }
     }
 
     public RuntimeMetricsSummaryInfo GetRuntimeMetrics()
     {
-        lock (metricsSyncRoot)
+        lock (_metricsSyncRoot)
         {
             return new RuntimeMetricsSummaryInfo
             {
-                TotalRequestCount = totalRequestCount,
-                MatchedRequestCount = matchedRequestCount,
-                UnmatchedRequestCount = unmatchedRequestCount,
-                FallbackResponseCount = fallbackResponseCount,
-                SemanticMatchCount = semanticMatchCount,
-                AverageLatencyMilliseconds = totalRequestCount == 0
+                TotalRequestCount = _totalRequestCount,
+                MatchedRequestCount = _matchedRequestCount,
+                UnmatchedRequestCount = _unmatchedRequestCount,
+                FallbackResponseCount = _fallbackResponseCount,
+                SemanticMatchCount = _semanticMatchCount,
+                AverageLatencyMilliseconds = _totalRequestCount == 0
                     ? 0
-                    : totalLatencyMilliseconds / totalRequestCount,
-                StatusCodes = statusCodeCounts
+                    : _totalLatencyMilliseconds / _totalRequestCount,
+                StatusCodes = _statusCodeCounts
                     .OrderByDescending(entry => entry.Value)
                     .ThenBy(entry => entry.Key)
                     .Select(entry => new RuntimeStatusCodeMetricInfo
@@ -62,7 +62,7 @@ internal sealed class StubInspectionRuntimeStore
                         RequestCount = entry.Value,
                     })
                     .ToList(),
-                TopRoutes = routeRequestCounts
+                TopRoutes = _routeRequestCounts
                     .OrderByDescending(entry => entry.Value)
                     .ThenBy(entry => entry.Key, StringComparer.Ordinal)
                     .Select(entry => new RouteUsageMetricInfo
@@ -79,58 +79,58 @@ internal sealed class StubInspectionRuntimeStore
     {
         ArgumentNullException.ThrowIfNull(explanation);
 
-        lock (metricsSyncRoot)
+        lock (_metricsSyncRoot)
         {
-            totalRequestCount++;
+            _totalRequestCount++;
 
             if (explanation.Result.Matched)
             {
-                matchedRequestCount++;
+                _matchedRequestCount++;
             }
             else
             {
-                unmatchedRequestCount++;
+                _unmatchedRequestCount++;
             }
 
             if (string.Equals(explanation.Result.MatchMode, "fallback", StringComparison.Ordinal))
             {
-                fallbackResponseCount++;
+                _fallbackResponseCount++;
             }
 
             if (string.Equals(explanation.Result.MatchMode, "semantic", StringComparison.Ordinal))
             {
-                semanticMatchCount++;
+                _semanticMatchCount++;
             }
 
-            totalLatencyMilliseconds += Math.Max(0, elapsed.TotalMilliseconds);
-            statusCodeCounts[statusCode] = statusCodeCounts.GetValueOrDefault(statusCode) + 1;
+            _totalLatencyMilliseconds += Math.Max(0, elapsed.TotalMilliseconds);
+            _statusCodeCounts[statusCode] = _statusCodeCounts.GetValueOrDefault(statusCode) + 1;
 
             if (!string.IsNullOrEmpty(explanation.Result.RouteId))
             {
-                routeRequestCounts[explanation.Result.RouteId] = routeRequestCounts.GetValueOrDefault(explanation.Result.RouteId) + 1;
+                _routeRequestCounts[explanation.Result.RouteId] = _routeRequestCounts.GetValueOrDefault(explanation.Result.RouteId) + 1;
             }
         }
     }
 
     public void ResetMetrics()
     {
-        lock (metricsSyncRoot)
+        lock (_metricsSyncRoot)
         {
-            statusCodeCounts.Clear();
-            routeRequestCounts.Clear();
-            recentRequests.Clear();
-            totalRequestCount = 0;
-            matchedRequestCount = 0;
-            unmatchedRequestCount = 0;
-            fallbackResponseCount = 0;
-            semanticMatchCount = 0;
-            totalLatencyMilliseconds = 0;
+            _statusCodeCounts.Clear();
+            _routeRequestCounts.Clear();
+            _recentRequests.Clear();
+            _totalRequestCount = 0;
+            _matchedRequestCount = 0;
+            _unmatchedRequestCount = 0;
+            _fallbackResponseCount = 0;
+            _semanticMatchCount = 0;
+            _totalLatencyMilliseconds = 0;
         }
     }
 
     public IReadOnlyList<RecentRequestInfo> GetRecentRequests(int limit)
     {
-        lock (metricsSyncRoot)
+        lock (_metricsSyncRoot)
         {
             var normalizedLimit = Math.Clamp(limit, 0, MaxRecentRequestCount);
 
@@ -139,7 +139,7 @@ internal sealed class StubInspectionRuntimeStore
                 return [];
             }
 
-            return recentRequests
+            return _recentRequests
                 .Reverse()
                 .Take(normalizedLimit)
                 .ToList();
@@ -152,14 +152,14 @@ internal sealed class StubInspectionRuntimeStore
         ArgumentException.ThrowIfNullOrEmpty(path);
         ArgumentNullException.ThrowIfNull(explanation);
 
-        lock (metricsSyncRoot)
+        lock (_metricsSyncRoot)
         {
-            if (recentRequests.Count >= MaxRecentRequestCount)
+            if (_recentRequests.Count >= MaxRecentRequestCount)
             {
-                recentRequests.Dequeue();
+                _recentRequests.Dequeue();
             }
 
-            recentRequests.Enqueue(new RecentRequestInfo
+            _recentRequests.Enqueue(new RecentRequestInfo
             {
                 Timestamp = timestamp,
                 Method = method,

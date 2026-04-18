@@ -6,12 +6,12 @@ namespace SemanticStub.Api.Services;
 
 internal sealed class StubDispatchSelector
 {
-    private readonly StubDefaultResponseSelector defaultResponseSelector;
-    private readonly MatcherService matcherService;
-    private readonly ISemanticMatcherService? semanticMatcherService;
-    private readonly StubResponseBuilder responseBuilder;
-    private readonly ScenarioService scenarioService;
-    private readonly ILogger? logger;
+    private readonly StubDefaultResponseSelector _defaultResponseSelector;
+    private readonly MatcherService _matcherService;
+    private readonly ISemanticMatcherService? _semanticMatcherService;
+    private readonly StubResponseBuilder _responseBuilder;
+    private readonly ScenarioService _scenarioService;
+    private readonly ILogger? _logger;
 
     public StubDispatchSelector(
         MatcherService matcherService,
@@ -21,12 +21,12 @@ internal sealed class StubDispatchSelector
         ScenarioService scenarioService,
         ILogger? logger)
     {
-        this.matcherService = matcherService;
-        this.semanticMatcherService = semanticMatcherService;
-        this.responseBuilder = responseBuilder;
-        this.defaultResponseSelector = defaultResponseSelector;
-        this.scenarioService = scenarioService;
-        this.logger = logger;
+        _matcherService = matcherService;
+        _semanticMatcherService = semanticMatcherService;
+        _responseBuilder = responseBuilder;
+        _defaultResponseSelector = defaultResponseSelector;
+        _scenarioService = scenarioService;
+        _logger = logger;
     }
 
     public async Task<StubDispatchSelectionResult> SelectAsync(
@@ -40,19 +40,19 @@ internal sealed class StubDispatchSelector
         bool mutateScenarioState,
         bool includeSemanticCandidates)
     {
-        var selectedDeterministicCandidate = matcherService.FindBestMatch(
+        var selectedDeterministicCandidate = _matcherService.FindBestMatch(
             pathItem.Parameters,
             operation,
             query,
             headers,
             body,
-            candidate => scenarioService.IsMatch(candidate.Response.Scenario) && IsDeterministicCandidate(candidate));
+            candidate => _scenarioService.IsMatch(candidate.Response.Scenario) && IsDeterministicCandidate(candidate));
 
         if (selectedDeterministicCandidate is not null)
         {
             var matchedCandidateIndex = operation.Matches.FindIndex(candidate => ReferenceEquals(candidate, selectedDeterministicCandidate));
 
-            if (!responseBuilder.TryBuild(selectedDeterministicCandidate.Response, out var deterministicResponse))
+            if (!_responseBuilder.TryBuild(selectedDeterministicCandidate.Response, out var deterministicResponse))
             {
                 return new StubDispatchSelectionResult
                 {
@@ -65,7 +65,7 @@ internal sealed class StubDispatchSelector
                 };
             }
 
-            logger?.LogInformation(
+            _logger?.LogInformation(
                 "Deterministic conditional match selected for '{Path}' {Method}. QueryKeys={QueryKeys}, HeaderKeys={HeaderKeys}, HasBody={HasBody}.",
                 path,
                 method.ToUpperInvariant(),
@@ -75,7 +75,7 @@ internal sealed class StubDispatchSelector
 
             if (mutateScenarioState)
             {
-                scenarioService.Advance(selectedDeterministicCandidate.Response.Scenario);
+                _scenarioService.Advance(selectedDeterministicCandidate.Response.Scenario);
             }
 
             return new StubDispatchSelectionResult
@@ -90,21 +90,21 @@ internal sealed class StubDispatchSelector
             };
         }
 
-        var semanticExplanation = semanticMatcherService is null
+        var semanticExplanation = _semanticMatcherService is null
             ? new SemanticMatchExplanation()
-            : await semanticMatcherService.ExplainMatchAsync(
+            : await _semanticMatcherService.ExplainMatchAsync(
                 method,
                 path,
                 query,
                 headers,
                 body,
                 operation.Matches,
-                candidate => scenarioService.IsMatch(candidate.Response.Scenario),
+                candidate => _scenarioService.IsMatch(candidate.Response.Scenario),
                 includeCandidateScores: includeSemanticCandidates);
 
         if (semanticExplanation.SelectedCandidate is not null)
         {
-            if (!responseBuilder.TryBuild(semanticExplanation.SelectedCandidate.Response, out var semanticResponse))
+            if (!_responseBuilder.TryBuild(semanticExplanation.SelectedCandidate.Response, out var semanticResponse))
             {
                 return new StubDispatchSelectionResult
                 {
@@ -119,14 +119,14 @@ internal sealed class StubDispatchSelector
                 };
             }
 
-            logger?.LogInformation(
+            _logger?.LogInformation(
                 "Semantic fallback produced a match for '{Path}' {Method}.",
                 path,
                 method.ToUpperInvariant());
 
             if (mutateScenarioState)
             {
-                scenarioService.Advance(semanticExplanation.SelectedCandidate.Response.Scenario);
+                _scenarioService.Advance(semanticExplanation.SelectedCandidate.Response.Scenario);
             }
 
             return new StubDispatchSelectionResult
@@ -142,7 +142,7 @@ internal sealed class StubDispatchSelector
             };
         }
 
-        if (defaultResponseSelector.TrySelect(operation, mutateScenarioState, out var defaultSelection))
+        if (_defaultResponseSelector.TrySelect(operation, mutateScenarioState, out var defaultSelection))
         {
             return new StubDispatchSelectionResult
             {

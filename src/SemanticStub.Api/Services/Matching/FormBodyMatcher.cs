@@ -11,11 +11,11 @@ internal sealed class FormBodyMatcher
 {
     private const string FormUrlEncodedMediaType = "application/x-www-form-urlencoded";
     private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(100);
-    private readonly ILogger<FormBodyMatcher>? logger;
+    private readonly ILogger<FormBodyMatcher>? _logger;
 
     internal FormBodyMatcher(ILogger<FormBodyMatcher>? logger = null)
     {
-        this.logger = logger;
+        _logger = logger;
     }
 
     internal IReadOnlyDictionary<string, StringValues>? ParseRequestBody(string? body, string? contentType)
@@ -171,12 +171,12 @@ internal sealed class FormBodyMatcher
         }
         catch (ArgumentException ex)
         {
-            logger?.LogWarning(ex, "Invalid regex match pattern '{Pattern}' in stub definition — treating as non-match.", pattern);
+            _logger?.LogWarning(ex, "Invalid regex match pattern '{Pattern}' in stub definition — treating as non-match.", pattern);
             return false;
         }
         catch (RegexMatchTimeoutException)
         {
-            logger?.LogWarning("Regex match pattern '{Pattern}' timed out after {TimeoutMs}ms — treating as non-match.", pattern, RegexMatchTimeout.TotalMilliseconds);
+            _logger?.LogWarning("Regex match pattern '{Pattern}' timed out after {TimeoutMs}ms — treating as non-match.", pattern, RegexMatchTimeout.TotalMilliseconds);
             return false;
         }
     }

@@ -11,11 +11,11 @@ namespace SemanticStub.Api.Services;
 public sealed class StubService : IStubService
 {
     private static readonly string[] SupportedMethodOrder = [HttpMethods.Get, HttpMethods.Post, HttpMethods.Put, HttpMethods.Patch, HttpMethods.Delete];
-    private readonly Func<StubDocument> documentAccessor;
-    private readonly StubDispatchSelector dispatchSelector;
-    private readonly StubInspectionProjectionBuilder inspectionProjectionBuilder;
-    private readonly MatcherService matcherService;
-    private readonly ScenarioService scenarioService;
+    private readonly Func<StubDocument> _documentAccessor;
+    private readonly StubDispatchSelector _dispatchSelector;
+    private readonly StubInspectionProjectionBuilder _inspectionProjectionBuilder;
+    private readonly MatcherService _matcherService;
+    private readonly ScenarioService _scenarioService;
 
     /// <summary>
     /// Creates a service that always evaluates requests against the latest successfully loaded stub document.
@@ -40,11 +40,11 @@ public sealed class StubService : IStubService
         StubDispatchSelector dispatchSelector,
         StubInspectionProjectionBuilder inspectionProjectionBuilder)
     {
-        this.documentAccessor = documentAccessor;
-        this.dispatchSelector = dispatchSelector;
-        this.inspectionProjectionBuilder = inspectionProjectionBuilder;
-        this.matcherService = matcherService;
-        this.scenarioService = scenarioService;
+        _documentAccessor = documentAccessor;
+        _dispatchSelector = dispatchSelector;
+        _inspectionProjectionBuilder = inspectionProjectionBuilder;
+        _matcherService = matcherService;
+        _scenarioService = scenarioService;
     }
 
     /// <summary>
@@ -54,7 +54,7 @@ public sealed class StubService : IStubService
     /// <returns>The configured methods for the resolved path, or an empty list when no path matches.</returns>
     public IReadOnlyList<string> GetAllowedMethods(string path)
     {
-        var pathItem = StubRouteResolver.ResolvePathItem(documentAccessor(), path);
+        var pathItem = StubRouteResolver.ResolvePathItem(_documentAccessor(), path);
 
         if (pathItem is null)
         {
@@ -111,7 +111,7 @@ public sealed class StubService : IStubService
         bool includeCandidates,
         bool includeSemanticCandidates)
     {
-        var document = documentAccessor();
+        var document = _documentAccessor();
 
         if (!StubOperationResolver.TryResolveOperation(document, method, path, out var pathPattern, out var pathItem, out var operation, out var failedMatchResult))
         {
@@ -126,7 +126,7 @@ public sealed class StubService : IStubService
 
         if (OperationUsesScenario(operation))
         {
-            return await scenarioService.ExecuteLockedAsync(
+            return await _scenarioService.ExecuteLockedAsync(
                 () => DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates));
         }
 
@@ -153,12 +153,12 @@ public sealed class StubService : IStubService
         bool includeSemanticCandidates)
     {
         var routeId = GetRouteId(method, pathPattern, operation);
-        var request = inspectionProjectionBuilder.CreateInspectionRequest(method, path, query, headers, body, includeCandidates, includeSemanticCandidates);
-        var scenarioSnapshots = inspectionProjectionBuilder.GetScenarioSnapshots(operation);
-        var deterministicEvaluations = matcherService.EvaluateCandidates(pathItem.Parameters, operation, query, headers, body)
-            .Select((evaluation, index) => inspectionProjectionBuilder.CreateCandidateInfo(evaluation, index, scenarioSnapshots))
+        var request = _inspectionProjectionBuilder.CreateInspectionRequest(method, path, query, headers, body, includeCandidates, includeSemanticCandidates);
+        var scenarioSnapshots = _inspectionProjectionBuilder.GetScenarioSnapshots(operation);
+        var deterministicEvaluations = _matcherService.EvaluateCandidates(pathItem.Parameters, operation, query, headers, body)
+            .Select((evaluation, index) => _inspectionProjectionBuilder.CreateCandidateInfo(evaluation, index, scenarioSnapshots))
             .ToList();
-        var selection = await dispatchSelector.SelectAsync(
+        var selection = await _dispatchSelector.SelectAsync(
             method,
             path,
             pathItem,
@@ -172,7 +172,7 @@ public sealed class StubService : IStubService
         SemanticMatchInfo? semanticEvaluationInfo = null;
         if (selection.SemanticExplanation.Attempted)
         {
-            semanticEvaluationInfo = inspectionProjectionBuilder.CreateSemanticMatchInfo(selection.SemanticExplanation, operation, includeSemanticCandidates);
+            semanticEvaluationInfo = _inspectionProjectionBuilder.CreateSemanticMatchInfo(selection.SemanticExplanation, operation, includeSemanticCandidates);
         }
 
         string? selectedResponseId = selection.SelectedResponseId;
@@ -182,7 +182,7 @@ public sealed class StubService : IStubService
         {
             var selectedCandidate = deterministicEvaluations.FirstOrDefault(candidate =>
                     ReferenceEquals(operation.Matches[candidate.CandidateIndex], selection.SelectedCandidate))
-                ?? inspectionProjectionBuilder.CreateCandidateInfo(
+                ?? _inspectionProjectionBuilder.CreateCandidateInfo(
                     new QueryMatchCandidateEvaluation
                     {
                         Candidate = selection.SelectedCandidate,

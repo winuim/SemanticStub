@@ -6,11 +6,11 @@ namespace SemanticStub.Api.Services;
 internal sealed class StubResponseBuilder
 {
     private const string JsonContentType = "application/json";
-    private readonly Func<string, string> responseFileReader;
+    private readonly Func<string, string> _responseFileReader;
 
     public StubResponseBuilder(Func<string, string> responseFileReader)
     {
-        this.responseFileReader = responseFileReader;
+        _responseFileReader = responseFileReader;
     }
 
     public bool TryBuild(int statusCode, ResponseDefinition responseDefinition, out StubResponse response)
@@ -128,7 +128,7 @@ internal sealed class StubResponseBuilder
             delayMilliseconds,
             content,
             headers,
-            responseFileReader(responseFile),
+            _responseFileReader(responseFile),
             filePath: null);
     }
 
