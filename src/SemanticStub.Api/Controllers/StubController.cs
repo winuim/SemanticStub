@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
@@ -13,14 +14,15 @@ namespace SemanticStub.Api.Controllers;
 [Route("{*path}")]
 public sealed class StubController : ControllerBase
 {
-    private const string FormUrlEncodedMediaType = "application/x-www-form-urlencoded";
     private readonly IStubService stubService;
     private readonly IStubInspectionService inspectionService;
+    private readonly ILogger<StubController> logger;
 
-    public StubController(IStubService stubService, IStubInspectionService inspectionService)
+    public StubController(IStubService stubService, IStubInspectionService inspectionService, ILogger<StubController> logger)
     {
         this.stubService = stubService;
         this.inspectionService = inspectionService;
+        this.logger = logger;
     }
 
     /// <summary>
@@ -99,8 +101,7 @@ public sealed class StubController : ControllerBase
     {
         var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
         var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
-        Request.EnableBuffering();
-        var requestBody = await ReadRequestBodyAsync();
+        var requestBody = await StubRequestBodyReader.ReadAsync(Request, logger);
         return await stubService.DispatchAsync(method, requestPath, query, headers, requestBody);
     }
 
@@ -189,68 +190,4 @@ public sealed class StubController : ControllerBase
             elapsed);
     }
 
-    private async Task<string?> ReadRequestBodyAsync()
-    {
-        try
-        {
-            if (IsFormUrlEncoded(Request.ContentType))
-            {
-                var form = await Request.ReadFormAsync();
-                return SerializeFormBody(form);
-            }
-
-            using var reader = new StreamReader(Request.Body, leaveOpen: true);
-            if (Request.Body.CanSeek)
-            {
-                Request.Body.Position = 0;
-            }
-
-            var body = await reader.ReadToEndAsync();
-
-            if (Request.Body.CanSeek)
-            {
-                Request.Body.Position = 0;
-            }
-
-            return string.IsNullOrWhiteSpace(body) ? null : body;
-        }
-        catch (IOException)
-        {
-            return null;
-        }
-        catch (OperationCanceledException) when (Request.HttpContext.RequestAborted.IsCancellationRequested)
-        {
-            return null;
-        }
-    }
-
-    private static bool IsFormUrlEncoded(string? contentType)
-    {
-        if (string.IsNullOrWhiteSpace(contentType))
-        {
-            return false;
-        }
-
-        var mediaType = contentType.Split(';', count: 2)[0].Trim();
-        return string.Equals(mediaType, FormUrlEncodedMediaType, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string? SerializeFormBody(IFormCollection form)
-    {
-        if (form.Count == 0)
-        {
-            return null;
-        }
-
-        var pairs = new List<string>();
-        foreach (var field in form)
-        {
-            foreach (var value in field.Value)
-            {
-                pairs.Add($"{Uri.EscapeDataString(field.Key)}={Uri.EscapeDataString(value ?? string.Empty)}");
-            }
-        }
-
-        return string.Join("&", pairs);
-    }
 }
