@@ -8,4 +8,8 @@
   <ItemGroup>
     <PackageReference Include="YamlDotNet" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SemanticStub.Application\SemanticStub.Application.csproj" />
+  </ItemGroup>
 </Project>
