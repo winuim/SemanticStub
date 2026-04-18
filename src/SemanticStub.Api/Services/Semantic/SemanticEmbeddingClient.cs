@@ -8,7 +8,7 @@ namespace SemanticStub.Api.Services;
 /// <summary>
 /// Calls the configured embedding endpoint and validates the returned embedding payloads.
 /// </summary>
-internal sealed class SemanticEmbeddingClient
+internal sealed class SemanticEmbeddingClient : ISemanticEmbeddingClient
 {
     private const string HttpClientName = "SemanticEmbedding";
     private readonly IHttpClientFactory httpClientFactory;

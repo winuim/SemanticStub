@@ -35,9 +35,9 @@ public static class StubServiceCollectionExtensions
             var settings = serviceProvider.GetRequiredService<IOptions<StubSettings>>().Value;
             client.Timeout = TimeSpan.FromSeconds(settings.SemanticMatching.TimeoutSeconds);
         });
-        services.AddSingleton<SemanticEmbeddingClient>();
+        services.AddSingleton<ISemanticEmbeddingClient, SemanticEmbeddingClient>();
         services.AddSingleton<ISemanticMatcherService>(serviceProvider => new SemanticMatcherService(
-            serviceProvider.GetRequiredService<SemanticEmbeddingClient>(),
+            serviceProvider.GetRequiredService<ISemanticEmbeddingClient>(),
             serviceProvider.GetRequiredService<IOptions<StubSettings>>(),
             serviceProvider.GetRequiredService<ILogger<SemanticMatcherService>>()));
 
