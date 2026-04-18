@@ -13,11 +13,11 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
     private const string DefaultStubFileName = "basic-routing.yaml";
     private static readonly string[] AdditionalStubFilePatterns = ["*.stub.yaml", "*.stub.yml"];
     private const string DefaultDefinitionsDirectoryName = "samples";
-    private readonly IWebHostEnvironment environment;
-    private readonly StubSettings settings;
-    private readonly IDeserializer deserializer;
-    private readonly StubDefinitionValidator validator;
-    private readonly StubDefinitionNormalizer normalizer;
+    private readonly IWebHostEnvironment _environment;
+    private readonly StubSettings _settings;
+    private readonly IDeserializer _deserializer;
+    private readonly StubDefinitionValidator _validator;
+    private readonly StubDefinitionNormalizer _normalizer;
 
     /// <summary>
     /// Creates a loader that discovers definitions relative to <see cref="IWebHostEnvironment.ContentRootPath"/> and uses the default <c>samples</c> search behavior when no explicit settings are supplied.
@@ -35,14 +35,14 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
     /// <param name="settings">Supplies the optional definitions directory override. When unset, the nearest ancestor directory containing <c>samples</c> is used.</param>
     public StubDefinitionLoader(IWebHostEnvironment environment, IOptions<StubSettings> settings)
     {
-        this.environment = environment;
-        this.settings = settings.Value;
-        deserializer = new DeserializerBuilder()
+        _environment = environment;
+        _settings = settings.Value;
+        _deserializer = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
             .IgnoreUnmatchedProperties()
             .Build();
-        validator = new StubDefinitionValidator();
-        normalizer = new StubDefinitionNormalizer();
+        _validator = new StubDefinitionValidator();
+        _normalizer = new StubDefinitionNormalizer();
     }
 
     /// <summary>
@@ -77,7 +77,7 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
     private StubDocument LoadDefinition(string path)
     {
         var yaml = File.ReadAllText(path);
-        var document = deserializer.Deserialize<StubDocument>(yaml);
+        var document = _deserializer.Deserialize<StubDocument>(yaml);
         var definitionDirectory = Path.GetDirectoryName(path)
             ?? throw new InvalidOperationException($"Could not determine definition directory for '{path}'.");
 
@@ -86,9 +86,9 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
             throw new InvalidOperationException("Failed to deserialize stub definition.");
         }
 
-        validator.ValidateDocument(document, definitionDirectory);
+        _validator.ValidateDocument(document, definitionDirectory);
 
-        return normalizer.NormalizeDocument(document, definitionDirectory);
+        return _normalizer.NormalizeDocument(document, definitionDirectory);
     }
 
     /// <summary>
@@ -182,9 +182,9 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
 
     private string ResolveDefinitionsDirectory()
     {
-        if (!string.IsNullOrWhiteSpace(settings.DefinitionsPath))
+        if (!string.IsNullOrWhiteSpace(_settings.DefinitionsPath))
         {
-            var configuredPath = settings.DefinitionsPath!;
+            var configuredPath = _settings.DefinitionsPath!;
 
             if (Path.IsPathRooted(configuredPath))
             {
@@ -196,7 +196,7 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
                 throw new DirectoryNotFoundException($"Could not locate configured definitions path '{configuredPath}'.");
             }
 
-            var configuredCurrent = new DirectoryInfo(environment.ContentRootPath);
+            var configuredCurrent = new DirectoryInfo(_environment.ContentRootPath);
 
             while (configuredCurrent is not null)
             {
@@ -213,7 +213,7 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
             throw new DirectoryNotFoundException($"Could not locate configured definitions path '{configuredPath}'.");
         }
 
-        var current = new DirectoryInfo(environment.ContentRootPath);
+        var current = new DirectoryInfo(_environment.ContentRootPath);
 
         while (current is not null)
         {
@@ -232,9 +232,9 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
 
     private string GetDefinitionsPathLabel()
     {
-        return string.IsNullOrWhiteSpace(settings.DefinitionsPath)
+        return string.IsNullOrWhiteSpace(_settings.DefinitionsPath)
             ? DefaultDefinitionsDirectoryName
-            : settings.DefinitionsPath!;
+            : _settings.DefinitionsPath!;
     }
 
     private static StubDocument MergeDefinitions(IReadOnlyCollection<(string Path, string Label, StubDocument Document)> sources)

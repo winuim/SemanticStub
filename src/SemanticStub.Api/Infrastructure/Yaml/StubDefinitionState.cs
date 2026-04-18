@@ -8,43 +8,43 @@ namespace SemanticStub.Api.Infrastructure.Yaml;
 /// </summary>
 internal sealed class StubDefinitionState
 {
-    private readonly IStubDefinitionLoader loader;
-    private readonly ScenarioService scenarioService;
-    private readonly ILogger<StubDefinitionState> logger;
-    private readonly object syncRoot = new();
-    private StubDocument currentDocument;
+    private readonly IStubDefinitionLoader _loader;
+    private readonly ScenarioService _scenarioService;
+    private readonly ILogger<StubDefinitionState> _logger;
+    private readonly object _syncRoot = new();
+    private StubDocument _currentDocument;
 
     public StubDefinitionState(IStubDefinitionLoader loader, ScenarioService scenarioService, ILogger<StubDefinitionState> logger)
     {
-        this.loader = loader;
-        this.scenarioService = scenarioService;
-        this.logger = logger;
-        currentDocument = loader.LoadDefaultDefinition();
+        _loader = loader;
+        _scenarioService = scenarioService;
+        _logger = logger;
+        _currentDocument = loader.LoadDefaultDefinition();
     }
 
     public StubDocument GetCurrentDocument()
     {
-        return Volatile.Read(ref currentDocument);
+        return Volatile.Read(ref _currentDocument);
     }
 
     public string LoadResponseFileContent(string fileName)
     {
-        return loader.LoadResponseFileContent(fileName);
+        return _loader.LoadResponseFileContent(fileName);
     }
 
     public bool TryReload()
     {
-        lock (syncRoot)
+        lock (_syncRoot)
         {
             try
             {
-                ApplyReloadedDocument(loader.LoadDefaultDefinition());
-                logger.LogInformation("Reloaded stub definitions from disk.");
+                ApplyReloadedDocument(_loader.LoadDefaultDefinition());
+                _logger.LogInformation("Reloaded stub definitions from disk.");
                 return true;
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to reload stub definitions. Continuing with the last successfully loaded definitions.");
+                _logger.LogError(ex, "Failed to reload stub definitions. Continuing with the last successfully loaded definitions.");
                 return false;
             }
         }
@@ -52,9 +52,9 @@ internal sealed class StubDefinitionState
 
     private void ApplyReloadedDocument(StubDocument reloadedDocument)
     {
-        scenarioService.ExecuteLocked(() =>
+        _scenarioService.ExecuteLocked(() =>
         {
-            Volatile.Write(ref currentDocument, reloadedDocument);
+            Volatile.Write(ref _currentDocument, reloadedDocument);
             ResetScenarioStatesWithinLock(reloadedDocument);
             return 0;
         });
@@ -62,7 +62,7 @@ internal sealed class StubDefinitionState
 
     private void ResetScenarioStatesWithinLock(StubDocument document)
     {
-        scenarioService.ResetScenariosWithinLock(
+        _scenarioService.ResetScenariosWithinLock(
             StubScenarioNameCollector.Collect(document),
             DateTimeOffset.UtcNow);
     }
