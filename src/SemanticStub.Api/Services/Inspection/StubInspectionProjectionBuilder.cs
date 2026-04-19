@@ -3,6 +3,7 @@ using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Models;
 using SemanticStub.Application.Models;
 using SemanticStub.Application.Services;
+using SemanticStub.Application.Services.Semantic;
 
 namespace SemanticStub.Api.Services;
 

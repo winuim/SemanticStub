@@ -7,10 +7,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Application.Infrastructure.Yaml;
-using SemanticStub.Infrastructure.Yaml;
-using SemanticStub.Api.Models;
 using SemanticStub.Application.Models;
-using SemanticStub.Api.Services;
+using SemanticStub.Application.Services.Semantic;
+using SemanticStub.Infrastructure.Semantic;
 using Xunit;
 
 namespace SemanticStub.Api.Tests.Unit.Semantic;
@@ -495,7 +494,7 @@ public sealed class SemanticMatcherServiceTests
         services.AddSingleton<ISemanticEmbeddingClient, SemanticEmbeddingClient>();
         services.AddSingleton<ISemanticMatcherService>(serviceProvider => new SemanticMatcherService(
             serviceProvider.GetRequiredService<ISemanticEmbeddingClient>(),
-            serviceProvider.GetRequiredService<IOptions<StubSettings>>(),
+            serviceProvider.GetRequiredService<IOptions<StubSettings>>().Value,
             serviceProvider.GetRequiredService<ILogger<SemanticMatcherService>>()));
 
         return (SemanticMatcherService)services.BuildServiceProvider().GetRequiredService<ISemanticMatcherService>();

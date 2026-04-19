@@ -1,12 +1,9 @@
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Application.Infrastructure.Yaml;
-using SemanticStub.Infrastructure.Yaml;
-using SemanticStub.Api.Models;
 using SemanticStub.Application.Models;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services.Semantic;
 
 /// <summary>
 /// Calls an external Text Embeddings Inference service to score optional semantic fallback candidates.
@@ -17,12 +14,12 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
     private readonly StubSettings _settings;
     private readonly ILogger<SemanticMatcherService> _logger;
 
-    internal SemanticMatcherService(
+    public SemanticMatcherService(
         ISemanticEmbeddingClient embeddingClient,
-        IOptions<StubSettings> settings,
+        StubSettings settings,
         ILogger<SemanticMatcherService> logger)
     {
-        _settings = settings.Value;
+        _settings = settings;
         _embeddingClient = embeddingClient;
         _logger = logger;
     }
@@ -235,5 +232,4 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             RequiredMargin = semanticSettings.TopScoreMargin,
         };
     }
-
 }

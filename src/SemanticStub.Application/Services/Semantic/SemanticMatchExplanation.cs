@@ -1,7 +1,6 @@
-using SemanticStub.Api.Models;
 using SemanticStub.Application.Models;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services.Semantic;
 
 /// <summary>
 /// Describes the result of a semantic fallback evaluation.

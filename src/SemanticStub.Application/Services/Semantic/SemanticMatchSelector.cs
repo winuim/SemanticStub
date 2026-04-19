@@ -1,4 +1,4 @@
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services.Semantic;
 
 /// <summary>
 /// Selects the final semantic match explanation from scored candidates.

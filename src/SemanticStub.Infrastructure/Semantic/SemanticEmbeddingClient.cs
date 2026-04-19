@@ -2,9 +2,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using SemanticStub.Application.Infrastructure.Yaml;
-using SemanticStub.Infrastructure.Yaml;
+using SemanticStub.Application.Services.Semantic;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Infrastructure.Semantic;
 
 /// <summary>
 /// Calls the configured embedding endpoint and validates the returned embedding payloads.

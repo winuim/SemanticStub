@@ -8,6 +8,7 @@ using SemanticStub.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
 using SemanticStub.Application.Models;
 using SemanticStub.Application.Services;
+using SemanticStub.Application.Services.Semantic;
 using SemanticStub.Api.Services;
 using Xunit;
 

@@ -1,8 +1,7 @@
 using Microsoft.Extensions.Primitives;
-using SemanticStub.Api.Models;
 using SemanticStub.Application.Models;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services.Semantic;
 
 /// <summary>
 /// Resolves an optional semantic fallback match for requests that did not satisfy deterministic matching rules.
