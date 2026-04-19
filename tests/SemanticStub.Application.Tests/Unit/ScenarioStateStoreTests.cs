@@ -1,5 +1,5 @@
-using SemanticStub.Api.Models;
-using SemanticStub.Api.Services;
+using SemanticStub.Application.Models;
+using SemanticStub.Application.Services;
 using Xunit;
 
 namespace SemanticStub.Application.Tests.Unit;

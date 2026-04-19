@@ -1,4 +1,4 @@
-namespace SemanticStub.Api.Infrastructure.Yaml;
+namespace SemanticStub.Infrastructure.Yaml;
 
 /// <summary>
 /// Configures the YAML stub definition source and optional matching features.

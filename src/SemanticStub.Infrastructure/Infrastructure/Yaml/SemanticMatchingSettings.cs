@@ -1,4 +1,4 @@
-namespace SemanticStub.Api.Infrastructure.Yaml;
+namespace SemanticStub.Infrastructure.Yaml;
 
 /// <summary>
 /// Configures the optional semantic request matching fallback.

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace SemanticStub.Api.Utilities;
+namespace SemanticStub.Application.Utilities;
 
 /// <summary>
 /// Normalizes YAML-deserialized example values into JSON-friendly shapes so matching and response generation can compare values consistently.

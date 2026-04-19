@@ -78,7 +78,7 @@ public sealed class HttpLoggingTests
 
         var configuration = factory.Services.GetRequiredService<IConfiguration>();
 
-        Assert.Equal("Information", configuration["Logging:LogLevel:SemanticStub.Api.Infrastructure.Yaml"]);
+        Assert.Equal("Information", configuration["Logging:LogLevel:SemanticStub.Infrastructure.Yaml"]);
     }
 
     [Fact]

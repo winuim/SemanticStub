@@ -1,6 +1,6 @@
 using YamlDotNet.Serialization;
 
-namespace SemanticStub.Api.Models;
+namespace SemanticStub.Application.Models;
 
 public sealed class QueryMatchResponseDefinition
 {

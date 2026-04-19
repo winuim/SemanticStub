@@ -6,8 +6,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
-using SemanticStub.Api.Infrastructure.Yaml;
+using SemanticStub.Application.Infrastructure.Yaml;
+using SemanticStub.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 using SemanticStub.Api.Services;
 using Xunit;
 

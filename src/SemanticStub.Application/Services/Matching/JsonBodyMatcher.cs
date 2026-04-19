@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using SemanticStub.Api.Utilities;
+using SemanticStub.Application.Utilities;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services;
 
 /// <summary>
 /// Parses request bodies and compares structured JSON body expectations without changing matcher orchestration behavior.

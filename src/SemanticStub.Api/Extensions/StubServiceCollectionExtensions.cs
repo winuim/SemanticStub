@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using SemanticStub.Api.Infrastructure.Yaml;
+using SemanticStub.Application.Infrastructure.Yaml;
+using SemanticStub.Application.Services;
+using SemanticStub.Infrastructure.Yaml;
 using SemanticStub.Api.Services;
 
 namespace SemanticStub.Api.Extensions;

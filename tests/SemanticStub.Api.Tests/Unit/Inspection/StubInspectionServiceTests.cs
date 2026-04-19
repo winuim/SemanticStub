@@ -3,8 +3,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SemanticStub.Api.Inspection;
-using SemanticStub.Api.Infrastructure.Yaml;
+using SemanticStub.Application.Infrastructure.Yaml;
+using SemanticStub.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
+using SemanticStub.Application.Services;
 using SemanticStub.Api.Services;
 using Xunit;
 

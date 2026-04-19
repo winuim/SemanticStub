@@ -1,8 +1,8 @@
 using System.Text.Json;
 using Microsoft.Extensions.Primitives;
-using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services;
 
 /// <summary>
 /// Evaluates <c>x-match</c> candidates and returns the most specific successful match without mutating request or stub state.

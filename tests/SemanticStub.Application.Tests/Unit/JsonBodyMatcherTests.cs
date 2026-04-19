@@ -1,4 +1,4 @@
-using SemanticStub.Api.Services;
+using SemanticStub.Application.Services;
 using Xunit;
 
 namespace SemanticStub.Application.Tests.Unit;

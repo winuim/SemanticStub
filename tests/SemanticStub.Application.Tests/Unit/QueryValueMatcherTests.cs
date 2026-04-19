@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Primitives;
-using SemanticStub.Api.Services;
+using SemanticStub.Application.Services;
 using Xunit;
 
 namespace SemanticStub.Application.Tests.Unit;

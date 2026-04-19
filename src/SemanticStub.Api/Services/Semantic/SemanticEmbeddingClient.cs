@@ -1,7 +1,8 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
-using SemanticStub.Api.Infrastructure.Yaml;
+using SemanticStub.Application.Infrastructure.Yaml;
+using SemanticStub.Infrastructure.Yaml;
 
 namespace SemanticStub.Api.Services;
 

@@ -3,7 +3,8 @@ using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.RequestDecompression;
 using Microsoft.AspNetCore.ResponseCompression;
 using SemanticStub.Api.Extensions;
-using SemanticStub.Api.Infrastructure.Yaml;
+using SemanticStub.Application.Infrastructure.Yaml;
+using SemanticStub.Infrastructure.Yaml;
 
 var builder = WebApplication.CreateBuilder(args);
 

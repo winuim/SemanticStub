@@ -1,6 +1,6 @@
-using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 
-namespace SemanticStub.Api.Infrastructure.Yaml;
+namespace SemanticStub.Application.Infrastructure.Yaml;
 
 /// <summary>
 /// Loads validated OpenAPI-based stub definitions and file-backed response payloads from disk without exposing discovery, validation, or normalization internals to callers.

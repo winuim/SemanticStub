@@ -1,6 +1,6 @@
-using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services;
 
 /// <summary>
 /// Describes how one <c>x-match</c> candidate evaluated against request data.

@@ -1,5 +1,5 @@
-using SemanticStub.Api.Services;
-using SemanticStub.Api.Models;
+using SemanticStub.Application.Services;
+using SemanticStub.Application.Models;
 using System.Threading;
 using Xunit;
 

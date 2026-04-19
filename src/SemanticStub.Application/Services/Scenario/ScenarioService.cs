@@ -1,6 +1,6 @@
-using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services;
 
 /// <summary>
 /// Stores scenario state transitions in memory so YAML-defined stateful flows can advance deterministically across requests.
