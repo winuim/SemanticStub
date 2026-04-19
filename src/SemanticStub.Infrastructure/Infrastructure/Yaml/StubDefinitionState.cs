@@ -8,7 +8,7 @@ namespace SemanticStub.Infrastructure.Yaml;
 /// <summary>
 /// Holds the current process-wide YAML definition snapshot and swaps it atomically during reloads.
 /// </summary>
-internal sealed class StubDefinitionState
+public sealed class StubDefinitionState
 {
     private readonly IStubDefinitionLoader _loader;
     private readonly ScenarioService _scenarioService;
@@ -16,6 +16,12 @@ internal sealed class StubDefinitionState
     private readonly object _syncRoot = new();
     private StubDocument _currentDocument;
 
+    /// <summary>
+    /// Initializes the process-wide definition state from the default YAML definition.
+    /// </summary>
+    /// <param name="loader">The YAML definition loader used for initial load, reload, and response file content.</param>
+    /// <param name="scenarioService">The scenario state service reset when definitions are reloaded.</param>
+    /// <param name="logger">The logger used for reload diagnostics.</param>
     public StubDefinitionState(IStubDefinitionLoader loader, ScenarioService scenarioService, ILogger<StubDefinitionState> logger)
     {
         _loader = loader;
@@ -24,16 +30,27 @@ internal sealed class StubDefinitionState
         _currentDocument = loader.LoadDefaultDefinition();
     }
 
+    /// <summary>
+    /// Returns the currently active stub document snapshot.
+    /// </summary>
     public StubDocument GetCurrentDocument()
     {
         return Volatile.Read(ref _currentDocument);
     }
 
+    /// <summary>
+    /// Loads response file content relative to the configured YAML definition root.
+    /// </summary>
+    /// <param name="fileName">The response file name referenced from YAML.</param>
     public string LoadResponseFileContent(string fileName)
     {
         return _loader.LoadResponseFileContent(fileName);
     }
 
+    /// <summary>
+    /// Attempts to reload YAML definitions and keeps the previous snapshot if reload fails.
+    /// </summary>
+    /// <returns><see langword="true"/> when reload succeeds; otherwise, <see langword="false"/>.</returns>
     public bool TryReload()
     {
         lock (_syncRoot)

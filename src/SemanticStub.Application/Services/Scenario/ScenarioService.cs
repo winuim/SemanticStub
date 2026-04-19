@@ -93,17 +93,31 @@ public sealed class ScenarioService
         ExecuteLockedWithTimestamp(timestamp => ResetScenariosWithinLock(scenarioNames, timestamp));
     }
 
-    internal ScenarioStateSnapshot GetSnapshotWithinLock(string scenarioName)
+    /// <summary>
+    /// Returns a scenario snapshot while the caller already holds the scenario lock.
+    /// </summary>
+    /// <param name="scenarioName">The scenario name defined in YAML.</param>
+    public ScenarioStateSnapshot GetSnapshotWithinLock(string scenarioName)
     {
         return _stateStore.GetSnapshot(scenarioName);
     }
 
-    internal void ResetScenarioWithinLock(string scenarioName, DateTimeOffset timestamp)
+    /// <summary>
+    /// Resets the supplied scenario while the caller already holds the scenario lock.
+    /// </summary>
+    /// <param name="scenarioName">The scenario name defined in YAML.</param>
+    /// <param name="timestamp">The timestamp to assign to the reset state.</param>
+    public void ResetScenarioWithinLock(string scenarioName, DateTimeOffset timestamp)
     {
         _stateStore.ResetScenario(scenarioName, timestamp);
     }
 
-    internal void ResetScenariosWithinLock(IEnumerable<string> scenarioNames, DateTimeOffset timestamp)
+    /// <summary>
+    /// Resets the supplied scenarios while the caller already holds the scenario lock.
+    /// </summary>
+    /// <param name="scenarioNames">The scenario names defined in YAML.</param>
+    /// <param name="timestamp">The timestamp to assign to each reset state.</param>
+    public void ResetScenariosWithinLock(IEnumerable<string> scenarioNames, DateTimeOffset timestamp)
     {
         _stateStore.ResetScenarios(scenarioNames, timestamp);
     }
