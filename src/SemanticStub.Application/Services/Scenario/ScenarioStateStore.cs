@@ -1,7 +1,7 @@
-using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 using System.Collections.Concurrent;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services;
 
 /// <summary>
 /// Stores in-memory scenario state snapshots and applies the runtime transition rules used by <see cref="ScenarioService"/>.

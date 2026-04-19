@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace SemanticStub.Api.Models;
+namespace SemanticStub.Application.Models;
 
 internal static class MatchOperatorDefinition
 {

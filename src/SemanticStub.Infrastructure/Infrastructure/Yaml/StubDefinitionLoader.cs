@@ -1,10 +1,11 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Options;
-using SemanticStub.Api.Models;
+using SemanticStub.Application.Infrastructure.Yaml;
+using SemanticStub.Application.Models;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace SemanticStub.Api.Infrastructure.Yaml;
+namespace SemanticStub.Infrastructure.Yaml;
 
 /// <summary>
 /// Loads OpenAPI-based stub definitions from disk, validates repository-specific constraints, and normalizes file-backed references before the runtime uses the document.

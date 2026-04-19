@@ -4,7 +4,9 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using SemanticStub.Api.Extensions;
-using SemanticStub.Api.Infrastructure.Yaml;
+using SemanticStub.Application.Infrastructure.Yaml;
+using SemanticStub.Application.Services;
+using SemanticStub.Infrastructure.Yaml;
 using SemanticStub.Api.Services;
 using Xunit;
 

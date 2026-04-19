@@ -1,6 +1,6 @@
 using YamlDotNet.Serialization;
 
-namespace SemanticStub.Api.Models;
+namespace SemanticStub.Application.Models;
 
 /// <summary>
 /// Describes an OpenAPI operation and its stub-specific match definitions.

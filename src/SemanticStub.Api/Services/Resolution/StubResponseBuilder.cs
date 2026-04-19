@@ -1,5 +1,6 @@
 using SemanticStub.Api.Models;
-using SemanticStub.Api.Utilities;
+using SemanticStub.Application.Models;
+using SemanticStub.Application.Utilities;
 
 namespace SemanticStub.Api.Services;
 

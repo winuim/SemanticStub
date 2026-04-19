@@ -2,9 +2,9 @@ using System.Collections;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
-using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services;
 
 /// <summary>
 /// Evaluates regex match constraints without changing matcher orchestration behavior.

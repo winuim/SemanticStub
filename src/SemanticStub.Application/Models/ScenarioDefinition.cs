@@ -1,6 +1,6 @@
 using YamlDotNet.Serialization;
 
-namespace SemanticStub.Api.Models;
+namespace SemanticStub.Application.Models;
 
 /// <summary>
 /// Describes the scenario state required for a response to be eligible and the optional next state to persist after that response is selected.

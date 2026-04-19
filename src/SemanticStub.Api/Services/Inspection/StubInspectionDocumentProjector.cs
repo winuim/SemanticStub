@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using SemanticStub.Api.Inspection;
 using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 
 namespace SemanticStub.Api.Services;
 

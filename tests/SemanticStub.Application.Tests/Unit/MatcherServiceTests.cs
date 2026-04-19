@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Primitives;
-using SemanticStub.Api.Models;
-using SemanticStub.Api.Services;
+using SemanticStub.Application.Models;
+using SemanticStub.Application.Services;
 using System.Diagnostics;
 using Xunit;
 

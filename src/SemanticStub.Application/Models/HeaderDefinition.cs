@@ -1,4 +1,4 @@
-namespace SemanticStub.Api.Models;
+namespace SemanticStub.Application.Models;
 
 /// <summary>
 /// Describes an OpenAPI response header exposed by a stub response.

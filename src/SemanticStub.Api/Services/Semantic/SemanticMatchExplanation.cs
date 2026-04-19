@@ -1,4 +1,5 @@
 using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 
 namespace SemanticStub.Api.Services;
 

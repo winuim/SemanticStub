@@ -1,8 +1,9 @@
 using Microsoft.Extensions.Logging;
-using SemanticStub.Api.Models;
-using SemanticStub.Api.Services;
+using SemanticStub.Application.Infrastructure.Yaml;
+using SemanticStub.Application.Models;
+using SemanticStub.Application.Services;
 
-namespace SemanticStub.Api.Infrastructure.Yaml;
+namespace SemanticStub.Infrastructure.Yaml;
 
 /// <summary>
 /// Holds the current process-wide YAML definition snapshot and swaps it atomically during reloads.

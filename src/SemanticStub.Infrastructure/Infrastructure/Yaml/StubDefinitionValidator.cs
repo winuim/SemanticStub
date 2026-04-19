@@ -1,8 +1,8 @@
-using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 using System.Collections;
 using System.Text.RegularExpressions;
 
-namespace SemanticStub.Api.Infrastructure.Yaml;
+namespace SemanticStub.Infrastructure.Yaml;
 
 internal sealed class StubDefinitionValidator
 {

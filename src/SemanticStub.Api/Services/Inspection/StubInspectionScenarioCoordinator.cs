@@ -1,5 +1,7 @@
 using SemanticStub.Api.Inspection;
-using SemanticStub.Api.Infrastructure.Yaml;
+using SemanticStub.Application.Infrastructure.Yaml;
+using SemanticStub.Application.Services;
+using SemanticStub.Infrastructure.Yaml;
 
 namespace SemanticStub.Api.Services;
 

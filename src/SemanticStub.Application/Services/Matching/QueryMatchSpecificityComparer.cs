@@ -1,7 +1,7 @@
 using System.Collections;
-using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services;
 
 internal sealed class QueryMatchSpecificityComparer : IComparer<QueryMatchDefinition>
 {

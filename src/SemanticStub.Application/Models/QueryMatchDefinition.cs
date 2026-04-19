@@ -1,6 +1,6 @@
 using YamlDotNet.Serialization;
 
-namespace SemanticStub.Api.Models;
+namespace SemanticStub.Application.Models;
 
 /// <summary>
 /// Describes the request conditions and response selected by a stub match entry.

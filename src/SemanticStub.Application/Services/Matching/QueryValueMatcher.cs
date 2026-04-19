@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Globalization;
 using Microsoft.Extensions.Primitives;
-using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services;
 
 /// <summary>
 /// Evaluates exact query value matches, including typed comparisons for declared query parameter schemas.

@@ -1,5 +1,7 @@
-using SemanticStub.Api.Infrastructure.Yaml;
+using SemanticStub.Application.Infrastructure.Yaml;
+using SemanticStub.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 using Xunit;
 
 namespace SemanticStub.Api.Tests.Unit.Infrastructure.Yaml;

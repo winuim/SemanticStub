@@ -1,7 +1,7 @@
-using SemanticStub.Api.Models;
-using SemanticStub.Api.Utilities;
+using SemanticStub.Application.Models;
+using SemanticStub.Application.Utilities;
 
-namespace SemanticStub.Api.Infrastructure.Yaml;
+namespace SemanticStub.Infrastructure.Yaml;
 
 internal sealed class StubDefinitionNormalizer
 {

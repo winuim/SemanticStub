@@ -1,6 +1,6 @@
 using YamlDotNet.Serialization;
 
-namespace SemanticStub.Api.Models;
+namespace SemanticStub.Application.Models;
 
 /// <summary>
 /// Represents the OpenAPI document used as the YAML source of truth for stub definitions.

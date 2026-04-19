@@ -3,9 +3,9 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
-using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services;
 
 internal sealed class FormBodyMatcher
 {

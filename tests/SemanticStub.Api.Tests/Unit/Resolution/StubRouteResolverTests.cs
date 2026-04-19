@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using SemanticStub.Api.Models;
+using SemanticStub.Application.Models;
 using SemanticStub.Api.Services;
 using Xunit;
 
