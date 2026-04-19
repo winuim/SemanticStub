@@ -1,7 +1,7 @@
 using SemanticStub.Api.Models;
 using Xunit;
 
-namespace SemanticStub.Api.Tests.Unit;
+namespace SemanticStub.Api.Tests.Unit.Models;
 
 public sealed class StubResponseTests
 {

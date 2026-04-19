@@ -3,7 +3,7 @@ using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
 using Xunit;
 
-namespace SemanticStub.Api.Tests.Unit;
+namespace SemanticStub.Api.Tests.Unit.Resolution;
 
 public sealed class StubRouteResolverTests
 {
