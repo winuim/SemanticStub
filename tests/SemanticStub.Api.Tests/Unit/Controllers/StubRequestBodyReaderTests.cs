@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using SemanticStub.Api.Controllers;
 using Xunit;
 
-namespace SemanticStub.Api.Tests.Unit;
+namespace SemanticStub.Api.Tests.Unit.Controllers;
 
 public sealed class StubRequestBodyReaderTests
 {

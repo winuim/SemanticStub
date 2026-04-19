@@ -11,7 +11,7 @@ using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
 using Xunit;
 
-namespace SemanticStub.Api.Tests.Unit;
+namespace SemanticStub.Api.Tests.Unit.Semantic;
 
 public sealed class SemanticMatcherServiceTests
 {

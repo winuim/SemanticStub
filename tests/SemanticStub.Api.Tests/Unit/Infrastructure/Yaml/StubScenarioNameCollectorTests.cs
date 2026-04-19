@@ -2,7 +2,7 @@ using SemanticStub.Api.Infrastructure.Yaml;
 using SemanticStub.Api.Models;
 using Xunit;
 
-namespace SemanticStub.Api.Tests.Unit;
+namespace SemanticStub.Api.Tests.Unit.Infrastructure.Yaml;
 
 public sealed class StubScenarioNameCollectorTests
 {

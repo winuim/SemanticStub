@@ -8,7 +8,7 @@ using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
 using Xunit;
 
-namespace SemanticStub.Api.Tests.Unit;
+namespace SemanticStub.Api.Tests.Unit.Inspection;
 
 public sealed class StubInspectionServiceTests
 {
