@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using SemanticStub.Api.Models;
 using SemanticStub.Api.Services;
 

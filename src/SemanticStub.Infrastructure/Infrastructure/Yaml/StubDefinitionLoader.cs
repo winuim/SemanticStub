@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Options;
 using SemanticStub.Api.Models;
 using YamlDotNet.Serialization;

@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
 namespace SemanticStub.Api.Infrastructure.Yaml;
 
 internal sealed class StubDefinitionWatcher : IHostedService, IDisposable
