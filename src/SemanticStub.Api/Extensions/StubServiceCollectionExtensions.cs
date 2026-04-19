@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using SemanticStub.Application.Extensions;
 using SemanticStub.Application.Infrastructure.Yaml;
 using SemanticStub.Application.Services;
+using SemanticStub.Infrastructure.Extensions;
 using SemanticStub.Infrastructure.Yaml;
 using SemanticStub.Api.Services;
 
@@ -22,11 +24,9 @@ public static class StubServiceCollectionExtensions
         // Keep resolution registration in this chain because inspection resolves IStubService lazily.
         return services
             .AddSemanticMatchingServices()
+            .AddApplicationServices()
             .AddYamlInfrastructureServices()
             .AddInspectionServices()
-            .AddHostedReloadServices()
-            .AddMatchingServices()
-            .AddScenarioServices()
             .AddResolutionServices();
     }
 
@@ -46,15 +46,6 @@ public static class StubServiceCollectionExtensions
         return services;
     }
 
-    private static IServiceCollection AddYamlInfrastructureServices(this IServiceCollection services)
-    {
-        services.AddSingleton<IStubDefinitionLoader, StubDefinitionLoader>();
-        // The loaded YAML definition is process-wide runtime state and is replaced atomically on reload.
-        services.AddSingleton<StubDefinitionState>();
-
-        return services;
-    }
-
     private static IServiceCollection AddInspectionServices(this IServiceCollection services)
     {
         // Runtime inspection metrics and recent request history are process-wide by design.
@@ -67,39 +58,6 @@ public static class StubServiceCollectionExtensions
             serviceProvider.GetRequiredService<IStubService>(),
             serviceProvider.GetRequiredService<StubInspectionRuntimeStore>(),
             serviceProvider.GetRequiredService<StubInspectionScenarioCoordinator>()));
-
-        return services;
-    }
-
-    private static IServiceCollection AddHostedReloadServices(this IServiceCollection services)
-    {
-        services.AddHostedService<StubDefinitionWatcher>();
-
-        return services;
-    }
-
-    private static IServiceCollection AddMatchingServices(this IServiceCollection services)
-    {
-        services.AddSingleton(serviceProvider => new JsonBodyMatcher(
-            serviceProvider.GetRequiredService<ILogger<JsonBodyMatcher>>()));
-        services.AddSingleton(serviceProvider => new FormBodyMatcher(
-            serviceProvider.GetRequiredService<ILogger<FormBodyMatcher>>()));
-        services.AddSingleton<QueryValueMatcher>();
-        services.AddSingleton(serviceProvider => new RegexQueryMatcher(
-            serviceProvider.GetRequiredService<ILogger<RegexQueryMatcher>>()));
-        services.AddSingleton<MatcherService>(serviceProvider => new MatcherService(
-            serviceProvider.GetRequiredService<JsonBodyMatcher>(),
-            serviceProvider.GetRequiredService<FormBodyMatcher>(),
-            serviceProvider.GetRequiredService<QueryValueMatcher>(),
-            serviceProvider.GetRequiredService<RegexQueryMatcher>()));
-
-        return services;
-    }
-
-    private static IServiceCollection AddScenarioServices(this IServiceCollection services)
-    {
-        // YAML scenario progress is shared across requests for the current process.
-        services.AddSingleton<ScenarioService>();
 
         return services;
     }
