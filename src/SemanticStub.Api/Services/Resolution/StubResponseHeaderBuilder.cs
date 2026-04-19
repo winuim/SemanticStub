@@ -3,7 +3,7 @@ using SemanticStub.Application.Models;
 using System.Collections;
 using System.Globalization;
 
-namespace SemanticStub.Application.Services.Resolution;
+namespace SemanticStub.Api.Services;
 
 internal static class StubResponseHeaderBuilder
 {
