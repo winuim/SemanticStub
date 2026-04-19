@@ -43,6 +43,13 @@ This project uses a modern, pragmatic .NET-based technology stack. The goal is t
 - Visual Studio / VS Code
 - Git + GitHub
 
+### Code Formatting
+- Use `dotnet format` to keep code style consistent.
+- Follow rules defined in `.editorconfig`.
+- Run formatting before committing changes.
+- In CI, use `dotnet format --verify-no-changes` to enforce consistency.
+- Do not manually fix formatting that can be handled by tools.
+
 ### Guidelines for Adding Libraries
 - Prefer built-in .NET libraries when sufficient.
 - Choose widely adopted and actively maintained libraries.
