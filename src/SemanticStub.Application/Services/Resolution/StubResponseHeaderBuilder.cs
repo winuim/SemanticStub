@@ -1,10 +1,9 @@
 using Microsoft.Extensions.Primitives;
-using SemanticStub.Api.Models;
 using SemanticStub.Application.Models;
 using System.Collections;
 using System.Globalization;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services.Resolution;
 
 internal static class StubResponseHeaderBuilder
 {

@@ -1,7 +1,7 @@
 using System.Text;
 using Microsoft.Extensions.Primitives;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services.Semantic;
 
 /// <summary>
 /// Builds the normalized request text used for semantic matching.

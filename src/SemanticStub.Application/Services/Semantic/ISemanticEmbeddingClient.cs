@@ -1,9 +1,9 @@
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services.Semantic;
 
 /// <summary>
 /// Provides embeddings from the configured semantic embedding provider.
 /// </summary>
-internal interface ISemanticEmbeddingClient
+public interface ISemanticEmbeddingClient
 {
     /// <summary>
     /// Gets embeddings for the supplied inputs.

@@ -1,7 +1,6 @@
-using SemanticStub.Api.Models;
 using SemanticStub.Application.Models;
 
-namespace SemanticStub.Api.Services;
+namespace SemanticStub.Application.Services.Semantic;
 
 /// <summary>
 /// Scores semantic candidates against a request embedding.

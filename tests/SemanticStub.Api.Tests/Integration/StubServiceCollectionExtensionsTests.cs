@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using SemanticStub.Api.Extensions;
 using SemanticStub.Application.Infrastructure.Yaml;
 using SemanticStub.Application.Services;
+using SemanticStub.Application.Services.Semantic;
 using SemanticStub.Infrastructure.Yaml;
 using SemanticStub.Api.Services;
 using Xunit;

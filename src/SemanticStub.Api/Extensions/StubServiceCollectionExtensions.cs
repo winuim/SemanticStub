@@ -4,7 +4,9 @@ using SemanticStub.Application.Extensions;
 using SemanticStub.Application.Infrastructure.Yaml;
 using SemanticStub.Application.Services;
 using SemanticStub.Infrastructure.Extensions;
+using SemanticStub.Infrastructure.Semantic;
 using SemanticStub.Infrastructure.Yaml;
+using SemanticStub.Application.Services.Semantic;
 using SemanticStub.Api.Services;
 
 namespace SemanticStub.Api.Extensions;
@@ -40,7 +42,7 @@ public static class StubServiceCollectionExtensions
         services.AddSingleton<ISemanticEmbeddingClient, SemanticEmbeddingClient>();
         services.AddSingleton<ISemanticMatcherService>(serviceProvider => new SemanticMatcherService(
             serviceProvider.GetRequiredService<ISemanticEmbeddingClient>(),
-            serviceProvider.GetRequiredService<IOptions<StubSettings>>(),
+            serviceProvider.GetRequiredService<IOptions<StubSettings>>().Value,
             serviceProvider.GetRequiredService<ILogger<SemanticMatcherService>>()));
 
         return services;
