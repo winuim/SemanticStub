@@ -401,9 +401,9 @@ public sealed class StubControllerTests
 
         public IReadOnlyList<RecentRequestInfo> GetRecentRequests(int limit) => throw new NotSupportedException();
 
-        public Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request) => throw new NotSupportedException();
+        public Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-        public Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request) => throw new NotSupportedException();
+        public Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public MatchExplanationInfo? GetLastMatchExplanation() => throw new NotSupportedException();
 
