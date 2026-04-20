@@ -139,10 +139,10 @@ public sealed class SemanticMatcherServiceTests
                     TopScoreMargin = 0.03d
                 }
             },
-            (_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+            (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("not-valid-json", Encoding.UTF8, "application/json")
-            });
+            }));
 
         var explanation = await service.ExplainMatchAsync(
             "POST",
@@ -368,7 +368,7 @@ public sealed class SemanticMatcherServiceTests
                     Endpoint = "http://tei"
                 }
             },
-            (_, _) => CreateEmbeddingResponse("[[0.0,0.0],[0.9,0.1]]"));
+            (_, _) => Task.FromResult(CreateEmbeddingResponse("[[0.0,0.0],[0.9,0.1]]")));
 
         var explanation = await service.ExplainMatchAsync(
             "POST",
@@ -393,7 +393,7 @@ public sealed class SemanticMatcherServiceTests
                     Endpoint = "http://tei"
                 }
             },
-            (_, _) => CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1,0.2]]"));
+            (_, _) => Task.FromResult(CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1,0.2]]")));
 
         var explanation = await service.ExplainMatchAsync(
             "POST",
@@ -427,7 +427,7 @@ public sealed class SemanticMatcherServiceTests
             (request, _) =>
             {
                 actualRequestUri = request.RequestUri;
-                return CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1]]");
+                return Task.FromResult(CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1]]"));
             });
 
         var candidate = CreateCandidate("find admin users");
@@ -458,9 +458,10 @@ public sealed class SemanticMatcherServiceTests
                     Endpoint = "http://tei"
                 }
             },
-            (request, _) =>
+            async (request, _) =>
             {
-                using var document = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+                var body = await request.Content!.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(body);
                 capturedRequestText = document.RootElement.GetProperty("inputs")[0].GetString();
                 return CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1]]");
             });
@@ -501,10 +502,10 @@ public sealed class SemanticMatcherServiceTests
                     Endpoint = "http://tei"
                 }
             },
-            (_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+            (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("{\"embeddings\":[[1.0,0.0]]}", Encoding.UTF8, "application/json")
-            });
+            }));
 
         var explanation = await service.ExplainMatchAsync(
             "POST",
@@ -535,7 +536,7 @@ public sealed class SemanticMatcherServiceTests
             (_, ct) =>
             {
                 receivedToken = ct;
-                return CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1]]");
+                return Task.FromResult(CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1]]"));
             });
 
         await service.ExplainMatchAsync(
@@ -567,7 +568,7 @@ public sealed class SemanticMatcherServiceTests
                     Endpoint = "http://tei"
                 }
             },
-            (_, _) => CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1]]"));
+            (_, _) => Task.FromResult(CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1]]")));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.ExplainMatchAsync(
             "POST",
@@ -603,7 +604,7 @@ public sealed class SemanticMatcherServiceTests
 
     private static SemanticMatcherService CreateService(
         StubSettings settings,
-        Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> handler)
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler)
     {
         var services = new ServiceCollection();
         services.AddSingleton(Options.Create(settings));
@@ -616,12 +617,12 @@ public sealed class SemanticMatcherServiceTests
         return (SemanticMatcherService)services.BuildServiceProvider().GetRequiredService<ISemanticMatcherService>();
     }
 
-    private static Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> CreateEmbeddingHandler(
+    private static Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> CreateEmbeddingHandler(
         IReadOnlyDictionary<string, string> embeddingsByInput)
     {
-        return (request, _) =>
+        return async (request, _) =>
         {
-            var body = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            var body = await request.Content!.ReadAsStringAsync();
             using var document = JsonDocument.Parse(body);
             var inputs = document.RootElement.GetProperty("inputs")
                 .EnumerateArray()
@@ -656,11 +657,11 @@ public sealed class SemanticMatcherServiceTests
     }
 
     private sealed class DelegatingTestHandler(
-        Func<HttpRequestMessage, CancellationToken, HttpResponseMessage> handler) : HttpMessageHandler
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            return Task.FromResult(handler(request, cancellationToken));
+            return handler(request, cancellationToken);
         }
     }
 
