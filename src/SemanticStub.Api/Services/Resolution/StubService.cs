@@ -134,7 +134,8 @@ public sealed class StubService : IStubService
         if (OperationUsesScenario(operation))
         {
             return await _scenarioService.ExecuteLockedAsync(
-                () => DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates, cancellationToken));
+                () => DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates, cancellationToken),
+                cancellationToken);
         }
 
         return await DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates, cancellationToken);
