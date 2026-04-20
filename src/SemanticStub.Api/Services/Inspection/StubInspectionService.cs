@@ -16,7 +16,7 @@ internal sealed class StubInspectionService : IStubInspectionService
     private readonly StubInspectionRuntimeStore _runtimeStore;
     private readonly StubInspectionScenarioCoordinator _scenarioCoordinator;
 
-    internal StubInspectionService(
+    public StubInspectionService(
         StubDefinitionState state,
         IStubDefinitionLoader loader,
         IOptions<StubSettings> settings,

@@ -68,6 +68,28 @@ public sealed class StubServiceCollectionExtensionsTests
             serviceProvider.GetRequiredService<StubInspectionRuntimeStore>());
     }
 
+    [Fact]
+    public void AddStubServices_UsesDirectRegistrationForStraightforwardServices()
+    {
+        using var workspace = StubWorkspace.Create();
+        var services = CreateServiceCollection(workspace);
+
+        services.AddStubServices();
+
+        AssertDirectRegistration<JsonBodyMatcher>(services);
+        AssertDirectRegistration<FormBodyMatcher>(services);
+        AssertDirectRegistration<QueryValueMatcher>(services);
+        AssertDirectRegistration<RegexQueryMatcher>(services);
+        AssertConstructorFactory<MatcherService>(services);
+        AssertDirectRegistration<ISemanticMatcherService, SemanticMatcherService>(services);
+        AssertDirectRegistration<IStubInspectionService, StubInspectionService>(services);
+        AssertDirectRegistration<StubResponseBuilder>(services);
+        AssertDirectRegistration<StubDefaultResponseSelector>(services);
+        AssertDirectRegistration<StubDispatchSelector>(services);
+        AssertDirectRegistration<StubInspectionProjectionBuilder>(services);
+        AssertConstructorFactory<IStubService>(services);
+    }
+
     private static ServiceCollection CreateServiceCollection(StubWorkspace workspace)
     {
         var services = new ServiceCollection();
@@ -92,6 +114,30 @@ public sealed class StubServiceCollectionExtensionsTests
         var descriptor = Assert.Single(services, descriptor => descriptor.ServiceType == typeof(TService));
 
         Assert.Equal(expectedLifetime, descriptor.Lifetime);
+    }
+
+    private static void AssertDirectRegistration<TService>(IServiceCollection services)
+    {
+        var descriptor = Assert.Single(services, descriptor => descriptor.ServiceType == typeof(TService));
+
+        Assert.Null(descriptor.ImplementationFactory);
+        Assert.Equal(typeof(TService), descriptor.ImplementationType);
+    }
+
+    private static void AssertDirectRegistration<TService, TImplementation>(IServiceCollection services)
+    {
+        var descriptor = Assert.Single(services, descriptor => descriptor.ServiceType == typeof(TService));
+
+        Assert.Null(descriptor.ImplementationFactory);
+        Assert.Equal(typeof(TImplementation), descriptor.ImplementationType);
+    }
+
+    private static void AssertConstructorFactory<TService>(IServiceCollection services)
+    {
+        var descriptor = Assert.Single(services, descriptor => descriptor.ServiceType == typeof(TService));
+
+        Assert.NotNull(descriptor.ImplementationFactory);
+        Assert.Null(descriptor.ImplementationType);
     }
 
     private sealed class StubWorkspace(string rootPath, string samplesPath) : IDisposable
