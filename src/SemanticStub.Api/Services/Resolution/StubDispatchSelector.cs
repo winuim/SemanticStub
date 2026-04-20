@@ -41,7 +41,8 @@ internal sealed class StubDispatchSelector
         IReadOnlyDictionary<string, string> headers,
         string? body,
         bool mutateScenarioState,
-        bool includeSemanticCandidates)
+        bool includeSemanticCandidates,
+        CancellationToken cancellationToken = default)
     {
         var selectedDeterministicCandidate = _matcherService.FindBestMatch(
             pathItem.Parameters,
@@ -103,7 +104,8 @@ internal sealed class StubDispatchSelector
                 body,
                 operation.Matches,
                 candidate => _scenarioService.IsMatch(candidate.Response.Scenario),
-                includeCandidateScores: includeSemanticCandidates);
+                includeCandidateScores: includeSemanticCandidates,
+                cancellationToken: cancellationToken);
 
         if (semanticExplanation.SelectedCandidate is not null)
         {

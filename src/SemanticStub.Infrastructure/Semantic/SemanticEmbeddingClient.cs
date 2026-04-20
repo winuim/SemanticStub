@@ -34,17 +34,17 @@ internal sealed class SemanticEmbeddingClient : ISemanticEmbeddingClient
     /// <exception cref="HttpRequestException">Thrown when the embedding endpoint request fails.</exception>
     /// <exception cref="TaskCanceledException">Thrown when the embedding endpoint request times out.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the response shape is invalid.</exception>
-    public async Task<IReadOnlyList<float[]>> GetEmbeddingsAsync(IReadOnlyList<string> inputs)
+    public async Task<IReadOnlyList<float[]>> GetEmbeddingsAsync(IReadOnlyList<string> inputs, CancellationToken cancellationToken = default)
     {
         var httpClient = _httpClientFactory.CreateClient(HttpClientName);
         var endpoint = SemanticEmbeddingEndpoint.Normalize(_settings.Endpoint!);
-        var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs));
+        var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         try
         {
-            using var responseStream = await response.Content.ReadAsStreamAsync();
-            using var document = await JsonDocument.ParseAsync(responseStream);
+            using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(responseStream, cancellationToken: cancellationToken);
 
             if (TryReadEmbeddings(document.RootElement, inputs.Count, out var embeddings))
             {

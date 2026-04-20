@@ -334,6 +334,19 @@ public sealed class StubControllerTests
         Assert.Equal("/users", inspectionService.LastRecordedExplanation!.Result.PathPattern);
     }
 
+    [Fact]
+    public async Task Get_PassesRequestAbortedToken_ToStubService()
+    {
+        var stubService = new RecordingStubService(StubMatchResult.Matched, new StubResponse { StatusCode = 200 });
+        var controller = CreateController(stubService);
+        using var cancellationSource = new CancellationTokenSource();
+        controller.HttpContext.RequestAborted = cancellationSource.Token;
+
+        await controller.Get("users");
+
+        Assert.Equal(cancellationSource.Token, stubService.CancellationToken);
+    }
+
     private static readonly RecordingInspectionService controllerInspectionService = new();
 
     private static StubController CreateController(IStubService stubService, IStubInspectionService? inspectionService = null)
@@ -456,6 +469,8 @@ public sealed class StubControllerTests
 
         public string? Body { get; private set; }
 
+        public CancellationToken CancellationToken { get; private set; }
+
         public IReadOnlyList<string> AllowedMethods { get; }
 
         public IReadOnlyList<string> GetAllowedMethods(string path)
@@ -468,13 +483,15 @@ public sealed class StubControllerTests
             string path,
             IReadOnlyDictionary<string, StringValues> query,
             IReadOnlyDictionary<string, string> headers,
-            string? body)
+            string? body,
+            CancellationToken cancellationToken = default)
         {
             Method = method;
             Path = path;
             Query = query;
             Headers = headers;
             Body = body;
+            CancellationToken = cancellationToken;
 
             return Task.FromResult(new StubDispatchResult
             {
@@ -511,7 +528,7 @@ public sealed class StubControllerTests
             });
         }
 
-        public Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request)
+        public Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(new MatchExplanationInfo
             {

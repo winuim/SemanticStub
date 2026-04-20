@@ -517,6 +517,68 @@ public sealed class SemanticMatcherServiceTests
         Assert.Null(explanation.SelectedCandidate);
     }
 
+    [Fact]
+    public async Task ExplainMatchAsync_PropagatesCancellationToken_ToEmbeddingClient()
+    {
+        CancellationToken receivedToken = default;
+        using var cancellationSource = new CancellationTokenSource();
+
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei"
+                }
+            },
+            (_, ct) =>
+            {
+                receivedToken = ct;
+                return CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1]]");
+            });
+
+        await service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [CreateCandidate("find admin users")],
+            cancellationToken: cancellationSource.Token);
+
+        // HttpClient links the caller's token internally, so the received token is a linked token rather
+        // than the original. Verify that a cancellable token (not CancellationToken.None) was forwarded.
+        Assert.True(receivedToken.CanBeCanceled);
+    }
+
+    [Fact]
+    public async Task ExplainMatchAsync_ThrowsOperationCanceledException_WhenTokenCancelledDuringEmbeddingCall()
+    {
+        using var cancellationSource = new CancellationTokenSource();
+        await cancellationSource.CancelAsync();
+
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei"
+                }
+            },
+            (_, _) => CreateEmbeddingResponse("[[1.0,0.0],[0.9,0.1]]"));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [CreateCandidate("find admin users")],
+            cancellationToken: cancellationSource.Token));
+    }
+
     private static QueryMatchDefinition CreateCandidate(string semanticMatch)
     {
         return new QueryMatchDefinition

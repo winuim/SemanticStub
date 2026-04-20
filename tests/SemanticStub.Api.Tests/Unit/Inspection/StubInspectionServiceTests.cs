@@ -151,7 +151,8 @@ public sealed class StubInspectionServiceTests
             string? body,
             IReadOnlyCollection<QueryMatchDefinition> candidates,
             Func<QueryMatchDefinition, bool>? candidateFilter = null,
-            bool includeCandidateScores = false)
+            bool includeCandidateScores = false,
+            CancellationToken cancellationToken = default)
         {
             return Task.FromResult(new SemanticMatchExplanation());
         }
@@ -167,7 +168,8 @@ public sealed class StubInspectionServiceTests
             string? body,
             IReadOnlyCollection<QueryMatchDefinition> candidates,
             Func<QueryMatchDefinition, bool>? candidateFilter = null,
-            bool includeCandidateScores = false)
+            bool includeCandidateScores = false,
+            CancellationToken cancellationToken = default)
         {
             return Task.FromResult(explanation);
         }

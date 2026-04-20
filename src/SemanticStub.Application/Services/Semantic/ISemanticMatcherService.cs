@@ -19,6 +19,7 @@ public interface ISemanticMatcherService
     /// <param name="candidates">The semantic candidates attached to the resolved operation.</param>
     /// <param name="candidateFilter">An optional filter that excludes ineligible candidates before scoring.</param>
     /// <param name="includeCandidateScores">Whether per-candidate scores should be returned.</param>
+    /// <param name="cancellationToken">A token that cancels the embedding request when the caller is no longer interested in the result.</param>
     /// <returns>The semantic evaluation details, including scores and the selected candidate when one was accepted.</returns>
     Task<SemanticMatchExplanation> ExplainMatchAsync(
         string method,
@@ -28,5 +29,6 @@ public interface ISemanticMatcherService
         string? body,
         IReadOnlyCollection<QueryMatchDefinition> candidates,
         Func<QueryMatchDefinition, bool>? candidateFilter = null,
-        bool includeCandidateScores = false);
+        bool includeCandidateScores = false,
+        CancellationToken cancellationToken = default);
 }

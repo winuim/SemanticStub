@@ -24,18 +24,21 @@ public interface IStubService
     /// <param name="query">The query-string values to evaluate.</param>
     /// <param name="headers">The request headers to evaluate.</param>
     /// <param name="body">The request body used for JSON body matching.</param>
+    /// <param name="cancellationToken">A token that cancels dispatch when the caller is no longer interested in the result.</param>
     /// <returns>The dispatch result, including the assembled response and explanation captured from the same evaluation.</returns>
     Task<StubDispatchResult> DispatchAsync(
         string method,
         string path,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
-        string? body);
+        string? body,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Explains how the runtime would evaluate the supplied virtual request without executing a response or mutating scenario state.
     /// </summary>
     /// <param name="request">The virtual request to evaluate.</param>
+    /// <param name="cancellationToken">A token that cancels the evaluation when the caller is no longer interested in the result.</param>
     /// <returns>The explanation produced by the shared matching pipeline.</returns>
-    Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request);
+    Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request, CancellationToken cancellationToken = default);
 }

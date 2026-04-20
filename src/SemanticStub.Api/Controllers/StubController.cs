@@ -102,7 +102,7 @@ public sealed class StubController : ControllerBase
         var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
         var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
         var requestBody = await StubRequestBodyReader.ReadAsync(Request, _logger);
-        return await _stubService.DispatchAsync(method, requestPath, query, headers, requestBody);
+        return await _stubService.DispatchAsync(method, requestPath, query, headers, requestBody, HttpContext.RequestAborted);
     }
 
     private async Task<IActionResult> CreateActionResultAsync(StubDispatchResult dispatch, string requestPath, Action<int> setStatusCode)
