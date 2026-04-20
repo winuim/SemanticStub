@@ -294,13 +294,13 @@ SemanticStub exposes runtime inspection endpoints under the reserved prefix
 - `GET /_semanticstub/runtime/routes/{routeId}` returns the effective runtime details for one active route.
 - `GET /_semanticstub/runtime/scenarios` returns the current scenario state snapshot.
 - `GET /_semanticstub/runtime/metrics` returns aggregate runtime metrics for real requests handled by the current process.
-- `POST /_semanticstub/runtime/metrics/reset` resets aggregate runtime metrics and recent request history for the current process.
+- `POST /_semanticstub/runtime/metrics/resets` resets aggregate runtime metrics and recent request history for the current process. `POST /_semanticstub/runtime/metrics/reset` remains supported for compatibility.
 - `GET /_semanticstub/runtime/requests?limit=20` returns a bounded recent request history for real requests handled by the current process.
 - `POST /_semanticstub/runtime/test-match` evaluates a virtual request without executing a real response or mutating scenario state.
 - `POST /_semanticstub/runtime/explain` returns structured match details for a virtual request, including deterministic and semantic evaluation when applicable.
 - `GET /_semanticstub/runtime/explain/last` returns the latest explanation captured from a real matched request in the current process.
-- `POST /_semanticstub/runtime/scenarios/reset` resets all configured scenarios back to their initial state.
-- `POST /_semanticstub/runtime/scenarios/{name}/reset` resets one configured scenario back to its initial state.
+- `POST /_semanticstub/runtime/scenarios/resets` resets all configured scenarios back to their initial state. `POST /_semanticstub/runtime/scenarios/reset` remains supported for compatibility.
+- `POST /_semanticstub/runtime/scenarios/{name}/resets` resets one configured scenario back to its initial state. `POST /_semanticstub/runtime/scenarios/{name}/reset` remains supported for compatibility.
 - YAML stub definitions under `/_semanticstub/runtime/*` are reserved for these inspection endpoints and are not reachable as normal stub routes.
 
 Inspection notes:
@@ -310,11 +310,11 @@ Inspection notes:
 - `/_semanticstub/runtime/routes/{routeId}` expands a single route into a stable detail view with top-level responses and normalized conditional match metadata.
 - `/_semanticstub/runtime/scenarios` returns one item per known scenario with its current state and whether it is active.
 - `/_semanticstub/runtime/metrics` is process-local and currently returns total request count, matched and unmatched counts, fallback and semantic counts, average latency, status-code summaries, and top routes.
-- `/_semanticstub/runtime/metrics/reset` clears process-local aggregate metrics and recent request history without reloading configuration, changing scenario state, or clearing `/_semanticstub/runtime/explain/last`.
+- `/_semanticstub/runtime/metrics/resets` and `/_semanticstub/runtime/metrics/reset` clear process-local aggregate metrics and recent request history without reloading configuration, changing scenario state, or clearing `/_semanticstub/runtime/explain/last`.
 - `/_semanticstub/runtime/requests` is process-local and currently returns up to 100 recent real requests in newest-first order. Each item includes timestamp, method, path, resolved route id when available, status code, elapsed time, match mode, and failure reason for unmatched requests. The `limit` query parameter defaults to `20`.
 - `/_semanticstub/runtime/test-match` and `/_semanticstub/runtime/explain` accept a virtual request payload with method, path, optional query/header/body values, and optional candidate-detail flags.
 - `/_semanticstub/runtime/explain/last` is process-local and only updates after a real request produces a matched stub response.
-- `/_semanticstub/runtime/scenarios/reset` and `/_semanticstub/runtime/scenarios/{name}/reset` mutate only in-memory scenario state for the current process.
+- `/_semanticstub/runtime/scenarios/resets`, `/_semanticstub/runtime/scenarios/reset`, `/_semanticstub/runtime/scenarios/{name}/resets`, and `/_semanticstub/runtime/scenarios/{name}/reset` mutate only in-memory scenario state for the current process.
 - These endpoints do not expose raw YAML, internal domain objects, or full response payload bodies.
 
 Example request body for `POST /_semanticstub/runtime/test-match` and

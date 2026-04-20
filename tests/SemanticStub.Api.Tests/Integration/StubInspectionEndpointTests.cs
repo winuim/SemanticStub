@@ -219,12 +219,49 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
     }
 
     [Fact]
+    public async Task ResetMetricsAlias_ReturnsNoContent()
+    {
+        var response = await client.PostAsync("/_semanticstub/runtime/metrics/resets", content: null);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
     public async Task ResetMetrics_ClearsMetricsAndRecentRequests()
     {
         var routedResponse = await client.GetAsync("/users?role=admin");
         routedResponse.EnsureSuccessStatusCode();
 
         var resetResponse = await client.PostAsync("/_semanticstub/runtime/metrics/reset", content: null);
+        Assert.Equal(HttpStatusCode.NoContent, resetResponse.StatusCode);
+
+        var metricsResponse = await client.GetAsync("/_semanticstub/runtime/metrics");
+        metricsResponse.EnsureSuccessStatusCode();
+        var metrics = await metricsResponse.Content.ReadFromJsonAsync<RuntimeMetricsSummaryInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        var requestsResponse = await client.GetAsync("/_semanticstub/runtime/requests");
+        requestsResponse.EnsureSuccessStatusCode();
+        var requests = await requestsResponse.Content.ReadFromJsonAsync<RecentRequestInfo[]>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(metrics);
+        Assert.Equal(0, metrics!.TotalRequestCount);
+        Assert.Equal(0, metrics.MatchedRequestCount);
+        Assert.Equal(0, metrics.UnmatchedRequestCount);
+        Assert.Empty(metrics.StatusCodes);
+        Assert.Empty(metrics.TopRoutes);
+        Assert.NotNull(requests);
+        Assert.Empty(requests!);
+    }
+
+    [Fact]
+    public async Task ResetMetricsAlias_ClearsMetricsAndRecentRequests()
+    {
+        var routedResponse = await client.GetAsync("/users?role=admin");
+        routedResponse.EnsureSuccessStatusCode();
+
+        var resetResponse = await client.PostAsync("/_semanticstub/runtime/metrics/resets", content: null);
         Assert.Equal(HttpStatusCode.NoContent, resetResponse.StatusCode);
 
         var metricsResponse = await client.GetAsync("/_semanticstub/runtime/metrics");
@@ -296,9 +333,34 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
     }
 
     [Fact]
+    public async Task ResetScenariosAlias_ReturnsNoContent()
+    {
+        var response = await client.PostAsync("/_semanticstub/runtime/scenarios/resets", content: null);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ResetScenarioAlias_ReturnsNoContent_WhenScenarioExists()
+    {
+        var response = await client.PostAsync("/_semanticstub/runtime/scenarios/checkout-flow/resets", content: null);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
     public async Task ResetScenario_ReturnsNotFound_WhenScenarioDoesNotExist()
     {
         var response = await client.PostAsync("/_semanticstub/runtime/scenarios/does-not-exist/reset", content: null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        await AssertNotFoundProblemDetails(response, "Scenario not found");
+    }
+
+    [Fact]
+    public async Task ResetScenarioAlias_ReturnsNotFound_WhenScenarioDoesNotExist()
+    {
+        var response = await client.PostAsync("/_semanticstub/runtime/scenarios/does-not-exist/resets", content: null);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         await AssertNotFoundProblemDetails(response, "Scenario not found");

@@ -51,6 +51,7 @@ public sealed class StubInspectionController : ControllerBase
 
     /// <summary>Resets aggregate runtime metrics and recent request history for the current process.</summary>
     [HttpPost("metrics/reset")]
+    [HttpPost("metrics/resets")]
     public IActionResult ResetMetrics()
     {
         _inspectionService.ResetRuntimeMetrics();
@@ -87,6 +88,7 @@ public sealed class StubInspectionController : ControllerBase
 
     /// <summary>Resets all configured scenarios back to their initial state.</summary>
     [HttpPost("scenarios/reset")]
+    [HttpPost("scenarios/resets")]
     public IActionResult ResetScenarios()
     {
         _inspectionService.ResetScenarioStates();
@@ -95,6 +97,7 @@ public sealed class StubInspectionController : ControllerBase
 
     /// <summary>Resets a configured scenario back to its initial state.</summary>
     [HttpPost("scenarios/{name}/reset")]
+    [HttpPost("scenarios/{name}/resets")]
     public IActionResult ResetScenario(string name)
     {
         return _inspectionService.ResetScenarioState(name)
