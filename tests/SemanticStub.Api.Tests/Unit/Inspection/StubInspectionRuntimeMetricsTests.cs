@@ -33,17 +33,6 @@ public sealed class StubInspectionRuntimeMetricsTests
         public string LoadResponseFileContent(string fileName) => throw new InvalidOperationException("Not used in inspection tests");
     }
 
-    private sealed class ReloadingStubDefinitionLoader(StubDocument document, string directoryPath = "/test/definitions") : IStubDefinitionLoader
-    {
-        public StubDocument CurrentDocument { get; set; } = document;
-
-        public string GetDefinitionsDirectoryPath() => directoryPath;
-
-        public StubDocument LoadDefaultDefinition() => CurrentDocument;
-
-        public string LoadResponseFileContent(string fileName) => throw new InvalidOperationException("Not used in inspection tests");
-    }
-
     private static StubDefinitionState CreateState(StubDocument document, string directoryPath = "/test/definitions")
     {
         var loader = new TestStubDefinitionLoader(document, directoryPath);
@@ -159,25 +148,8 @@ public sealed class StubInspectionRuntimeMetricsTests
         }
     }
 
-    private sealed class StubSemanticMatcherService(SemanticMatchExplanation explanation) : ISemanticMatcherService
-    {
-        public Task<SemanticMatchExplanation> ExplainMatchAsync(
-            string method,
-            string path,
-            IReadOnlyDictionary<string, Microsoft.Extensions.Primitives.StringValues> query,
-            IReadOnlyDictionary<string, string> headers,
-            string? body,
-            IReadOnlyCollection<QueryMatchDefinition> candidates,
-            Func<QueryMatchDefinition, bool>? candidateFilter = null,
-            bool includeCandidateScores = false,
-            CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(explanation);
-        }
-    }
-
     // ---------------------------------------------------------------------------
-    // GetConfigSnapshot — definitions directory
+    // Runtime metrics
     // ---------------------------------------------------------------------------
 
     [Fact]
