@@ -36,7 +36,9 @@ public sealed class StubInspectionController : ControllerBase
     public IActionResult GetRoute(string routeId)
     {
         var route = _inspectionService.GetRoute(routeId);
-        return route is null ? NotFound() : Ok(route);
+        return route is null
+            ? NotFoundProblem("Route not found", $"Inspection route '{routeId}' was not found.")
+            : Ok(route);
     }
 
     /// <summary>Returns the current runtime state for all configured scenarios.</summary>
@@ -78,7 +80,9 @@ public sealed class StubInspectionController : ControllerBase
     public IActionResult ExplainLastMatch()
     {
         var explanation = _inspectionService.GetLastMatchExplanation();
-        return explanation is null ? NotFound() : Ok(explanation);
+        return explanation is null
+            ? NotFoundProblem("Last match explanation not found", "No real request match explanation has been captured yet.")
+            : Ok(explanation);
     }
 
     /// <summary>Resets all configured scenarios back to their initial state.</summary>
@@ -95,6 +99,14 @@ public sealed class StubInspectionController : ControllerBase
     {
         return _inspectionService.ResetScenarioState(name)
             ? NoContent()
-            : NotFound();
+            : NotFoundProblem("Scenario not found", $"Scenario '{name}' was not found.");
+    }
+
+    private ObjectResult NotFoundProblem(string title, string detail)
+    {
+        return Problem(
+            statusCode: StatusCodes.Status404NotFound,
+            title: title,
+            detail: detail);
     }
 }
