@@ -18,7 +18,7 @@ public sealed class StartupValidationTests
         var exception = Record.Exception(() => factory.CreateClient());
 
         Assert.NotNull(exception);
-        Assert.Contains("non-empty absolute URI", exception.ToString());
+        Assert.Contains("non-empty absolute HTTP or HTTPS URI", exception.ToString());
     }
 
     [Fact]
@@ -32,7 +32,21 @@ public sealed class StartupValidationTests
         var exception = Record.Exception(() => factory.CreateClient());
 
         Assert.NotNull(exception);
-        Assert.Contains("non-empty absolute URI", exception.ToString());
+        Assert.Contains("non-empty absolute HTTP or HTTPS URI", exception.ToString());
+    }
+
+    [Fact]
+    public void CreateClient_ThrowsWhenSemanticMatchingEnabledWithUnsupportedScheme()
+    {
+        using var factory = new SettingsFactory([
+            KeyValuePair.Create<string, string?>("StubSettings:SemanticMatching:Enabled", "true"),
+            KeyValuePair.Create<string, string?>("StubSettings:SemanticMatching:Endpoint", "ftp://host/embed"),
+        ]);
+
+        var exception = Record.Exception(() => factory.CreateClient());
+
+        Assert.NotNull(exception);
+        Assert.Contains("non-empty absolute HTTP or HTTPS URI", exception.ToString());
     }
 
     [Theory]

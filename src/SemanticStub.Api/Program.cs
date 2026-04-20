@@ -29,8 +29,9 @@ builder.Services.AddOptions<StubSettings>()
     .Validate(
         s => !s.SemanticMatching.Enabled
              || (!string.IsNullOrWhiteSpace(s.SemanticMatching.Endpoint)
-                 && Uri.TryCreate(s.SemanticMatching.Endpoint, UriKind.Absolute, out _)),
-        "SemanticMatching.Endpoint must be a non-empty absolute URI when semantic matching is enabled.")
+                 && Uri.TryCreate(s.SemanticMatching.Endpoint, UriKind.Absolute, out var uri)
+                 && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)),
+        "SemanticMatching.Endpoint must be a non-empty absolute HTTP or HTTPS URI when semantic matching is enabled.")
     .Validate(
         s => s.SemanticMatching.TimeoutSeconds > 0,
         "SemanticMatching.TimeoutSeconds must be positive.")
