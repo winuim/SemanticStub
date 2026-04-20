@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using SemanticStub.Api.Inspection;
 using Xunit;
@@ -139,6 +140,7 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
         var response = await client.GetAsync("/_semanticstub/runtime/routes/does-not-exist");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        await AssertNotFoundProblemDetails(response, "Route not found");
     }
 
     [Fact]
@@ -299,6 +301,7 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
         var response = await client.PostAsync("/_semanticstub/runtime/scenarios/does-not-exist/reset", content: null);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        await AssertNotFoundProblemDetails(response, "Scenario not found");
     }
 
     [Fact]
@@ -383,5 +386,30 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
         Assert.NotNull(payload);
         Assert.Equal("Matched", payload!.Result.MatchResult);
         Assert.Equal("listUsers", payload.Result.RouteId);
+    }
+
+    [Fact]
+    public async Task ExplainLastMatch_ReturnsNotFoundProblemDetails_WhenNoRealRequestExplanationExists()
+    {
+        await using var factory = new WebApplicationFactory<Program>();
+        using var freshClient = factory.CreateClient();
+
+        var response = await freshClient.GetAsync("/_semanticstub/runtime/explain/last");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        await AssertNotFoundProblemDetails(response, "Last match explanation not found");
+    }
+
+    private static async Task AssertNotFoundProblemDetails(HttpResponseMessage response, string expectedTitle)
+    {
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(problem);
+        Assert.Equal(StatusCodes.Status404NotFound, problem!.Status);
+        Assert.Equal(expectedTitle, problem.Title);
+        Assert.False(string.IsNullOrWhiteSpace(problem.Detail));
     }
 }
