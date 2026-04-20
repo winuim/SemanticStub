@@ -158,7 +158,17 @@ public sealed class ScenarioService
     /// <param name="action">The scenario-aware async operation to run atomically.</param>
     public async Task<T> ExecuteLockedAsync<T>(Func<Task<T>> action)
     {
-        await _semaphore.WaitAsync();
+        return await ExecuteLockedAsync(action, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Executes scenario-sensitive selection and transition logic under one asynchronous lock so state checks and advances stay atomic across concurrent async requests.
+    /// </summary>
+    /// <param name="action">The scenario-aware async operation to run atomically.</param>
+    /// <param name="cancellationToken">The token that cancels waiting for the scenario lock.</param>
+    public async Task<T> ExecuteLockedAsync<T>(Func<Task<T>> action, CancellationToken cancellationToken)
+    {
+        await _semaphore.WaitAsync(cancellationToken);
         try
         {
             return await action();

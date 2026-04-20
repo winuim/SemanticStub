@@ -32,6 +32,40 @@ public sealed class ScenarioServiceTests
     }
 
     [Fact]
+    public async Task ExecuteLockedAsync_ThrowsOperationCanceledException_WhenCancellationIsRequestedWhileWaiting()
+    {
+        var service = new ScenarioService();
+        var lockEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseLock = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cts = new CancellationTokenSource();
+
+        var heldLock = service.ExecuteLockedAsync(async () =>
+        {
+            lockEntered.SetResult();
+            await releaseLock.Task;
+            return 0;
+        });
+
+        await lockEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        var waitingForLock = service.ExecuteLockedAsync(
+            () => Task.FromResult(0),
+            cts.Token);
+
+        cts.Cancel();
+
+        try
+        {
+            await Assert.ThrowsAsync<OperationCanceledException>(() => waitingForLock);
+        }
+        finally
+        {
+            releaseLock.SetResult();
+            await heldLock;
+        }
+    }
+
+    [Fact]
     public void Reset_ClearsAdvancedScenarioState()
     {
         var service = new ScenarioService();
