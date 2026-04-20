@@ -29,12 +29,12 @@ public sealed class StubServiceTests
         return Assert.IsType<StubResponse>(response);
     }
 
-    private static (StubMatchResult Result, StubResponse? Response) Dispatch(
+    private static Task<(StubMatchResult Result, StubResponse? Response)> DispatchAsync(
         StubService service,
         string method,
         string path)
     {
-        return Dispatch(
+        return DispatchAsync(
             service,
             method,
             path,
@@ -43,13 +43,13 @@ public sealed class StubServiceTests
             body: null);
     }
 
-    private static (StubMatchResult Result, StubResponse? Response) Dispatch(
+    private static Task<(StubMatchResult Result, StubResponse? Response)> DispatchAsync(
         StubService service,
         string method,
         string path,
         IReadOnlyDictionary<string, string> query)
     {
-        return Dispatch(
+        return DispatchAsync(
             service,
             method,
             path,
@@ -58,13 +58,13 @@ public sealed class StubServiceTests
             body: null);
     }
 
-    private static (StubMatchResult Result, StubResponse? Response) Dispatch(
+    private static Task<(StubMatchResult Result, StubResponse? Response)> DispatchAsync(
         StubService service,
         string method,
         string path,
         IReadOnlyDictionary<string, StringValues> query)
     {
-        return Dispatch(
+        return DispatchAsync(
             service,
             method,
             path,
@@ -73,14 +73,14 @@ public sealed class StubServiceTests
             body: null);
     }
 
-    private static (StubMatchResult Result, StubResponse? Response) Dispatch(
+    private static Task<(StubMatchResult Result, StubResponse? Response)> DispatchAsync(
         StubService service,
         string method,
         string path,
         IReadOnlyDictionary<string, string> query,
         string? body)
     {
-        return Dispatch(
+        return DispatchAsync(
             service,
             method,
             path,
@@ -89,14 +89,14 @@ public sealed class StubServiceTests
             body);
     }
 
-    private static (StubMatchResult Result, StubResponse? Response) Dispatch(
+    private static Task<(StubMatchResult Result, StubResponse? Response)> DispatchAsync(
         StubService service,
         string method,
         string path,
         IReadOnlyDictionary<string, StringValues> query,
         string? body)
     {
-        return Dispatch(
+        return DispatchAsync(
             service,
             method,
             path,
@@ -105,7 +105,7 @@ public sealed class StubServiceTests
             body);
     }
 
-    private static (StubMatchResult Result, StubResponse? Response) Dispatch(
+    private static async Task<(StubMatchResult Result, StubResponse? Response)> DispatchAsync(
         StubService service,
         string method,
         string path,
@@ -113,7 +113,7 @@ public sealed class StubServiceTests
         IReadOnlyDictionary<string, string> headers,
         string? body)
     {
-        var dispatch = service.DispatchAsync(method, path, query, headers, body).GetAwaiter().GetResult();
+        var dispatch = await service.DispatchAsync(method, path, query, headers, body);
         return (dispatch.Result, dispatch.Response);
     }
 
@@ -145,7 +145,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_ReturnsMatchedResponseForMethodAndPathOnly()
+    public async Task DispatchAsync_ReturnsMatchedResponseForMethodAndPathOnly()
     {
         var document = new StubDocument
         {
@@ -178,7 +178,7 @@ public sealed class StubServiceTests
 
         StubService service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(200, matchedResponse.StatusCode);
@@ -209,7 +209,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void ConstructorContract_UsesLoaderBackedDocumentState()
+    public async Task ConstructorContract_UsesLoaderBackedDocumentState()
     {
         var document = new StubDocument
         {
@@ -242,7 +242,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document, matcherService: CreateMatcherService());
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(200, matchedResponse.StatusCode);
@@ -295,7 +295,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_QueryOnlyOverload_MatchesFullOverloadBehavior()
+    public async Task DispatchAsync_QueryOnlyOverload_MatchesFullOverloadBehavior()
     {
         var document = new StubDocument
         {
@@ -340,8 +340,8 @@ public sealed class StubServiceTests
             ["role"] = "admin"
         };
 
-        var (queryOnlyResult, queryOnlyResponse) = Dispatch(service, HttpMethods.Get, "/users", query);
-        var (fullResult, fullResponse) = Dispatch(
+        var (queryOnlyResult, queryOnlyResponse) = await DispatchAsync(service, HttpMethods.Get, "/users", query);
+        var (fullResult, fullResponse) = await DispatchAsync(
             service,
             HttpMethods.Get,
             "/users",
@@ -357,7 +357,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_UsesStatusCodeDefinedInYamlResponses()
+    public async Task DispatchAsync_UsesStatusCodeDefinedInYamlResponses()
     {
         var document = new StubDocument
         {
@@ -390,7 +390,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(201, matchedResponse.StatusCode);
@@ -398,7 +398,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_ReturnsConfiguredDelayFromYamlResponses()
+    public async Task DispatchAsync_ReturnsConfiguredDelayFromYamlResponses()
     {
         var document = new StubDocument
         {
@@ -432,14 +432,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(250, matchedResponse.DelayMilliseconds);
     }
 
     [Fact]
-    public void DispatchAsync_ReturnsConfiguredDelayFromMatchedResponse()
+    public async Task DispatchAsync_ReturnsConfiguredDelayFromMatchedResponse()
     {
         var document = new StubDocument
         {
@@ -485,14 +485,14 @@ public sealed class StubServiceTests
             ["role"] = "admin"
         };
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(125, matchedResponse.DelayMilliseconds);
     }
 
     [Fact]
-    public void DispatchAsync_LeavesDelayNullWhenYamlResponseDelayIsNotConfigured()
+    public async Task DispatchAsync_LeavesDelayNullWhenYamlResponseDelayIsNotConfigured()
     {
         var document = new StubDocument
         {
@@ -525,14 +525,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Null(matchedResponse.DelayMilliseconds);
     }
 
     [Fact]
-    public void DispatchAsync_LeavesDelayNullWhenMatchedResponseDelayIsNotConfigured()
+    public async Task DispatchAsync_LeavesDelayNullWhenMatchedResponseDelayIsNotConfigured()
     {
         var document = new StubDocument
         {
@@ -577,14 +577,14 @@ public sealed class StubServiceTests
             ["role"] = "admin"
         };
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Null(matchedResponse.DelayMilliseconds);
     }
 
     [Fact]
-    public void DispatchAsync_MatchesMultiValueQueryParameter()
+    public async Task DispatchAsync_MatchesMultiValueQueryParameter()
     {
         var document = new StubDocument
         {
@@ -645,14 +645,14 @@ public sealed class StubServiceTests
             ["tag"] = new StringValues(["alpha", "beta"])
         };
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/search", query);
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/search", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"ordered\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void DispatchAsync_UsesResponseFileContentWhenConfigured()
+    public async Task DispatchAsync_UsesResponseFileContentWhenConfigured()
     {
         var document = new StubDocument
         {
@@ -683,7 +683,7 @@ public sealed class StubServiceTests
             responseFileReader: _ => "{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}",
             matcherService: CreateMatcherService());
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/users");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(200, matchedResponse.StatusCode);
@@ -691,7 +691,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_UsesFilePathForAbsoluteResponseFile()
+    public async Task DispatchAsync_UsesFilePathForAbsoluteResponseFile()
     {
         var filePath = Path.Combine(Path.GetTempPath(), $"semanticstub-{Guid.NewGuid():N}.bin");
         File.WriteAllBytes(filePath, [0x00, 0x01, 0x7F, 0xFF]);
@@ -727,7 +727,7 @@ public sealed class StubServiceTests
                 responseFileReader: _ => throw new InvalidOperationException("Response file reader should not be used for absolute paths."),
                 matcherService: CreateMatcherService());
 
-            var (matched, response) = Dispatch(service, HttpMethods.Get, "/download");
+            var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/download");
             var matchedResponse = AssertMatchedResponse(matched, response);
 
             Assert.Equal(filePath, matchedResponse.FilePath);
@@ -741,7 +741,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_ReturnsConfiguredResponseHeaders()
+    public async Task DispatchAsync_ReturnsConfiguredResponseHeaders()
     {
         var document = new StubDocument
         {
@@ -788,7 +788,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("hello", matchedResponse.Headers["X-Stub-Source"].Single());
@@ -796,7 +796,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_ReturnsDateTimeHeaderExamplesWithoutJsonQuoting()
+    public async Task DispatchAsync_ReturnsDateTimeHeaderExamplesWithoutJsonQuoting()
     {
         var document = new StubDocument
         {
@@ -836,14 +836,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("2026-03-26T00:00:00.0000000+00:00", matchedResponse.Headers["Last-Modified"].Single());
     }
 
     [Fact]
-    public void DispatchAsync_JoinsArrayHeaderExamplesUsingHttpHeaderFormatting()
+    public async Task DispatchAsync_JoinsArrayHeaderExamplesUsingHttpHeaderFormatting()
     {
         var document = new StubDocument
         {
@@ -886,14 +886,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("Accept-Encoding, Origin", matchedResponse.Headers["Vary"].Single());
     }
 
     [Fact]
-    public void DispatchAsync_PreservesSeparateSetCookieHeaderValues()
+    public async Task DispatchAsync_PreservesSeparateSetCookieHeaderValues()
     {
         var document = new StubDocument
         {
@@ -936,14 +936,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(new[] { "a=1; Path=/", "b=2; Path=/" }, matchedResponse.Headers["Set-Cookie"].ToArray());
     }
 
     [Fact]
-    public void DispatchAsync_ReturnsConfiguredHeadersFromMatchedResponse()
+    public async Task DispatchAsync_ReturnsConfiguredHeadersFromMatchedResponse()
     {
         var document = new StubDocument
         {
@@ -995,14 +995,14 @@ public sealed class StubServiceTests
             ["role"] = "admin"
         };
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("admin", matchedResponse.Headers["X-User-Role"].Single());
     }
 
     [Fact]
-    public void DispatchAsync_UsesPutOperationWhenConfigured()
+    public async Task DispatchAsync_UsesPutOperationWhenConfigured()
     {
         var document = new StubDocument
         {
@@ -1035,14 +1035,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Put, "/profile");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Put, "/profile");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"replaced\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void DispatchAsync_UsesDeleteOperationWhenConfigured()
+    public async Task DispatchAsync_UsesDeleteOperationWhenConfigured()
     {
         var document = new StubDocument
         {
@@ -1075,14 +1075,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Delete, "/profile");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Delete, "/profile");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"deleted\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void DispatchAsync_PrefersMoreSpecificQueryMatch()
+    public async Task DispatchAsync_PrefersMoreSpecificQueryMatch()
     {
         var document = new StubDocument
         {
@@ -1150,14 +1150,14 @@ public sealed class StubServiceTests
             ["view"] = "summary"
         };
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"message\":\"admin-summary\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void DispatchAsync_FallsBackToDefaultResponseWhenNoQueryMatchExists()
+    public async Task DispatchAsync_FallsBackToDefaultResponseWhenNoQueryMatchExists()
     {
         var document = new StubDocument
         {
@@ -1218,14 +1218,14 @@ public sealed class StubServiceTests
             ["role"] = "guest"
         };
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"message\":\"default\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void DispatchAsync_ReturnsResponseNotConfigured_WhenMatchedQueryResponseIsInvalid()
+    public async Task DispatchAsync_ReturnsResponseNotConfigured_WhenMatchedQueryResponseIsInvalid()
     {
         var document = new StubDocument
         {
@@ -1286,13 +1286,13 @@ public sealed class StubServiceTests
             ["role"] = "admin"
         };
 
-        var (matched, _) = Dispatch(service, HttpMethods.Get, "/users", query);
+        var (matched, _) = await DispatchAsync(service, HttpMethods.Get, "/users", query);
 
         Assert.Equal(StubMatchResult.ResponseNotConfigured, matched);
     }
 
     [Fact]
-    public void DispatchAsync_ReturnsTextPlainBodyWithCorrectContentType()
+    public async Task DispatchAsync_ReturnsTextPlainBodyWithCorrectContentType()
     {
         var document = new StubDocument
         {
@@ -1322,7 +1322,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/hello");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/hello");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("text/plain", matchedResponse.ContentType);
@@ -1330,7 +1330,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_ReturnsXmlContentTypeForResponseFile()
+    public async Task DispatchAsync_ReturnsXmlContentTypeForResponseFile()
     {
         var document = new StubDocument
         {
@@ -1361,7 +1361,7 @@ public sealed class StubServiceTests
             responseFileReader: _ => "<root><item>1</item></root>",
             matcherService: CreateMatcherService());
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/data");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/data");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("application/xml", matchedResponse.ContentType);
@@ -1369,7 +1369,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_ReturnsNonJsonContentTypeFromXMatch()
+    public async Task DispatchAsync_ReturnsNonJsonContentTypeFromXMatch()
     {
         var document = new StubDocument
         {
@@ -1408,7 +1408,7 @@ public sealed class StubServiceTests
         var service = CreateService(document);
         var query = new Dictionary<string, string>(StringComparer.Ordinal) { ["format"] = "csv" };
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/report", query);
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/report", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("text/csv", matchedResponse.ContentType);
@@ -1416,7 +1416,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_ReturnsResponseNotConfigured_WhenFallbackJsonExampleIsMissing()
+    public async Task DispatchAsync_ReturnsResponseNotConfigured_WhenFallbackJsonExampleIsMissing()
     {
         var document = new StubDocument
         {
@@ -1471,13 +1471,13 @@ public sealed class StubServiceTests
             ["role"] = "guest"
         };
 
-        var (matched, _) = Dispatch(service, HttpMethods.Get, "/users", query);
+        var (matched, _) = await DispatchAsync(service, HttpMethods.Get, "/users", query);
 
         Assert.Equal(StubMatchResult.ResponseNotConfigured, matched);
     }
 
     [Fact]
-    public void DispatchAsync_MatchesResponseUsingRequestBody()
+    public async Task DispatchAsync_MatchesResponseUsingRequestBody()
     {
         var document = new StubDocument
         {
@@ -1535,7 +1535,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(
+        var (matched, response) = await DispatchAsync(
             service,
             HttpMethods.Post,
             "/login",
@@ -1547,7 +1547,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_PrefersMoreSpecificBodyMatch()
+    public async Task DispatchAsync_PrefersMoreSpecificBodyMatch()
     {
         var document = new StubDocument
         {
@@ -1610,7 +1610,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(
+        var (matched, response) = await DispatchAsync(
             service,
             HttpMethods.Post,
             "/login",
@@ -1622,7 +1622,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_FallsBackToDefaultResponseWhenBodyIsInvalidJson()
+    public async Task DispatchAsync_FallsBackToDefaultResponseWhenBodyIsInvalidJson()
     {
         var document = new StubDocument
         {
@@ -1679,7 +1679,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(
+        var (matched, response) = await DispatchAsync(
             service,
             HttpMethods.Post,
             "/login",
@@ -1691,7 +1691,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_MatchesResponseUsingHeaders()
+    public async Task DispatchAsync_MatchesResponseUsingHeaders()
     {
         var document = new StubDocument
         {
@@ -1748,7 +1748,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(
+        var (matched, response) = await DispatchAsync(
             service,
             HttpMethods.Get,
             "/users",
@@ -1764,7 +1764,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_MatchesOpenApiPathTemplateWhenExactPathIsMissing()
+    public async Task DispatchAsync_MatchesOpenApiPathTemplateWhenExactPathIsMissing()
     {
         var document = new StubDocument
         {
@@ -1797,14 +1797,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/orders/123");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/orders/123");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"pattern\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void DispatchAsync_PrefersExactPathOverMatchingTemplatePath()
+    public async Task DispatchAsync_PrefersExactPathOverMatchingTemplatePath()
     {
         var document = new StubDocument
         {
@@ -1859,14 +1859,14 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/orders/special");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/orders/special");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal("{\"result\":\"exact\"}", matchedResponse.Body);
     }
 
     [Fact]
-    public void DispatchAsync_ReturnsMethodNotAllowedForMatchingTemplatePathWithUnsupportedMethod()
+    public async Task DispatchAsync_ReturnsMethodNotAllowedForMatchingTemplatePathWithUnsupportedMethod()
     {
         var document = new StubDocument
         {
@@ -1899,7 +1899,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, _) = Dispatch(service, HttpMethods.Post, "/orders/123");
+        var (matched, _) = await DispatchAsync(service, HttpMethods.Post, "/orders/123");
 
         Assert.Equal(StubMatchResult.MethodNotAllowed, matched);
     }
@@ -2002,7 +2002,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_UsesSemanticFallbackWhenDeterministicMatchFails()
+    public async Task DispatchAsync_UsesSemanticFallbackWhenDeterministicMatchFails()
     {
         var semanticCandidate = new QueryMatchDefinition
         {
@@ -2048,7 +2048,7 @@ public sealed class StubServiceTests
             ["role"] = "guest"
         };
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(1, semanticMatcher.CallCount);
@@ -2057,7 +2057,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_DoesNotUseSemanticFallbackWhenDeterministicMatchSucceeds()
+    public async Task DispatchAsync_DoesNotUseSemanticFallbackWhenDeterministicMatchSucceeds()
     {
         var semanticCandidate = new QueryMatchDefinition
         {
@@ -2103,7 +2103,7 @@ public sealed class StubServiceTests
             ["role"] = "admin"
         };
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users", query);
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/users", query);
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(0, semanticMatcher.CallCount);
@@ -2112,7 +2112,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_DoesNotTreatSemanticOnlyCandidateAsDeterministicMatch()
+    public async Task DispatchAsync_DoesNotTreatSemanticOnlyCandidateAsDeterministicMatch()
     {
         var document = new StubDocument
         {
@@ -2166,7 +2166,7 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (matched, response) = Dispatch(service, HttpMethods.Get, "/users");
+        var (matched, response) = await DispatchAsync(service, HttpMethods.Get, "/users");
         var matchedResponse = AssertMatchedResponse(matched, response);
 
         Assert.Equal(404, matchedResponse.StatusCode);
@@ -2174,7 +2174,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_AdvancesScenarioStateAcrossRequests()
+    public async Task DispatchAsync_AdvancesScenarioStateAcrossRequests()
     {
         var document = new StubDocument
         {
@@ -2231,9 +2231,9 @@ public sealed class StubServiceTests
 
         var service = CreateService(document);
 
-        var (firstMatch, firstResponse) = Dispatch(service, HttpMethods.Post, "/checkout");
+        var (firstMatch, firstResponse) = await DispatchAsync(service, HttpMethods.Post, "/checkout");
         var firstMatchedResponse = AssertMatchedResponse(firstMatch, firstResponse);
-        var (secondMatch, secondResponse) = Dispatch(service, HttpMethods.Post, "/checkout");
+        var (secondMatch, secondResponse) = await DispatchAsync(service, HttpMethods.Post, "/checkout");
         var secondMatchedResponse = AssertMatchedResponse(secondMatch, secondResponse);
 
         Assert.Equal(409, firstMatchedResponse.StatusCode);
@@ -2243,7 +2243,7 @@ public sealed class StubServiceTests
     }
 
     [Fact]
-    public void DispatchAsync_FiltersMatchedConditionalResponsesByScenarioState()
+    public async Task DispatchAsync_FiltersMatchedConditionalResponsesByScenarioState()
     {
         var document = new StubDocument
         {
@@ -2320,9 +2320,9 @@ public sealed class StubServiceTests
             ["step"] = "1"
         };
 
-        var (firstMatch, firstResponse) = Dispatch(service, HttpMethods.Post, "/checkout", query);
+        var (firstMatch, firstResponse) = await DispatchAsync(service, HttpMethods.Post, "/checkout", query);
         var firstMatchedResponse = AssertMatchedResponse(firstMatch, firstResponse);
-        var (secondMatch, secondResponse) = Dispatch(service, HttpMethods.Post, "/checkout", query);
+        var (secondMatch, secondResponse) = await DispatchAsync(service, HttpMethods.Post, "/checkout", query);
         var secondMatchedResponse = AssertMatchedResponse(secondMatch, secondResponse);
 
         Assert.Equal(409, firstMatchedResponse.StatusCode);
