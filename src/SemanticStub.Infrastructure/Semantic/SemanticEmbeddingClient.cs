@@ -41,15 +41,26 @@ internal sealed class SemanticEmbeddingClient : ISemanticEmbeddingClient
         var response = await httpClient.PostAsJsonAsync(endpoint, new EmbedRequest(inputs));
         response.EnsureSuccessStatusCode();
 
-        using var responseStream = await response.Content.ReadAsStreamAsync();
-        using var document = await JsonDocument.ParseAsync(responseStream);
-
-        if (TryReadEmbeddings(document.RootElement, inputs.Count, out var embeddings))
+        try
         {
-            return embeddings;
-        }
+            using var responseStream = await response.Content.ReadAsStreamAsync();
+            using var document = await JsonDocument.ParseAsync(responseStream);
 
-        throw new InvalidOperationException("The embedding endpoint returned an unexpected response shape.");
+            if (TryReadEmbeddings(document.RootElement, inputs.Count, out var embeddings))
+            {
+                return embeddings;
+            }
+
+            throw new InvalidOperationException("The embedding endpoint returned an unexpected response shape.");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException("The embedding endpoint returned an invalid JSON response.", ex);
+        }
+        catch (FormatException ex)
+        {
+            throw new InvalidOperationException("The embedding endpoint returned an invalid numeric value.", ex);
+        }
     }
 
     private static bool TryReadEmbeddings(JsonElement root, int expectedCount, out IReadOnlyList<float[]> embeddings)

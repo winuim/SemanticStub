@@ -126,6 +126,39 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
+    public async Task ExplainMatchAsync_ReturnsAttemptedNonMatchWhenEmbeddingResponseIsInvalidJson()
+    {
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei",
+                    Threshold = 0.8d,
+                    TopScoreMargin = 0.03d
+                }
+            },
+            (_, _) => new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("not-valid-json", Encoding.UTF8, "application/json")
+            });
+
+        var explanation = await service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [CreateCandidate("find admin users")]);
+
+        Assert.True(explanation.Attempted);
+        Assert.Null(explanation.SelectedCandidate);
+        Assert.Equal(0.8d, explanation.Threshold);
+        Assert.Equal(0.03d, explanation.RequiredMargin);
+    }
+
+    [Fact]
     public async Task ExplainMatchAsync_PropagatesUnexpectedExceptions()
     {
         var service = CreateService(
