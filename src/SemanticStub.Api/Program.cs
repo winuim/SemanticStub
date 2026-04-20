@@ -24,7 +24,23 @@ builder.Services.Configure<GzipCompressionProviderOptions>(options =>
 {
     options.Level = CompressionLevel.Fastest;
 });
-builder.Services.Configure<StubSettings>(builder.Configuration.GetSection("StubSettings"));
+builder.Services.AddOptions<StubSettings>()
+    .BindConfiguration("StubSettings")
+    .Validate(
+        s => !s.SemanticMatching.Enabled
+             || (!string.IsNullOrWhiteSpace(s.SemanticMatching.Endpoint)
+                 && Uri.TryCreate(s.SemanticMatching.Endpoint, UriKind.Absolute, out _)),
+        "SemanticMatching.Endpoint must be a non-empty absolute URI when semantic matching is enabled.")
+    .Validate(
+        s => s.SemanticMatching.TimeoutSeconds > 0,
+        "SemanticMatching.TimeoutSeconds must be positive.")
+    .Validate(
+        s => s.SemanticMatching.Threshold is >= -1.0 and <= 1.0,
+        "SemanticMatching.Threshold must be within the cosine similarity range [-1.0, 1.0].")
+    .Validate(
+        s => s.SemanticMatching.TopScoreMargin >= 0,
+        "SemanticMatching.TopScoreMargin must be non-negative.")
+    .ValidateOnStart();
 builder.Services.AddStubServices();
 
 var app = builder.Build();
