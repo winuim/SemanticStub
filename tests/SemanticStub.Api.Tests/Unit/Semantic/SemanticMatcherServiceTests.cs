@@ -126,6 +126,29 @@ public sealed class SemanticMatcherServiceTests
     }
 
     [Fact]
+    public async Task ExplainMatchAsync_PropagatesUnexpectedExceptions()
+    {
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei"
+                }
+            },
+            (_, _) => throw new ArgumentNullException("Unexpected bug"));
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [CreateCandidate("find admin users")]));
+    }
+
+    [Fact]
     public async Task ExplainMatchAsync_ReturnsNullSelectedCandidateWhenBestScoreIsBelowThreshold()
     {
         var service = CreateService(
