@@ -247,8 +247,40 @@ public sealed class StubDispatchSelectorTests
         Assert.Equal("confirmed", scenarioService.GetSnapshot("checkout-flow").State);
     }
 
+    [Fact]
+    public async Task SelectAsync_PassesCancellationToken_ToSemanticMatcherService()
+    {
+        var scenarioService = new ScenarioService();
+        var responseBuilder = new StubResponseBuilder(_ => throw new InvalidOperationException("No file loading expected."));
+        var spy = new StubSemanticMatcherService(new SemanticMatchExplanation());
+        var selector = new StubDispatchSelector(
+            CreateMatcherService(),
+            spy,
+            responseBuilder,
+            new StubDefaultResponseSelector(responseBuilder, scenarioService),
+            scenarioService,
+            logger: null);
+        using var cancellationSource = new CancellationTokenSource();
+
+        await selector.SelectAsync(
+            HttpMethods.Get,
+            "/users",
+            new PathItemDefinition(),
+            new OperationDefinition(),
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            null,
+            mutateScenarioState: false,
+            includeSemanticCandidates: false,
+            cancellationSource.Token);
+
+        Assert.Equal(cancellationSource.Token, spy.ReceivedCancellationToken);
+    }
+
     private sealed class StubSemanticMatcherService(SemanticMatchExplanation explanation) : ISemanticMatcherService
     {
+        public CancellationToken ReceivedCancellationToken { get; private set; }
+
         public Task<SemanticMatchExplanation> ExplainMatchAsync(
             string method,
             string path,
@@ -257,8 +289,10 @@ public sealed class StubDispatchSelectorTests
             string? body,
             IReadOnlyCollection<QueryMatchDefinition> candidates,
             Func<QueryMatchDefinition, bool>? candidateFilter = null,
-            bool includeCandidateScores = false)
+            bool includeCandidateScores = false,
+            CancellationToken cancellationToken = default)
         {
+            ReceivedCancellationToken = cancellationToken;
             return Task.FromResult(explanation);
         }
     }

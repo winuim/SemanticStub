@@ -81,16 +81,16 @@ internal sealed class StubInspectionService : IStubInspectionService
     }
 
     /// <inheritdoc/>
-    public async Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request)
+    public async Task<MatchSimulationInfo> TestMatchAsync(MatchRequestInfo request, CancellationToken cancellationToken = default)
     {
-        var explanation = await _stubService.ExplainMatchAsync(request);
+        var explanation = await _stubService.ExplainMatchAsync(request, cancellationToken);
         return explanation.Result;
     }
 
     /// <inheritdoc/>
-    public Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request)
+    public Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request, CancellationToken cancellationToken = default)
     {
-        return _stubService.ExplainMatchAsync(request);
+        return _stubService.ExplainMatchAsync(request, cancellationToken);
     }
 
     /// <inheritdoc/>

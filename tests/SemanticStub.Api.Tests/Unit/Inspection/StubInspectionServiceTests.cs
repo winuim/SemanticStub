@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Inspection;
 using SemanticStub.Application.Infrastructure.Yaml;
 using SemanticStub.Infrastructure.Yaml;
@@ -151,7 +152,8 @@ public sealed class StubInspectionServiceTests
             string? body,
             IReadOnlyCollection<QueryMatchDefinition> candidates,
             Func<QueryMatchDefinition, bool>? candidateFilter = null,
-            bool includeCandidateScores = false)
+            bool includeCandidateScores = false,
+            CancellationToken cancellationToken = default)
         {
             return Task.FromResult(new SemanticMatchExplanation());
         }
@@ -167,7 +169,8 @@ public sealed class StubInspectionServiceTests
             string? body,
             IReadOnlyCollection<QueryMatchDefinition> candidates,
             Func<QueryMatchDefinition, bool>? candidateFilter = null,
-            bool includeCandidateScores = false)
+            bool includeCandidateScores = false,
+            CancellationToken cancellationToken = default)
         {
             return Task.FromResult(explanation);
         }
@@ -1847,6 +1850,75 @@ public sealed class StubInspectionServiceTests
         Assert.True(explanation!.Result.Matched);
         Assert.Equal("fallback", explanation.Result.MatchMode);
         Assert.Equal("listUsers", explanation.Result.RouteId);
+    }
+
+    [Fact]
+    public async Task TestMatchAsync_PassesCancellationToken_ToStubService()
+    {
+        var spy = new RecordingExplainStubService();
+        var service = CreateInspectionServiceWithStubService(spy);
+        using var cancellationSource = new CancellationTokenSource();
+
+        await service.TestMatchAsync(new MatchRequestInfo { Method = "GET", Path = "/users" }, cancellationSource.Token);
+
+        Assert.Equal(cancellationSource.Token, spy.ReceivedCancellationToken);
+    }
+
+    [Fact]
+    public async Task ExplainMatchAsync_PassesCancellationToken_ToStubService()
+    {
+        var spy = new RecordingExplainStubService();
+        var service = CreateInspectionServiceWithStubService(spy);
+        using var cancellationSource = new CancellationTokenSource();
+
+        await service.ExplainMatchAsync(new MatchRequestInfo { Method = "GET", Path = "/users" }, cancellationSource.Token);
+
+        Assert.Equal(cancellationSource.Token, spy.ReceivedCancellationToken);
+    }
+
+    private static StubInspectionService CreateInspectionServiceWithStubService(IStubService stubService)
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new() { Get = new OperationDefinition() }
+            }
+        };
+        var loader = new TestStubDefinitionLoader(document);
+        var scenarioService = new ScenarioService();
+        var state = new StubDefinitionState(loader, scenarioService, NullLogger<StubDefinitionState>.Instance);
+        return new StubInspectionService(
+            state,
+            loader,
+            Options.Create(new StubSettings()),
+            stubService,
+            new StubInspectionRuntimeStore(),
+            new StubInspectionScenarioCoordinator(state, scenarioService));
+    }
+
+    private sealed class RecordingExplainStubService : IStubService
+    {
+        public CancellationToken ReceivedCancellationToken { get; private set; }
+
+        public IReadOnlyList<string> GetAllowedMethods(string path) => Array.Empty<string>();
+
+        public Task<StubDispatchResult> DispatchAsync(
+            string method,
+            string path,
+            IReadOnlyDictionary<string, StringValues> query,
+            IReadOnlyDictionary<string, string> headers,
+            string? body,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request, CancellationToken cancellationToken = default)
+        {
+            ReceivedCancellationToken = cancellationToken;
+            return Task.FromResult(new MatchExplanationInfo
+            {
+                Result = new MatchSimulationInfo { MatchResult = "PathNotFound" }
+            });
+        }
     }
 
     [Fact]

@@ -1979,7 +1979,8 @@ public sealed class StubServiceTests
             string? body,
             IReadOnlyCollection<QueryMatchDefinition> candidates,
             Func<QueryMatchDefinition, bool>? candidateFilter = null,
-            bool includeCandidateScores = false)
+            bool includeCandidateScores = false,
+            CancellationToken cancellationToken = default)
         {
             CallCount++;
 

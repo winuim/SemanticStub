@@ -75,7 +75,8 @@ public sealed class StubService : IStubService
         string path,
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
-        string? body)
+        string? body,
+        CancellationToken cancellationToken = default)
     {
         return await EvaluateAsync(
             method,
@@ -85,11 +86,12 @@ public sealed class StubService : IStubService
             body,
             mutateScenarioState: true,
             includeCandidates: true,
-            includeSemanticCandidates: false);
+            includeSemanticCandidates: false,
+            cancellationToken);
     }
 
     /// <inheritdoc/>
-    public async Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request)
+    public async Task<MatchExplanationInfo> ExplainMatchAsync(MatchRequestInfo request, CancellationToken cancellationToken = default)
     {
         var dispatch = await EvaluateAsync(
             CreateExplainMethod(request),
@@ -99,7 +101,8 @@ public sealed class StubService : IStubService
             NormalizeBody(request.Body),
             mutateScenarioState: false,
             includeCandidates: request.IncludeCandidates,
-            includeSemanticCandidates: request.IncludeSemanticCandidates);
+            includeSemanticCandidates: request.IncludeSemanticCandidates,
+            cancellationToken);
 
         return dispatch.Explanation;
     }
@@ -112,7 +115,8 @@ public sealed class StubService : IStubService
         string? body,
         bool mutateScenarioState,
         bool includeCandidates,
-        bool includeSemanticCandidates)
+        bool includeSemanticCandidates,
+        CancellationToken cancellationToken)
     {
         var document = _documentAccessor();
 
@@ -130,10 +134,10 @@ public sealed class StubService : IStubService
         if (OperationUsesScenario(operation))
         {
             return await _scenarioService.ExecuteLockedAsync(
-                () => DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates));
+                () => DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates, cancellationToken));
         }
 
-        return await DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates);
+        return await DispatchCoreAsync(method, path, pathPattern, pathItem, operation, query, headers, body, mutateScenarioState, includeCandidates, includeSemanticCandidates, cancellationToken);
     }
 
     private static bool OperationUsesScenario(OperationDefinition operation)
@@ -153,7 +157,8 @@ public sealed class StubService : IStubService
         string? body,
         bool mutateScenarioState,
         bool includeCandidates,
-        bool includeSemanticCandidates)
+        bool includeSemanticCandidates,
+        CancellationToken cancellationToken)
     {
         var routeId = GetRouteId(method, pathPattern, operation);
         var request = _inspectionProjectionBuilder.CreateInspectionRequest(method, path, query, headers, body, includeCandidates, includeSemanticCandidates);
@@ -170,7 +175,8 @@ public sealed class StubService : IStubService
             headers,
             body,
             mutateScenarioState,
-            includeSemanticCandidates);
+            includeSemanticCandidates,
+            cancellationToken);
 
         SemanticMatchInfo? semanticEvaluationInfo = null;
         if (selection.SemanticExplanation.Attempted)

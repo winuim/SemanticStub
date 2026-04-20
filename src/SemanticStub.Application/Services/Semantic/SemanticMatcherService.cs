@@ -33,7 +33,8 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         string? body,
         IReadOnlyCollection<QueryMatchDefinition> candidates,
         Func<QueryMatchDefinition, bool>? candidateFilter = null,
-        bool includeCandidateScores = false)
+        bool includeCandidateScores = false,
+        CancellationToken cancellationToken = default)
     {
         var semanticSettings = _settings.SemanticMatching;
         var normalizedMethod = method.ToUpperInvariant();
@@ -78,7 +79,8 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 query,
                 headers,
                 body,
-                semanticCandidates);
+                semanticCandidates,
+                cancellationToken);
 
             return ScoreAndLogExplanation(
                 path,
@@ -100,6 +102,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         }
         catch (TaskCanceledException ex)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             _logger.LogWarning(
                 ex,
                 "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request timed out. Treating the request as a non-match.",
@@ -154,7 +157,8 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         IReadOnlyDictionary<string, StringValues> query,
         IReadOnlyDictionary<string, string> headers,
         string? body,
-        IReadOnlyList<QueryMatchDefinition> semanticCandidates)
+        IReadOnlyList<QueryMatchDefinition> semanticCandidates,
+        CancellationToken cancellationToken)
     {
         var allTexts = new List<string>(semanticCandidates.Count + 1)
         {
@@ -162,7 +166,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         };
 
         allTexts.AddRange(semanticCandidates.Select(candidate => candidate.SemanticMatch!));
-        return await _embeddingClient.GetEmbeddingsAsync(allTexts);
+        return await _embeddingClient.GetEmbeddingsAsync(allTexts, cancellationToken);
     }
 
     private SemanticMatchExplanation ScoreAndLogExplanation(
