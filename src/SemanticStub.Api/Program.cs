@@ -43,9 +43,7 @@ static void ConfigureHttpLoggingDefaults(HttpLoggingOptions options)
 {
     options.LoggingFields =
         HttpLoggingFields.RequestPropertiesAndHeaders |
-        HttpLoggingFields.ResponsePropertiesAndHeaders |
-        HttpLoggingFields.RequestBody |
-        HttpLoggingFields.ResponseBody;
+        HttpLoggingFields.ResponsePropertiesAndHeaders;
 }
 
 static void ConfigureHttpLoggingMediaTypes(HttpLoggingOptions options)

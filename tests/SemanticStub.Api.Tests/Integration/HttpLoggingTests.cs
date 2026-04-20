@@ -11,20 +11,30 @@ namespace SemanticStub.Api.Tests.Integration;
 
 public sealed class HttpLoggingTests
 {
-    [Theory]
-    [InlineData("Development", 4096)]
-    [InlineData("Production", 1024)]
-    public void CreateClient_ConfiguresBodyLogLimitsPerEnvironment(string environmentName, int expectedLimit)
+    [Fact]
+    public void CreateClient_DefaultLogging_DoesNotIncludeBodyFields()
     {
-        using var factory = new HttpLoggingFactory(environmentName);
+        using var factory = new HttpLoggingFactory("Production");
         using var client = factory.CreateClient();
 
         var options = factory.Services.GetRequiredService<IOptions<HttpLoggingOptions>>().Value;
 
-        Assert.Equal(expectedLimit, options.RequestBodyLogLimit);
-        Assert.Equal(expectedLimit, options.ResponseBodyLogLimit);
+        Assert.False(options.LoggingFields.HasFlag(HttpLoggingFields.RequestBody));
+        Assert.False(options.LoggingFields.HasFlag(HttpLoggingFields.ResponseBody));
+    }
+
+    [Fact]
+    public void CreateClient_DevelopmentLogging_IncludesBodyFieldsWithLimits()
+    {
+        using var factory = new HttpLoggingFactory("Development");
+        using var client = factory.CreateClient();
+
+        var options = factory.Services.GetRequiredService<IOptions<HttpLoggingOptions>>().Value;
+
         Assert.True(options.LoggingFields.HasFlag(HttpLoggingFields.RequestBody));
         Assert.True(options.LoggingFields.HasFlag(HttpLoggingFields.ResponseBody));
+        Assert.Equal(4096, options.RequestBodyLogLimit);
+        Assert.Equal(4096, options.ResponseBodyLogLimit);
     }
 
     [Fact]
@@ -124,6 +134,12 @@ public sealed class HttpLoggingTests
             if (!string.IsNullOrEmpty(contentRootPath))
             {
                 builder.UseContentRoot(contentRootPath);
+                builder.ConfigureAppConfiguration((_, cfg) =>
+                {
+                    var baseDir = AppContext.BaseDirectory;
+                    cfg.AddJsonFile(Path.Combine(baseDir, "appsettings.json"), optional: true);
+                    cfg.AddJsonFile(Path.Combine(baseDir, $"appsettings.{environmentName}.json"), optional: true);
+                });
             }
 
             if (loggerProvider is null)
