@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.RequestDecompression;
 using Microsoft.AspNetCore.ResponseCompression;
 using SemanticStub.Api.Extensions;
 using SemanticStub.Application.Infrastructure.Yaml;
-using SemanticStub.Infrastructure.Yaml;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,9 +44,6 @@ builder.Services.AddOptions<StubSettings>()
 builder.Services.AddStubServices();
 
 var app = builder.Build();
-
-// Fail fast during startup when stub definitions are invalid instead of deferring configuration errors until the first request.
-app.Services.GetRequiredService<StubDefinitionState>();
 
 app.UseRequestDecompression();
 app.UseResponseCompression();
