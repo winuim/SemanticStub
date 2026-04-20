@@ -33,6 +33,9 @@ public sealed class StubServiceCollectionExtensionsTests
         Assert.NotNull(serviceProvider.GetRequiredService<IStubInspectionService>());
         Assert.NotNull(serviceProvider.GetRequiredService<IStubDefinitionLoader>());
         Assert.NotEmpty(serviceProvider.GetServices<IHostedService>());
+        Assert.Contains(services, descriptor =>
+            descriptor.ServiceType == typeof(IHostedService) &&
+            descriptor.ImplementationType?.Name == "StubDefinitionStartupValidator");
     }
 
     [Fact]

@@ -19,6 +19,7 @@ public static class YamlInfrastructureServiceCollectionExtensions
         services.AddSingleton<IStubDefinitionLoader, StubDefinitionLoader>();
         // The loaded YAML definition is process-wide runtime state and is replaced atomically on reload.
         services.AddSingleton<StubDefinitionState>();
+        services.AddHostedService<StubDefinitionStartupValidator>();
         services.AddHostedService<StubDefinitionWatcher>();
 
         return services;
