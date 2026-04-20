@@ -107,11 +107,11 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 normalizedMethod);
             return CreateFailedExplanation(semanticSettings);
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex)
         {
-            _logger.LogError(
+            _logger.LogWarning(
                 ex,
-                "Semantic matching encountered an unexpected error for '{Path}' {Method}. Treating the request as a non-match.",
+                "Semantic matching failed for '{Path}' {Method}: the embedding endpoint returned an unexpected response. Treating the request as a non-match.",
                 path,
                 normalizedMethod);
             return CreateFailedExplanation(semanticSettings);
