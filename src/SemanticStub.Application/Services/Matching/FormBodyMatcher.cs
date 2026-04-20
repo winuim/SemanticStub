@@ -13,7 +13,7 @@ internal sealed class FormBodyMatcher
     private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(100);
     private readonly ILogger<FormBodyMatcher>? _logger;
 
-    internal FormBodyMatcher(ILogger<FormBodyMatcher>? logger = null)
+    public FormBodyMatcher(ILogger<FormBodyMatcher>? logger = null)
     {
         _logger = logger;
     }

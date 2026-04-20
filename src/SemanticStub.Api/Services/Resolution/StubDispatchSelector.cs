@@ -14,7 +14,7 @@ internal sealed class StubDispatchSelector
     private readonly ISemanticMatcherService? _semanticMatcherService;
     private readonly StubResponseBuilder _responseBuilder;
     private readonly ScenarioService _scenarioService;
-    private readonly ILogger? _logger;
+    private readonly ILogger<StubDispatchSelector>? _logger;
 
     public StubDispatchSelector(
         MatcherService matcherService,
@@ -22,7 +22,7 @@ internal sealed class StubDispatchSelector
         StubResponseBuilder responseBuilder,
         StubDefaultResponseSelector defaultResponseSelector,
         ScenarioService scenarioService,
-        ILogger? logger)
+        ILogger<StubDispatchSelector>? logger)
     {
         _matcherService = matcherService;
         _semanticMatcherService = semanticMatcherService;

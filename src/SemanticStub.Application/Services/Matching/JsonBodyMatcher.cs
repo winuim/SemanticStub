@@ -14,7 +14,7 @@ internal sealed class JsonBodyMatcher
     /// <summary>
     /// Creates a body matcher with optional warning logging for invalid stub body definitions.
     /// </summary>
-    internal JsonBodyMatcher(ILogger<JsonBodyMatcher>? logger = null)
+    public JsonBodyMatcher(ILogger<JsonBodyMatcher>? logger = null)
     {
         _logger = logger;
     }

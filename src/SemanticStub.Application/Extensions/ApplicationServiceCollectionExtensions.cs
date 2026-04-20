@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using SemanticStub.Application.Services;
 
 namespace SemanticStub.Application.Extensions;
@@ -16,14 +15,11 @@ public static class ApplicationServiceCollectionExtensions
     /// <returns>The same service collection for chaining.</returns>
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
-        services.AddSingleton(serviceProvider => new JsonBodyMatcher(
-            serviceProvider.GetRequiredService<ILogger<JsonBodyMatcher>>()));
-        services.AddSingleton(serviceProvider => new FormBodyMatcher(
-            serviceProvider.GetRequiredService<ILogger<FormBodyMatcher>>()));
+        services.AddSingleton<JsonBodyMatcher>();
+        services.AddSingleton<FormBodyMatcher>();
         services.AddSingleton<QueryValueMatcher>();
-        services.AddSingleton(serviceProvider => new RegexQueryMatcher(
-            serviceProvider.GetRequiredService<ILogger<RegexQueryMatcher>>()));
-        services.AddSingleton<MatcherService>(serviceProvider => new MatcherService(
+        services.AddSingleton<RegexQueryMatcher>();
+        services.AddSingleton(serviceProvider => new MatcherService(
             serviceProvider.GetRequiredService<JsonBodyMatcher>(),
             serviceProvider.GetRequiredService<FormBodyMatcher>(),
             serviceProvider.GetRequiredService<QueryValueMatcher>(),

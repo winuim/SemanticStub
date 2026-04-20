@@ -40,10 +40,8 @@ public static class StubServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(settings.SemanticMatching.TimeoutSeconds);
         });
         services.AddSingleton<ISemanticEmbeddingClient, SemanticEmbeddingClient>();
-        services.AddSingleton<ISemanticMatcherService>(serviceProvider => new SemanticMatcherService(
-            serviceProvider.GetRequiredService<ISemanticEmbeddingClient>(),
-            serviceProvider.GetRequiredService<IOptions<StubSettings>>().Value,
-            serviceProvider.GetRequiredService<ILogger<SemanticMatcherService>>()));
+        services.AddSingleton(serviceProvider => serviceProvider.GetRequiredService<IOptions<StubSettings>>().Value);
+        services.AddSingleton<ISemanticMatcherService, SemanticMatcherService>();
 
         return services;
     }
@@ -53,13 +51,7 @@ public static class StubServiceCollectionExtensions
         // Runtime inspection metrics and recent request history are process-wide by design.
         services.AddSingleton<StubInspectionRuntimeStore>();
         services.AddSingleton<StubInspectionScenarioCoordinator>();
-        services.AddSingleton<IStubInspectionService>(serviceProvider => new StubInspectionService(
-            serviceProvider.GetRequiredService<StubDefinitionState>(),
-            serviceProvider.GetRequiredService<IStubDefinitionLoader>(),
-            serviceProvider.GetRequiredService<IOptions<StubSettings>>(),
-            serviceProvider.GetRequiredService<IStubService>(),
-            serviceProvider.GetRequiredService<StubInspectionRuntimeStore>(),
-            serviceProvider.GetRequiredService<StubInspectionScenarioCoordinator>()));
+        services.AddSingleton<IStubInspectionService, StubInspectionService>();
 
         return services;
     }
@@ -68,20 +60,10 @@ public static class StubServiceCollectionExtensions
     {
         services.AddSingleton<Func<string, string>>(serviceProvider =>
             serviceProvider.GetRequiredService<StubDefinitionState>().LoadResponseFileContent);
-        services.AddSingleton<StubResponseBuilder>(serviceProvider => new StubResponseBuilder(
-            serviceProvider.GetRequiredService<Func<string, string>>()));
-        services.AddSingleton<StubDefaultResponseSelector>(serviceProvider => new StubDefaultResponseSelector(
-            serviceProvider.GetRequiredService<StubResponseBuilder>(),
-            serviceProvider.GetRequiredService<ScenarioService>()));
-        services.AddSingleton<StubDispatchSelector>(serviceProvider => new StubDispatchSelector(
-            serviceProvider.GetRequiredService<MatcherService>(),
-            serviceProvider.GetRequiredService<ISemanticMatcherService>(),
-            serviceProvider.GetRequiredService<StubResponseBuilder>(),
-            serviceProvider.GetRequiredService<StubDefaultResponseSelector>(),
-            serviceProvider.GetRequiredService<ScenarioService>(),
-            serviceProvider.GetRequiredService<ILogger<StubDispatchSelector>>()));
-        services.AddSingleton<StubInspectionProjectionBuilder>(serviceProvider => new StubInspectionProjectionBuilder(
-            serviceProvider.GetRequiredService<ScenarioService>()));
+        services.AddSingleton<StubResponseBuilder>();
+        services.AddSingleton<StubDefaultResponseSelector>();
+        services.AddSingleton<StubDispatchSelector>();
+        services.AddSingleton<StubInspectionProjectionBuilder>();
         services.AddSingleton<IStubService>(serviceProvider => new StubService(
             serviceProvider.GetRequiredService<StubDefinitionState>(),
             serviceProvider.GetRequiredService<MatcherService>(),

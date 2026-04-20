@@ -610,10 +610,8 @@ public sealed class SemanticMatcherServiceTests
         services.AddLogging();
         services.AddSingleton<IHttpClientFactory>(_ => new TestHttpClientFactory(new HttpClient(new DelegatingTestHandler(handler))));
         services.AddSingleton<ISemanticEmbeddingClient, SemanticEmbeddingClient>();
-        services.AddSingleton<ISemanticMatcherService>(serviceProvider => new SemanticMatcherService(
-            serviceProvider.GetRequiredService<ISemanticEmbeddingClient>(),
-            serviceProvider.GetRequiredService<IOptions<StubSettings>>().Value,
-            serviceProvider.GetRequiredService<ILogger<SemanticMatcherService>>()));
+        services.AddSingleton(serviceProvider => serviceProvider.GetRequiredService<IOptions<StubSettings>>().Value);
+        services.AddSingleton<ISemanticMatcherService, SemanticMatcherService>();
 
         return (SemanticMatcherService)services.BuildServiceProvider().GetRequiredService<ISemanticMatcherService>();
     }

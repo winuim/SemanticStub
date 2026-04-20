@@ -17,7 +17,7 @@ internal sealed class RegexQueryMatcher
     /// <summary>
     /// Creates a regex query matcher with optional warning logging for invalid or slow regex patterns.
     /// </summary>
-    internal RegexQueryMatcher(ILogger<RegexQueryMatcher>? logger = null)
+    public RegexQueryMatcher(ILogger<RegexQueryMatcher>? logger = null)
     {
         _logger = logger;
     }
