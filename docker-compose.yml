@@ -21,12 +21,3 @@ services:
       - ./samples:/app/samples
     depends_on:
       - tei
-
-  mcp:
-    build: ./mcp
-    stdin_open: true
-    tty: false
-    environment:
-      SEMANTIC_STUB_URL: http://semantic-stub:8080
-    depends_on:
-      - semantic-stub

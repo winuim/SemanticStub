@@ -5,8 +5,8 @@ It exposes runtime inspection, match simulation, and scenario reset as tools so 
 
 Japanese documentation is available in [README.ja.md](./README.ja.md).
 
-For normal usage, prefer the Docker Compose setup in the repository root
-[README.md](../README.md). This file describes how to run `mcp` on its own.
+For the full setup including SemanticStub and TEI, see the repository root
+[README.md](../README.md). This file describes how to run the MCP server on its own.
 
 ## Requirements
 
