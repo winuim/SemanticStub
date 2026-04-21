@@ -2,7 +2,32 @@
 
 Semantic-aware な API モックサーバーです。
 
+
 English: [README.md](README.md)
+
+## 概要
+
+SemanticStub は、ローカル開発、テスト、AI 支援ワークフロー向けの semantic-aware な API モックサーバーです。
+
+決定的な OpenAPI ベースのルーティングと、必要に応じたセマンティックマッチングを組み合わせることで、厳密なモック動作を定義しつつ、自然言語ベースのフォールバックシナリオにも対応できます。
+
+### 主な機能
+
+- OpenAPI 3.1 ベースの YAML stub 定義と、SemanticStub 固有の動作を記述する `x-*` 拡張。
+- query string、header、JSON body、form-urlencoded body に対する条件付きリクエストマッチング。
+- Text Embeddings Inference (TEI) エンドポイントを利用したオプションのセマンティックマッチング。
+- インメモリ state transition によるシナリオベースのレスポンスフロー。
+- route、scenario、metrics、recent requests、match explanation を確認できる runtime inspection endpoint。
+- ファイルベースレスポンス、レスポンス遅延、Docker を使ったローカル開発サポート。
+
+## ❤️ Sponsors
+
+SemanticStub がワークフローの役に立ったら、スポンサーをご検討ください 🙌
+
+ご支援によって、次の取り組みを継続できます。
+- SemanticStub の保守と改善
+- 関連する開発者向けツールの開発
+- AI 支援開発に関する調査と実験
 
 ## YAML 拡張
 
