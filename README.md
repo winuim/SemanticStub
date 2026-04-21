@@ -4,6 +4,30 @@ Semantic-aware API mock server.
 
 日本語版: [README.ja.md](README.ja.md)
 
+## Overview
+
+SemanticStub is a semantic-aware API mock server for local development, testing, and AI-assisted workflows.
+
+It combines deterministic OpenAPI-based routing with optional semantic matching, so you can define precise mock behavior while also supporting natural-language fallback scenarios.
+
+### Key features
+
+- OpenAPI 3.1-based YAML stub definitions with `x-*` extensions for SemanticStub-specific behavior.
+- Conditional request matching for query strings, headers, JSON bodies, and form-urlencoded bodies.
+- Optional semantic matching powered by a Text Embeddings Inference (TEI) endpoint.
+- Scenario-based response flows with in-memory state transitions.
+- Runtime inspection endpoints for routes, scenarios, metrics, recent requests, and match explanations.
+- File-backed responses, response delays, and Docker-based local development support.
+
+## ❤️ Sponsors
+
+If SemanticStub helps your workflow, consider sponsoring 🙌
+
+Your support helps:
+- Maintain and improve SemanticStub
+- Build related developer tools
+- Continue AI-assisted development research
+
 ## YAML Extensions
 
 SemanticStub uses OpenAPI 3.1 for the base document structure and `x-*`
