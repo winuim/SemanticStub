@@ -446,9 +446,19 @@ Claude Desktop には次のように MCP サーバーを追加します:
 
 [Agent Skills](https://agentskills.io) 仕様に対応したスキルを使うと、MCP ツールを効率よく利用できます。Claude Code・GitHub Copilot・Cursor など多くのエージェントで利用可能です。
 
+### gh skill で使う場合
+
 ```sh
 gh skill install winuim/SemanticStub semantic-stub
 ```
+
+### Claude Desktop に手動インストール
+
+1. `skills/semantic-stub.skill` をダウンロードします
+2. Claude Desktop → カスタマイズ → スキル を開きます
+3. `+` ボタン → `スキルを作成` をクリックします
+4. `スキルをアップロード` を選択します
+5. `.skill` ファイルをアップロードします
 
 ## テスト
 
