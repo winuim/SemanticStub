@@ -477,6 +477,25 @@ A Claude skill is available for efficient use of the MCP tools.
 dotnet test
 ```
 
+Collect coverage in Cobertura format:
+
+```sh
+dotnet test --collect:"XPlat Code Coverage"
+```
+
+Write coverage results to a fixed directory:
+
+```sh
+dotnet test --collect:"XPlat Code Coverage" --results-directory ./TestResults
+```
+
+Optionally generate an HTML report from the Cobertura output with ReportGenerator:
+
+```sh
+dotnet tool install --global dotnet-reportgenerator-globaltool
+reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:"TestResults/CoverageReport" -reporttypes:Html
+```
+
 ## Notes
 See `AGENTS.md` for repository guidance.
 

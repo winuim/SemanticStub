@@ -438,6 +438,25 @@ Claude Skill を使うと、MCP ツールを効率よく利用できます。
 dotnet test
 ```
 
+Cobertura 形式でカバレッジを計測する場合:
+
+```sh
+dotnet test --collect:"XPlat Code Coverage"
+```
+
+結果を固定ディレクトリに出力する場合:
+
+```sh
+dotnet test --collect:"XPlat Code Coverage" --results-directory ./TestResults
+```
+
+必要に応じて ReportGenerator で Cobertura 出力から HTML レポートを生成できます:
+
+```sh
+dotnet tool install --global dotnet-reportgenerator-globaltool
+reportgenerator -reports:"TestResults/**/coverage.cobertura.xml" -targetdir:"TestResults/CoverageReport" -reporttypes:Html
+```
+
 ## 補足
 
 リポジトリ固有のガイダンスは `AGENTS.md` を参照してください。
