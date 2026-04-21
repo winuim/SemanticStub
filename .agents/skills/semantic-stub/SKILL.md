@@ -6,6 +6,8 @@ description: >
   route matching, scenario state, or asks why a request matched or didn't match.
   Also trigger for questions like "which stub matches this request?",
   "show me recent requests", "check the scenario state", or "why did this response come back?".
+license: MIT
+compatibility: Requires a running SemanticStub server with MCP enabled (SEMANTIC_STUB_URL env var, default http://localhost:8080)
 ---
 
 # SemanticStub MCP Skill

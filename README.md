@@ -470,30 +470,23 @@ Add the MCP server to Claude Desktop:
 {
   "mcpServers": {
     "semantic-stub": {
-      "command": "docker",
-      "args": [
-        "compose",
-        "-f",
-        "/path/to/SemanticStub/docker-compose.yml",
-        "run",
-        "--rm",
-        "-i",
-        "mcp"
-      ]
+      "command": "node",
+      "args": ["/path/to/SemanticStub/mcp/dist/index.js"],
+      "env": {
+        "SEMANTIC_STUB_URL": "http://localhost:8080"
+      }
     }
   }
 }
 ```
 
-## Claude Skill
+## Agent Skill
 
-A Claude skill is available for efficient use of the MCP tools.
+A skill is available for efficient use of the MCP tools. It supports any agent compatible with the [Agent Skills](https://agentskills.io) specification, including Claude Code, GitHub Copilot, Cursor, and others.
 
-1. Download `mcp/skill/semantic-stub.skill`
-2. Open Claude Desktop → Customize → Skills
-3. Click the `+` button → `+ Create skill`
-4. Select `Upload a skill`
-5. Upload the `.skill` file
+```sh
+gh skill install winuim/SemanticStub semantic-stub
+```
 
 ## Test
 
