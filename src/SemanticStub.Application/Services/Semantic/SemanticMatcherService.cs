@@ -239,11 +239,51 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             _cachedCandidateEmbeddingDimension = candidateEmbeddings[0].Length;
         }
 
+        var candidateEmbeddingsByText = new Dictionary<string, float[]>(StringComparer.Ordinal);
+
+        for (var i = 0; i < missingCandidateTexts.Length; i++)
+        {
+            candidateEmbeddingsByText[missingCandidateTexts[i]] = candidateEmbeddings[i];
+        }
+
+        var refetchCandidateTexts = candidateTexts
+            .Where(text => !candidateEmbeddingsByText.ContainsKey(text) &&
+                           !_candidateEmbeddingCache.TryGetValue(text, out _))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        if (refetchCandidateTexts.Length > 0)
+        {
+            var refetchedCandidateEmbeddings = await _embeddingClient.GetEmbeddingsAsync(refetchCandidateTexts, cancellationToken);
+
+            for (var i = 0; i < refetchCandidateTexts.Length; i++)
+            {
+                _candidateEmbeddingCache[refetchCandidateTexts[i]] = refetchedCandidateEmbeddings[i];
+                candidateEmbeddingsByText[refetchCandidateTexts[i]] = refetchedCandidateEmbeddings[i];
+            }
+
+            _cachedCandidateEmbeddingDimension = refetchedCandidateEmbeddings[0].Length;
+        }
+
         var allEmbeddings = new List<float[]>(semanticCandidates.Count + 1)
         {
             requestEmbedding
         };
-        allEmbeddings.AddRange(candidateTexts.Select(text => _candidateEmbeddingCache[text]));
+        allEmbeddings.AddRange(candidateTexts.Select(text =>
+        {
+            if (candidateEmbeddingsByText.TryGetValue(text, out var embedding))
+            {
+                return embedding;
+            }
+
+            if (_candidateEmbeddingCache.TryGetValue(text, out embedding))
+            {
+                candidateEmbeddingsByText[text] = embedding;
+                return embedding;
+            }
+
+            throw new InvalidOperationException($"Failed to resolve a cached embedding for semantic candidate '{text}'.");
+        }));
 
         return allEmbeddings;
     }

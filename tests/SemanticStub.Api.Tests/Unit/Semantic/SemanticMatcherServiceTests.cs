@@ -840,6 +840,89 @@ public sealed class SemanticMatcherServiceTests
             requestedInputs[2]);
     }
 
+    [Fact]
+    public async Task ExplainMatchAsync_RefetchesCandidateEmbeddingWhenConcurrentInvalidationClearsCache()
+    {
+        var definitionVersionProvider = new MutableStubDefinitionVersionProvider();
+        var secondRequestStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSecondRequest = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var requestCount = 0;
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei"
+                }
+            },
+            async (request, _) =>
+            {
+                var body = await request.Content!.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(body);
+                var inputs = document.RootElement.GetProperty("inputs")
+                    .EnumerateArray()
+                    .Select(element => element.GetString()!)
+                    .ToArray();
+                requestCount++;
+
+                if (requestCount == 2)
+                {
+                    secondRequestStarted.SetResult();
+                    await releaseSecondRequest.Task;
+                }
+
+                var embeddings = inputs.Select(input => input switch
+                {
+                    "method: POST\npath: /search\nbody:\nadmin search" => requestCount == 2
+                        ? new[] { 1.0f, 0.0f }
+                        : new[] { 1.0f, 0.0f },
+                    "find admin users" => new[] { 0.9f, 0.1f },
+                    _ => throw new InvalidOperationException($"Unexpected input '{input}'.")
+                });
+
+                return CreateEmbeddingsResponse(embeddings);
+            },
+            definitionVersionProvider);
+
+        var candidate = CreateCandidate("find admin users");
+
+        await service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [candidate]);
+
+        var inFlightRequest = service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [candidate]);
+
+        await secondRequestStarted.Task;
+        definitionVersionProvider.CurrentVersion = 1;
+
+        var invalidatingRequest = service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [candidate]);
+
+        releaseSecondRequest.SetResult();
+
+        var inFlightExplanation = await inFlightRequest;
+        var invalidatingExplanation = await invalidatingRequest;
+
+        Assert.Same(candidate, inFlightExplanation.SelectedCandidate);
+        Assert.Same(candidate, invalidatingExplanation.SelectedCandidate);
+    }
+
     private static QueryMatchDefinition CreateCandidate(string semanticMatch)
     {
         return new QueryMatchDefinition
