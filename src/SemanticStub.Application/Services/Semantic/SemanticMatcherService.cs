@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Application.Infrastructure.Yaml;
@@ -38,6 +39,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
     {
         var semanticSettings = _settings.SemanticMatching;
         var normalizedMethod = method.ToUpperInvariant();
+        var totalStopwatch = Stopwatch.StartNew();
 
         if (!IsEnabled(out var disabledReason))
         {
@@ -73,6 +75,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 semanticSettings.TopScoreMargin,
                 semanticCandidates.Count);
 
+            var embeddingStopwatch = Stopwatch.StartNew();
             var allEmbeddings = await GetEmbeddingsAsync(
                 method,
                 path,
@@ -81,8 +84,16 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 body,
                 semanticCandidates,
                 cancellationToken);
+            embeddingStopwatch.Stop();
 
-            return ScoreAndLogExplanation(
+            _logger.LogDebug(
+                "Semantic embedding request completed for '{Path}' {Method}. ElapsedMs={ElapsedMs}, Candidates={CandidateCount}.",
+                path,
+                normalizedMethod,
+                Math.Max(0, embeddingStopwatch.Elapsed.TotalMilliseconds),
+                semanticCandidates.Count);
+
+            var explanation = ScoreAndLogExplanation(
                 path,
                 normalizedMethod,
                 semanticCandidates,
@@ -90,33 +101,51 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
                 semanticSettings.Threshold,
                 semanticSettings.TopScoreMargin,
                 includeCandidateScores);
+
+            totalStopwatch.Stop();
+
+            _logger.LogInformation(
+                "Semantic matching completed for '{Path}' {Method}. ElapsedMs={ElapsedMs}, MatchSelected={MatchSelected}, CandidateCount={CandidateCount}.",
+                path,
+                normalizedMethod,
+                Math.Max(0, totalStopwatch.Elapsed.TotalMilliseconds),
+                explanation.SelectedCandidate is not null,
+                semanticCandidates.Count);
+
+            return explanation;
         }
         catch (HttpRequestException ex)
         {
+            totalStopwatch.Stop();
             _logger.LogWarning(
                 ex,
-                "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request failed. Treating the request as a non-match.",
+                "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request failed after {ElapsedMs}ms. Treating the request as a non-match.",
                 path,
-                normalizedMethod);
+                normalizedMethod,
+                Math.Max(0, totalStopwatch.Elapsed.TotalMilliseconds));
             return CreateFailedExplanation(semanticSettings);
         }
         catch (TaskCanceledException ex)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            totalStopwatch.Stop();
             _logger.LogWarning(
                 ex,
-                "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request timed out. Treating the request as a non-match.",
+                "Semantic matching failed for '{Path}' {Method}: the embedding endpoint request timed out after {ElapsedMs}ms. Treating the request as a non-match.",
                 path,
-                normalizedMethod);
+                normalizedMethod,
+                Math.Max(0, totalStopwatch.Elapsed.TotalMilliseconds));
             return CreateFailedExplanation(semanticSettings);
         }
         catch (InvalidOperationException ex)
         {
+            totalStopwatch.Stop();
             _logger.LogWarning(
                 ex,
-                "Semantic matching failed for '{Path}' {Method}: the embedding endpoint returned an unexpected response. Treating the request as a non-match.",
+                "Semantic matching failed for '{Path}' {Method}: the embedding endpoint returned an unexpected response after {ElapsedMs}ms. Treating the request as a non-match.",
                 path,
-                normalizedMethod);
+                normalizedMethod,
+                Math.Max(0, totalStopwatch.Elapsed.TotalMilliseconds));
             return CreateFailedExplanation(semanticSettings);
         }
     }

@@ -2,11 +2,29 @@ using System.IO.Compression;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.RequestDecompression;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
 using SemanticStub.Api.Extensions;
 using SemanticStub.Application.Infrastructure.Yaml;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.Configure(options =>
+{
+    options.ActivityTrackingOptions =
+        ActivityTrackingOptions.SpanId |
+        ActivityTrackingOptions.TraceId;
+});
+builder.Services.Configure<ConsoleLoggerOptions>(options =>
+{
+    options.FormatterName = ConsoleFormatterNames.Simple;
+});
+builder.Services.Configure<SimpleConsoleFormatterOptions>(options =>
+{
+    options.SingleLine = true;
+    options.IncludeScopes = true;
+    options.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff zzz ";
+});
 builder.Services.AddControllers();
 builder.Services.AddHttpLogging(options =>
 {
