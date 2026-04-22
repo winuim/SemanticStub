@@ -235,9 +235,11 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             newlyFetchedEmbeddings[missingCandidateTexts[i]] = candidateEmbeddings[i];
         }
 
+        var publishedCacheSnapshot = cacheSnapshot;
+
         if (newlyFetchedEmbeddings.Count > 0)
         {
-            cacheSnapshot = PublishCandidateEmbeddings(
+            publishedCacheSnapshot = PublishCandidateEmbeddings(
                 cacheSnapshot.DefinitionVersion,
                 candidateEmbeddings[0].Length,
                 newlyFetchedEmbeddings);
@@ -246,7 +248,8 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         foreach (var text in candidateTexts.Distinct(StringComparer.Ordinal))
         {
             if (newlyFetchedEmbeddings.TryGetValue(text, out var embedding) ||
-                cacheSnapshot.Embeddings.TryGetValue(text, out embedding))
+                cacheSnapshot.Embeddings.TryGetValue(text, out embedding) ||
+                publishedCacheSnapshot.Embeddings.TryGetValue(text, out embedding))
             {
                 candidateEmbeddingsByText[text] = embedding;
             }
