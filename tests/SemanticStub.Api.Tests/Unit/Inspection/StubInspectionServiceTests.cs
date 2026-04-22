@@ -891,6 +891,7 @@ public sealed class StubInspectionServiceTests
                 Assert.Equal(["X-Env"], candidate.HeaderKeys);
                 Assert.True(candidate.HasBody);
                 Assert.False(candidate.UsesSemanticMatching);
+                Assert.Null(candidate.SemanticMatchSummary);
                 Assert.Equal(202, candidate.ResponseStatusCode);
                 Assert.Equal(250, candidate.DelayMilliseconds);
                 Assert.Equal("admin-users.json", candidate.ResponseFile);
@@ -911,6 +912,7 @@ public sealed class StubInspectionServiceTests
                 Assert.Empty(candidate.HeaderKeys);
                 Assert.False(candidate.HasBody);
                 Assert.True(candidate.UsesSemanticMatching);
+                Assert.Equal("find administrator user accounts", candidate.SemanticMatchSummary);
                 Assert.Equal(200, candidate.ResponseStatusCode);
                 Assert.Null(candidate.DelayMilliseconds);
                 Assert.Null(candidate.ResponseFile);
@@ -918,6 +920,45 @@ public sealed class StubInspectionServiceTests
                 Assert.False(candidate.UsesScenario);
                 Assert.Null(candidate.Scenario);
             });
+    }
+
+    [Fact]
+    public void GetRoute_NormalizesSemanticMatchSummaryWhitespace()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Get = new OperationDefinition
+                    {
+                        OperationId = "listUsers",
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                SemanticMatch = "  find   administrator \n user accounts  ",
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 200,
+                                },
+                            },
+                        ],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new(),
+                        },
+                    },
+                },
+            },
+        };
+
+        var route = CreateService(document).GetRoute("listUsers");
+
+        Assert.NotNull(route);
+        var candidate = Assert.Single(route!.ConditionalMatches);
+        Assert.Equal("find administrator user accounts", candidate.SemanticMatchSummary);
     }
 
     [Fact]

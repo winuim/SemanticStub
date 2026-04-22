@@ -138,6 +138,7 @@ internal static class StubInspectionDocumentProjector
                 HeaderKeys = OrderKeys(match.Headers.Keys),
                 HasBody = match.Body is not null,
                 UsesSemanticMatching = match.SemanticMatch is not null,
+                SemanticMatchSummary = BuildSemanticMatchSummary(match.SemanticMatch),
                 ResponseStatusCode = match.Response.StatusCode,
                 DelayMilliseconds = match.Response.DelayMilliseconds,
                 ResponseFile = GetResponseFileName(match.Response.ResponseFile),
@@ -167,6 +168,19 @@ internal static class StubInspectionDocumentProjector
         => string.IsNullOrWhiteSpace(responseFile)
             ? null
             : Path.GetFileName(responseFile);
+
+    private static string? BuildSemanticMatchSummary(string? semanticMatch)
+    {
+        if (string.IsNullOrWhiteSpace(semanticMatch))
+        {
+            return null;
+        }
+
+        return string.Join(
+            " ",
+            semanticMatch
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
 
     private static IReadOnlyList<string> GetEqualsKeys(IReadOnlyDictionary<string, object?> fields)
         => fields
