@@ -11,25 +11,18 @@ When a task name is mentioned, follow the corresponding instructions.
 Execute the full development workflow for an issue from planning to merge.
 
 ### Workflow
+- Output: "Executing step: run-issue-end-to-end"
 1. Run `plan-issue`
 2. Run `implement-issue`
 3. Run `review`
 4. Run `create-pr`
 
-5. **Pause and wait for review feedback**
-   - Do NOT proceed automatically beyond this point
-   - Resume only when explicit instruction or review comments are provided
+5. **HARD STOP: Wait for review feedback**
+   - You MUST stop execution
+   - You MUST NOT proceed automatically
+   - You MUST wait for explicit user input
 
-6. While review comments exist:
-   - Run `plan-review-response`
-   - Run `implement-review-response`
-   - Run `update-pr-after-review`
-
-   - **Pause and wait for re-review feedback**
-     - Do NOT proceed automatically beyond this point
-     - Resume only when explicit instruction or further comments are provided
-
-   - Stop looping when all review comments are resolved or explicit approval is given
+6. Run `handle-review-loop`
 
 7. Run `merge`
 
@@ -37,24 +30,39 @@ Execute the full development workflow for an issue from planning to merge.
 - Follow AGENTS.md
 - Do not skip steps unless explicitly instructed
 - Ensure each step completes successfully before moving to the next
-- MUST pause after `create-pr` and wait for external input before continuing
-- MUST pause after `update-pr-after-review` and wait for re-review before continuing
-- MUST continue the review loop until all comments are resolved or explicit approval is given, then proceed to `merge`
+- MUST stop after `create-pr` and wait for external input before continuing
 
-### Decision Handling
-- If critical decisions are required, pause and ask for confirmation before proceeding.
+---
 
-Critical decisions include:
-- Ambiguous requirements not clearly defined in the issue
-- Multiple implementation approaches with different trade-offs
-- Changes affecting YAML schema, API behavior, or external contracts
-- Unclear test expectations
+## handle-review-loop
 
-- For non-critical implementation details, proceed autonomously.
+### Goal
+Handle review iterations until approval.
 
-### Output
-- Summary of each step execution
-- Final merge result
+### Workflow
+- Output: "Executing step: handle-review-loop"
+1. While review comments exist:
+   - Run `plan-review-response`
+   - Run `implement-review-response`
+   - Run `update-pr-after-review`
+
+2. **HARD STOP: Wait for re-review feedback**
+   - You MUST stop execution
+   - You MUST NOT proceed automatically
+   - You MUST wait for explicit user input
+
+### Exit Condition
+- All review comments are resolved OR
+- Explicit approval is given
+
+If neither condition is met:
+- Continue the loop
+- DO NOT proceed to merge
+
+### Constraints
+- Follow AGENTS.md
+- Do not skip loop iterations
+- MUST wait for explicit feedback after each iteration
 
 ---
 
@@ -324,12 +332,23 @@ Safely merge a reviewed pull request and synchronize local/remote states.
 3. Verify PR branch has no conflicts with updated `main`
 4. Perform squash merge
 5. Push merge result to remote
-6. Delete source branch (remote and local if applicable)
+6. Delete source branch (remote only)
 7. Ensure local `main` matches merged remote state
 8. Close the related issue
+9. Clean local workspace for next work:
+   - Remove the merged feature branch locally (if exists)
+   - Ensure current branch is `main`
+   - Ensure working tree is clean (no uncommitted changes)
+   - Remove any temporary or stale branches not needed
 
 ### Output
 - merge result (success / failure)
 - performed checks
 - final commit message
 - post-merge local/remote branch status
+- local workspace cleanup status
+
+### Completion Criteria
+- Local main matches remote origin/main
+- Merged source branch is deleted locally
+- Current branch is main
