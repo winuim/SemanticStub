@@ -5,6 +5,23 @@ When a task name is mentioned, follow the corresponding instructions.
 
 ---
 
+## Execution Mode
+
+You are an executor, not a planner.
+
+- You MUST strictly follow the defined workflow steps
+- You MUST NOT skip, reorder, or merge steps
+- You MUST stop at defined pause points
+- You MUST NOT optimize or shortcut the workflow
+
+If a step cannot be completed:
+- You MUST stop
+- You MUST report the issue
+- You MUST ask for instructions
+- If a step cannot be completed, do NOT improvise an alternative workflow
+
+---
+
 ## run-issue-end-to-end
 
 ### Goal
@@ -18,9 +35,9 @@ Execute the full development workflow for an issue from planning to merge.
 4. Run `create-pr`
 
 5. **HARD STOP: Wait for review feedback**
-   - You MUST stop execution
-   - You MUST NOT proceed automatically
-   - You MUST wait for explicit user input
+  - You MUST stop execution
+  - You MUST NOT proceed automatically
+  - You MUST wait for explicit user input
 
 6. Run `handle-review-loop`
 
@@ -42,14 +59,14 @@ Handle review iterations until approval.
 ### Workflow
 - Output: "Executing step: handle-review-loop"
 1. While review comments exist:
-   - Run `plan-review-response`
-   - Run `implement-review-response`
-   - Run `update-pr-after-review`
+  - Run `plan-review-response`
+  - Run `implement-review-response`
+  - Run `update-pr-after-review`
 
 2. **HARD STOP: Wait for re-review feedback**
-   - You MUST stop execution
-   - You MUST NOT proceed automatically
-   - You MUST wait for explicit user input
+  - You MUST stop execution
+  - You MUST NOT proceed automatically
+  - You MUST wait for explicit user input
 
 ### Exit Condition
 - All review comments are resolved OR
@@ -144,7 +161,7 @@ Implement the approved plan while preserving existing behavior, YAML compatibili
 ### Goal
 Review code quality without modifying code.
 
-### Checklist
+### Workflow
 - Readability
 - Naming
 - Unnecessary code
@@ -336,10 +353,14 @@ Safely merge a reviewed pull request and synchronize local/remote states.
 7. Ensure local `main` matches merged remote state
 8. Close the related issue
 9. Clean local workspace for next work:
-   - Remove the merged feature branch locally (if exists)
-   - Ensure current branch is `main`
-   - Ensure working tree is clean (no uncommitted changes)
-   - Remove any temporary or stale branches not needed
+  - Remove the merged feature branch locally (if exists)
+  - Ensure current branch is `main`
+  - Ensure working tree is clean (no uncommitted changes)
+    - If uncommitted changes exist:
+      - Do NOT discard them automatically
+      - Report the changes
+      - Ask for instructions before proceeding
+  - Remove any temporary or stale branches not needed
 
 ### Output
 - merge result (success / failure)
@@ -349,6 +370,8 @@ Safely merge a reviewed pull request and synchronize local/remote states.
 - local workspace cleanup status
 
 ### Completion Criteria
+- Merge completed successfully
 - Local main matches remote origin/main
 - Merged source branch is deleted locally
 - Current branch is main
+- Working tree has no uncommitted changes OR uncommitted changes were reported and approved
