@@ -55,6 +55,8 @@ public sealed class StubMatchExplanationBuilderTests
             "fallback",
             "200",
             200,
+            "responses",
+            selectedResponseCandidateIndex: null,
             "No conditional candidate matched, so the eligible default response was selected.");
 
         Assert.True(dispatch.Explanation.PathMatched);
@@ -63,5 +65,37 @@ public sealed class StubMatchExplanationBuilderTests
         Assert.Empty(dispatch.Explanation.Result.Candidates);
         Assert.Equal("listUsers", dispatch.Explanation.Result.RouteId);
         Assert.Equal("fallback", dispatch.Explanation.Result.MatchMode);
+        Assert.Equal("responses", dispatch.Explanation.Result.SelectedResponseSource);
+        Assert.Null(dispatch.Explanation.Result.SelectedResponseCandidateIndex);
+    }
+
+    [Fact]
+    public void CreateMatchedDispatchResult_ProjectsConditionalResponseSource()
+    {
+        var request = new MatchRequestInfo
+        {
+            Method = "GET",
+            Path = "/users",
+            IncludeCandidates = true,
+        };
+
+        var dispatch = StubMatchExplanationBuilder.CreateMatchedDispatchResult(
+            request,
+            "listUsers",
+            "GET",
+            "/users",
+            [],
+            semanticEvaluation: null,
+            StubMatchResult.Matched,
+            new StubResponse { StatusCode = 202, Body = "{}", ContentType = "application/json" },
+            "exact",
+            "202",
+            202,
+            "x-match",
+            1,
+            "Deterministic candidate 1 matched all configured conditions and was selected.");
+
+        Assert.Equal("x-match", dispatch.Explanation.Result.SelectedResponseSource);
+        Assert.Equal(1, dispatch.Explanation.Result.SelectedResponseCandidateIndex);
     }
 }
