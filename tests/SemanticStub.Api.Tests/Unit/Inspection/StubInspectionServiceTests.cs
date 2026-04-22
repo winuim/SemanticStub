@@ -876,6 +876,7 @@ public sealed class StubInspectionServiceTests
                 Assert.NotNull(response.Scenario);
                 Assert.Equal("checkout", response.Scenario!.Name);
                 Assert.Equal("initial", response.Scenario.State);
+                Assert.True(response.Scenario.AdvancesScenarioState);
                 Assert.Equal("pending", response.Scenario.Next);
             });
 
@@ -900,6 +901,7 @@ public sealed class StubInspectionServiceTests
                 Assert.NotNull(candidate.Scenario);
                 Assert.Equal("checkout", candidate.Scenario!.Name);
                 Assert.Equal("pending", candidate.Scenario.State);
+                Assert.True(candidate.Scenario.AdvancesScenarioState);
                 Assert.Equal("complete", candidate.Scenario.Next);
             },
             candidate =>
