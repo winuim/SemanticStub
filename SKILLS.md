@@ -41,7 +41,7 @@ Execute the full development workflow for an issue from planning to merge.
 
 6. Run `handle-review-loop`
 
-7. Run `merge`
+7. Run `merge` (including post-merge local cleanup)
 
 ### Constraints
 - Follow AGENTS.md
