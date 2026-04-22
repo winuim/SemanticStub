@@ -40,6 +40,8 @@ internal static class StubMatchExplanationBuilder
         string? matchMode,
         string? selectedResponseId,
         int? selectedResponseStatusCode,
+        string? selectedResponseSource,
+        int? selectedResponseCandidateIndex,
         string selectionReason)
     {
         return new StubDispatchResult
@@ -62,6 +64,8 @@ internal static class StubMatchExplanationBuilder
                     PathPattern = pathPattern,
                     SelectedResponseId = selectedResponseId,
                     SelectedResponseStatusCode = selectedResponseStatusCode,
+                    SelectedResponseSource = selectedResponseSource,
+                    SelectedResponseCandidateIndex = selectedResponseCandidateIndex,
                     MatchMode = matchMode,
                     Candidates = request.IncludeCandidates ? deterministicCandidates : [],
                 }

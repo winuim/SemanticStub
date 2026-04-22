@@ -63,6 +63,8 @@ internal sealed class StubDispatchSelector
                     Result = StubMatchResult.ResponseNotConfigured,
                     MatchMode = "exact",
                     SelectedCandidate = selectedDeterministicCandidate,
+                    SelectedResponseSource = "x-match",
+                    SelectedResponseCandidateIndex = matchedCandidateIndex,
                     SelectedResponseId = selectedDeterministicCandidate.Response.StatusCode.ToString(),
                     SelectedResponseStatusCode = selectedDeterministicCandidate.Response.StatusCode,
                     SelectionReason = $"Deterministic candidate {matchedCandidateIndex} matched, but its response is not configured.",
@@ -88,6 +90,8 @@ internal sealed class StubDispatchSelector
                 Response = deterministicResponse,
                 MatchMode = "exact",
                 SelectedCandidate = selectedDeterministicCandidate,
+                SelectedResponseSource = "x-match",
+                SelectedResponseCandidateIndex = matchedCandidateIndex,
                 SelectedResponseId = selectedDeterministicCandidate.Response.StatusCode.ToString(),
                 SelectedResponseStatusCode = selectedDeterministicCandidate.Response.StatusCode,
                 SelectionReason = $"Deterministic candidate {matchedCandidateIndex} matched all configured conditions and was selected.",
@@ -109,6 +113,8 @@ internal sealed class StubDispatchSelector
 
         if (semanticExplanation.SelectedCandidate is not null)
         {
+            var selectedSemanticCandidateIndex = operation.Matches.FindIndex(candidate => ReferenceEquals(candidate, semanticExplanation.SelectedCandidate));
+
             if (!_responseBuilder.TryBuild(semanticExplanation.SelectedCandidate.Response, out var semanticResponse))
             {
                 return new StubDispatchSelectionResult
@@ -117,6 +123,8 @@ internal sealed class StubDispatchSelector
                     Response = null,
                     MatchMode = "semantic",
                     SelectedCandidate = semanticExplanation.SelectedCandidate,
+                    SelectedResponseSource = "x-match",
+                    SelectedResponseCandidateIndex = selectedSemanticCandidateIndex,
                     SelectedResponseId = semanticExplanation.SelectedCandidate.Response.StatusCode.ToString(),
                     SelectedResponseStatusCode = semanticExplanation.SelectedCandidate.Response.StatusCode,
                     SelectionReason = "Semantic fallback selected a candidate, but its response is not configured.",
@@ -140,6 +148,8 @@ internal sealed class StubDispatchSelector
                 Response = semanticResponse,
                 MatchMode = "semantic",
                 SelectedCandidate = semanticExplanation.SelectedCandidate,
+                SelectedResponseSource = "x-match",
+                SelectedResponseCandidateIndex = selectedSemanticCandidateIndex,
                 SelectedResponseId = semanticExplanation.SelectedCandidate.Response.StatusCode.ToString(),
                 SelectedResponseStatusCode = semanticExplanation.SelectedCandidate.Response.StatusCode,
                 SelectionReason = "Semantic fallback selected the highest-scoring eligible candidate.",
@@ -154,6 +164,7 @@ internal sealed class StubDispatchSelector
                 Result = StubMatchResult.Matched,
                 Response = defaultSelection.Response,
                 MatchMode = "fallback",
+                SelectedResponseSource = "responses",
                 SelectedResponseId = defaultSelection.ResponseId,
                 SelectedResponseStatusCode = defaultSelection.StatusCode,
                 SelectionReason = "No conditional candidate matched, so the eligible default response was selected.",
@@ -190,6 +201,10 @@ internal sealed class StubDispatchSelectionResult
     public string? MatchMode { get; init; }
 
     public QueryMatchDefinition? SelectedCandidate { get; init; }
+
+    public string? SelectedResponseSource { get; init; }
+
+    public int? SelectedResponseCandidateIndex { get; init; }
 
     public string? SelectedResponseId { get; init; }
 

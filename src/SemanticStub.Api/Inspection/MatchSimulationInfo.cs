@@ -41,6 +41,17 @@ public sealed class MatchSimulationInfo
     public int? SelectedResponseStatusCode { get; init; }
 
     /// <summary>
+    /// Gets the YAML response source that produced the selected response when available.
+    /// Expected values are <c>responses</c> and <c>x-match</c>.
+    /// </summary>
+    public string? SelectedResponseSource { get; init; }
+
+    /// <summary>
+    /// Gets the selected conditional candidate index when the response came from <c>x-match</c>.
+    /// </summary>
+    public int? SelectedResponseCandidateIndex { get; init; }
+
+    /// <summary>
     /// Gets the match mode when a response was selected.
     /// </summary>
     public string? MatchMode { get; init; }

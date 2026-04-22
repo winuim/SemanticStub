@@ -187,6 +187,8 @@ public sealed class StubService : IStubService
 
         string? selectedResponseId = selection.SelectedResponseId;
         int? selectedResponseStatusCode = selection.SelectedResponseStatusCode;
+        string? selectedResponseSource = selection.SelectedResponseSource;
+        int? selectedResponseCandidateIndex = selection.SelectedResponseCandidateIndex;
 
         if (selection.SelectedCandidate is not null)
         {
@@ -219,6 +221,8 @@ public sealed class StubService : IStubService
             selection.MatchMode,
             selectedResponseId,
             selectedResponseStatusCode,
+            selectedResponseSource,
+            selectedResponseCandidateIndex,
             selection.SelectionReason);
     }
 

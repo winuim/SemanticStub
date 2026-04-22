@@ -1203,6 +1203,8 @@ public sealed class StubInspectionServiceTests
         Assert.True(explanation.Result.Matched);
         Assert.Equal("exact", explanation.Result.MatchMode);
         Assert.Equal("listUsers", explanation.Result.RouteId);
+        Assert.Equal("x-match", explanation.Result.SelectedResponseSource);
+        Assert.Equal(0, explanation.Result.SelectedResponseCandidateIndex);
         Assert.Equal(2, explanation.DeterministicCandidates.Count);
         Assert.True(explanation.DeterministicCandidates[0].Matched);
         Assert.False(explanation.DeterministicCandidates[1].Matched);
@@ -1479,6 +1481,8 @@ public sealed class StubInspectionServiceTests
         Assert.True(explanation!.Result.Matched);
         Assert.Equal("fallback", explanation.Result.MatchMode);
         Assert.Equal("listUsers", explanation.Result.RouteId);
+        Assert.Equal("responses", explanation.Result.SelectedResponseSource);
+        Assert.Null(explanation.Result.SelectedResponseCandidateIndex);
     }
 
     [Fact]
