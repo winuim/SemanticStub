@@ -331,7 +331,7 @@ Inspection notes:
 
 - `/_semanticstub/runtime/config` is a summary view. It currently returns snapshot metadata such as timestamp, configuration hash, definitions directory, route count, and whether semantic matching is enabled.
 - `/_semanticstub/runtime/routes` returns one item per active path and HTTP method with stable external fields such as route id, normalized path pattern, semantic matching usage, scenario usage, and response count.
-- `/_semanticstub/runtime/routes/{routeId}` expands a single route into a stable detail view with top-level responses and normalized conditional match metadata.
+- `/_semanticstub/runtime/routes/{routeId}` expands a single route into a stable detail view with top-level responses, configured response media types, and normalized conditional match metadata.
 - `/_semanticstub/runtime/scenarios` returns one item per known scenario with its current state and whether it is active.
 - `/_semanticstub/runtime/metrics` is process-local and currently returns total request count, matched and unmatched counts, fallback and semantic counts, average latency, status-code summaries, and top routes.
 - `/_semanticstub/runtime/metrics/resets` and `/_semanticstub/runtime/metrics/reset` clear process-local aggregate metrics and recent request history without reloading configuration, changing scenario state, or clearing `/_semanticstub/runtime/explain/last`.
@@ -370,6 +370,7 @@ Excerpt from the response body for `GET /_semanticstub/runtime/routes/listUsers`
     {
       "responseId": "200",
       "delayMilliseconds": 100,
+      "mediaTypes": ["application/json"],
       "usesScenario": false,
       "scenario": null
     }
@@ -388,6 +389,7 @@ Excerpt from the response body for `GET /_semanticstub/runtime/routes/listUsers`
       "usesSemanticMatching": false,
       "responseStatusCode": 200,
       "delayMilliseconds": null,
+      "mediaTypes": ["application/json"],
       "usesScenario": false,
       "scenario": null
     }

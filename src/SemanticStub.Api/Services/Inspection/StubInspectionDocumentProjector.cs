@@ -117,6 +117,7 @@ internal static class StubInspectionDocumentProjector
             {
                 ResponseId = entry.Key,
                 DelayMilliseconds = entry.Value.DelayMilliseconds,
+                MediaTypes = OrderKeys(entry.Value.Content.Keys),
                 UsesScenario = entry.Value.Scenario is not null,
                 Scenario = BuildScenario(entry.Value.Scenario),
             })
@@ -138,6 +139,7 @@ internal static class StubInspectionDocumentProjector
                 UsesSemanticMatching = match.SemanticMatch is not null,
                 ResponseStatusCode = match.Response.StatusCode,
                 DelayMilliseconds = match.Response.DelayMilliseconds,
+                MediaTypes = OrderKeys(match.Response.Content.Keys),
                 UsesScenario = match.Response.Scenario is not null,
                 Scenario = BuildScenario(match.Response.Scenario),
             })

@@ -107,8 +107,12 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
         Assert.Equal("/users", route.PathPattern);
         Assert.True(route.HasConditionalMatches);
         Assert.True(route.ResponseCount >= 1);
-        Assert.Contains(route.Responses, response => response.ResponseId == "200");
-        Assert.Contains(route.ConditionalMatches, candidate => candidate.HasExactQuery);
+        Assert.Contains(route.Responses, response =>
+            response.ResponseId == "200"
+            && response.MediaTypes.Contains("application/json"));
+        Assert.Contains(route.ConditionalMatches, candidate =>
+            candidate.HasExactQuery
+            && candidate.MediaTypes.Contains("application/json"));
         Assert.Contains(route.ConditionalMatches, candidate => candidate.HasRegexQuery);
     }
 

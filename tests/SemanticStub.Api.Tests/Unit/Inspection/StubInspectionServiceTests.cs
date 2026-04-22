@@ -784,6 +784,11 @@ public sealed class StubInspectionServiceTests
                                 {
                                     StatusCode = 202,
                                     DelayMilliseconds = 250,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["text/plain"] = new(),
+                                        ["application/json"] = new(),
+                                    },
                                     Scenario = new ScenarioDefinition
                                     {
                                         Name = "checkout",
@@ -798,6 +803,10 @@ public sealed class StubInspectionServiceTests
                                 Response = new QueryMatchResponseDefinition
                                 {
                                     StatusCode = 200,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new(),
+                                    },
                                 },
                             },
                         ],
@@ -807,6 +816,11 @@ public sealed class StubInspectionServiceTests
                             {
                                 Description = "Default users",
                                 DelayMilliseconds = 150,
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["text/plain"] = new(),
+                                    ["application/json"] = new(),
+                                },
                             },
                             ["409"] = new()
                             {
@@ -816,6 +830,10 @@ public sealed class StubInspectionServiceTests
                                     Name = "checkout",
                                     State = "initial",
                                     Next = "pending",
+                                },
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/problem+json"] = new(),
                                 },
                             },
                         },
@@ -841,6 +859,7 @@ public sealed class StubInspectionServiceTests
             {
                 Assert.Equal("200", response.ResponseId);
                 Assert.Equal(150, response.DelayMilliseconds);
+                Assert.Equal(["application/json", "text/plain"], response.MediaTypes);
                 Assert.False(response.UsesScenario);
                 Assert.Null(response.Scenario);
             },
@@ -848,6 +867,7 @@ public sealed class StubInspectionServiceTests
             {
                 Assert.Equal("409", response.ResponseId);
                 Assert.Null(response.DelayMilliseconds);
+                Assert.Equal(["application/problem+json"], response.MediaTypes);
                 Assert.True(response.UsesScenario);
                 Assert.NotNull(response.Scenario);
                 Assert.Equal("checkout", response.Scenario!.Name);
@@ -869,6 +889,7 @@ public sealed class StubInspectionServiceTests
                 Assert.False(candidate.UsesSemanticMatching);
                 Assert.Equal(202, candidate.ResponseStatusCode);
                 Assert.Equal(250, candidate.DelayMilliseconds);
+                Assert.Equal(["application/json", "text/plain"], candidate.MediaTypes);
                 Assert.True(candidate.UsesScenario);
                 Assert.NotNull(candidate.Scenario);
                 Assert.Equal("checkout", candidate.Scenario!.Name);
@@ -887,6 +908,7 @@ public sealed class StubInspectionServiceTests
                 Assert.True(candidate.UsesSemanticMatching);
                 Assert.Equal(200, candidate.ResponseStatusCode);
                 Assert.Null(candidate.DelayMilliseconds);
+                Assert.Equal(["application/json"], candidate.MediaTypes);
                 Assert.False(candidate.UsesScenario);
                 Assert.Null(candidate.Scenario);
             });
