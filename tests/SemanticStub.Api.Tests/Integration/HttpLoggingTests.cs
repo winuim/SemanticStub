@@ -93,6 +93,17 @@ public sealed class HttpLoggingTests
     }
 
     [Fact]
+    public void CreateClient_DevelopmentConfiguresSemanticMatcherCategoryAtDebug()
+    {
+        using var factory = new HttpLoggingFactory("Development");
+        using var client = factory.CreateClient();
+
+        var configuration = factory.Services.GetRequiredService<IConfiguration>();
+
+        Assert.Equal("Debug", configuration["Logging:LogLevel:SemanticStub.Application.Services.Semantic.SemanticMatcherService"]);
+    }
+
+    [Fact]
     public void CreateClient_ConfiguresConsoleLoggingForReadableCorrelatedOutput()
     {
         using var factory = new HttpLoggingFactory("Production");
