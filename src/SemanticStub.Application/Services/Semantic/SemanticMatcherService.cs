@@ -13,18 +13,24 @@ namespace SemanticStub.Application.Services.Semantic;
 public sealed class SemanticMatcherService : ISemanticMatcherService
 {
     private readonly ISemanticEmbeddingClient _embeddingClient;
+    private readonly IStubDefinitionVersionProvider _definitionVersionProvider;
     private readonly StubSettings _settings;
     private readonly ILogger<SemanticMatcherService> _logger;
     private readonly ConcurrentDictionary<string, float[]> _candidateEmbeddingCache = new(StringComparer.Ordinal);
+    private int? _cachedCandidateEmbeddingDimension;
+    private long _cachedDefinitionVersion;
 
     public SemanticMatcherService(
         ISemanticEmbeddingClient embeddingClient,
+        IStubDefinitionVersionProvider definitionVersionProvider,
         StubSettings settings,
         ILogger<SemanticMatcherService> logger)
     {
+        _definitionVersionProvider = definitionVersionProvider;
         _settings = settings;
         _embeddingClient = embeddingClient;
         _logger = logger;
+        _cachedDefinitionVersion = definitionVersionProvider.CurrentVersion;
     }
 
     /// <inheritdoc/>
@@ -191,6 +197,8 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         IReadOnlyList<QueryMatchDefinition> semanticCandidates,
         CancellationToken cancellationToken)
     {
+        InvalidateCacheIfDefinitionsReloaded();
+
         var requestText = SemanticRequestTextBuilder.Build(method, path, query, headers, body);
         var candidateTexts = semanticCandidates
             .Select(candidate => candidate.SemanticMatch!)
@@ -199,19 +207,36 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             .Where(text => !_candidateEmbeddingCache.ContainsKey(text))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-
         var textsToEmbed = new List<string>(missingCandidateTexts.Length + 1)
         {
             requestText
         };
         textsToEmbed.AddRange(missingCandidateTexts);
 
-        var newEmbeddings = await _embeddingClient.GetEmbeddingsAsync(textsToEmbed, cancellationToken);
-        var requestEmbedding = newEmbeddings[0];
+        var embeddings = await _embeddingClient.GetEmbeddingsAsync(textsToEmbed, cancellationToken);
+        var requestEmbedding = embeddings[0];
+        IReadOnlyList<float[]> candidateEmbeddings = embeddings.Skip(1).ToArray();
+
+        if (_cachedCandidateEmbeddingDimension.HasValue &&
+            _cachedCandidateEmbeddingDimension.Value != requestEmbedding.Length)
+        {
+            ClearCandidateEmbeddingCache();
+            missingCandidateTexts = candidateTexts
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            candidateEmbeddings = missingCandidateTexts.Length == 0
+                ? []
+                : await _embeddingClient.GetEmbeddingsAsync(missingCandidateTexts, cancellationToken);
+        }
 
         for (var i = 0; i < missingCandidateTexts.Length; i++)
         {
-            _candidateEmbeddingCache[missingCandidateTexts[i]] = newEmbeddings[i + 1];
+            _candidateEmbeddingCache[missingCandidateTexts[i]] = candidateEmbeddings[i];
+        }
+
+        if (missingCandidateTexts.Length > 0)
+        {
+            _cachedCandidateEmbeddingDimension = candidateEmbeddings[0].Length;
         }
 
         var allEmbeddings = new List<float[]>(semanticCandidates.Count + 1)
@@ -221,6 +246,25 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         allEmbeddings.AddRange(candidateTexts.Select(text => _candidateEmbeddingCache[text]));
 
         return allEmbeddings;
+    }
+
+    private void InvalidateCacheIfDefinitionsReloaded()
+    {
+        var currentDefinitionVersion = _definitionVersionProvider.CurrentVersion;
+
+        if (currentDefinitionVersion == _cachedDefinitionVersion)
+        {
+            return;
+        }
+
+        ClearCandidateEmbeddingCache();
+        _cachedDefinitionVersion = currentDefinitionVersion;
+    }
+
+    private void ClearCandidateEmbeddingCache()
+    {
+        _candidateEmbeddingCache.Clear();
+        _cachedCandidateEmbeddingDimension = null;
     }
 
     private SemanticMatchExplanation ScoreAndLogExplanation(

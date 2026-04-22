@@ -698,6 +698,148 @@ public sealed class SemanticMatcherServiceTests
             requestedInputs[1]);
     }
 
+    [Fact]
+    public async Task ExplainMatchAsync_InvalidatesCandidateCacheWhenDefinitionVersionChanges()
+    {
+        var requestedInputs = new List<string[]>();
+        var definitionVersionProvider = new MutableStubDefinitionVersionProvider();
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei"
+                }
+            },
+            async (request, _) =>
+            {
+                var body = await request.Content!.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(body);
+                var inputs = document.RootElement.GetProperty("inputs")
+                    .EnumerateArray()
+                    .Select(element => element.GetString()!)
+                    .ToArray();
+                requestedInputs.Add(inputs);
+
+                return CreateEmbeddingsResponse(inputs.Select(input => input switch
+                {
+                    "method: POST\npath: /search\nbody:\nadmin search" => new[] { 1.0f, 0.0f },
+                    "find admin users" => new[] { 0.9f, 0.1f },
+                    _ => throw new InvalidOperationException($"Unexpected input '{input}'.")
+                }));
+            },
+            definitionVersionProvider);
+
+        var candidate = CreateCandidate("find admin users");
+
+        await service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [candidate]);
+
+        definitionVersionProvider.CurrentVersion = 1;
+
+        await service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [candidate]);
+
+        Assert.Equal(2, requestedInputs.Count);
+        Assert.Equal(
+            ["method: POST\npath: /search\nbody:\nadmin search", "find admin users"],
+            requestedInputs[0]);
+        Assert.Equal(
+            ["method: POST\npath: /search\nbody:\nadmin search", "find admin users"],
+            requestedInputs[1]);
+    }
+
+    [Fact]
+    public async Task ExplainMatchAsync_RebuildsCandidateCacheWhenEmbeddingDimensionChanges()
+    {
+        var requestedInputs = new List<string[]>();
+        var requestCount = 0;
+        var service = CreateService(
+            new StubSettings
+            {
+                SemanticMatching = new SemanticMatchingSettings
+                {
+                    Enabled = true,
+                    Endpoint = "http://tei"
+                }
+            },
+            async (request, _) =>
+            {
+                var body = await request.Content!.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(body);
+                var inputs = document.RootElement.GetProperty("inputs")
+                    .EnumerateArray()
+                    .Select(element => element.GetString()!)
+                    .ToArray();
+                requestedInputs.Add(inputs);
+                requestCount++;
+
+                var embeddings = requestCount switch
+                {
+                    1 => inputs.Select(input => input switch
+                    {
+                        "method: POST\npath: /search\nbody:\nadmin search" => new[] { 1.0f, 0.0f },
+                        "find admin users" => new[] { 0.9f, 0.1f },
+                        _ => throw new InvalidOperationException($"Unexpected input '{input}'.")
+                    }),
+                    2 => inputs.Select(input => input switch
+                    {
+                        "method: POST\npath: /search\nbody:\nadmin search" => new[] { 1.0f, 0.0f, 0.0f },
+                        _ => throw new InvalidOperationException($"Unexpected input '{input}'.")
+                    }),
+                    3 => inputs.Select(input => input switch
+                    {
+                        "find admin users" => new[] { 0.9f, 0.1f, 0.0f },
+                        _ => throw new InvalidOperationException($"Unexpected input '{input}'.")
+                    }),
+                    _ => throw new InvalidOperationException("Unexpected embedding request count.")
+                };
+
+                return CreateEmbeddingsResponse(embeddings);
+            });
+
+        var candidate = CreateCandidate("find admin users");
+
+        await service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [candidate]);
+
+        var explanation = await service.ExplainMatchAsync(
+            "POST",
+            "/search",
+            new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            "admin search",
+            [candidate]);
+
+        Assert.Same(candidate, explanation.SelectedCandidate);
+        Assert.Equal(3, requestedInputs.Count);
+        Assert.Equal(
+            ["method: POST\npath: /search\nbody:\nadmin search", "find admin users"],
+            requestedInputs[0]);
+        Assert.Equal(
+            ["method: POST\npath: /search\nbody:\nadmin search"],
+            requestedInputs[1]);
+        Assert.Equal(
+            ["find admin users"],
+            requestedInputs[2]);
+    }
+
     private static QueryMatchDefinition CreateCandidate(string semanticMatch)
     {
         return new QueryMatchDefinition
@@ -722,12 +864,14 @@ public sealed class SemanticMatcherServiceTests
 
     private static SemanticMatcherService CreateService(
         StubSettings settings,
-        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler)
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler,
+        IStubDefinitionVersionProvider? definitionVersionProvider = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton(Options.Create(settings));
         services.AddLogging();
         services.AddSingleton<IHttpClientFactory>(_ => new TestHttpClientFactory(new HttpClient(new DelegatingTestHandler(handler))));
+        services.AddSingleton(definitionVersionProvider ?? new MutableStubDefinitionVersionProvider());
         services.AddSingleton<ISemanticEmbeddingClient, SemanticEmbeddingClient>();
         services.AddSingleton(serviceProvider => serviceProvider.GetRequiredService<IOptions<StubSettings>>().Value);
         services.AddSingleton<ISemanticMatcherService, SemanticMatcherService>();
@@ -797,5 +941,10 @@ public sealed class SemanticMatcherServiceTests
         {
             return client;
         }
+    }
+
+    private sealed class MutableStubDefinitionVersionProvider : IStubDefinitionVersionProvider
+    {
+        public long CurrentVersion { get; set; }
     }
 }
