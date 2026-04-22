@@ -70,7 +70,7 @@ public sealed class StubMatchExplanationBuilderTests
     }
 
     [Fact]
-    public void CreateMatchedDispatchResult_ProjectsConditionalResponseSource()
+    public void CreateMatchedDispatchResult_WhenSourceIsXMatch_SetsSelectedResponseSourceAndCandidateIndex()
     {
         var request = new MatchRequestInfo
         {
