@@ -12,17 +12,23 @@ namespace SemanticStub.Application.Services.Semantic;
 public sealed class SemanticMatcherService : ISemanticMatcherService
 {
     private readonly ISemanticEmbeddingClient _embeddingClient;
+    private readonly IStubDefinitionVersionProvider _definitionVersionProvider;
     private readonly StubSettings _settings;
     private readonly ILogger<SemanticMatcherService> _logger;
+    private readonly object _cacheSyncRoot = new();
+    private CandidateEmbeddingCacheState _candidateEmbeddingCache;
 
     public SemanticMatcherService(
         ISemanticEmbeddingClient embeddingClient,
+        IStubDefinitionVersionProvider definitionVersionProvider,
         StubSettings settings,
         ILogger<SemanticMatcherService> logger)
     {
+        _definitionVersionProvider = definitionVersionProvider;
         _settings = settings;
         _embeddingClient = embeddingClient;
         _logger = logger;
+        _candidateEmbeddingCache = CandidateEmbeddingCacheState.CreateEmpty(definitionVersionProvider.CurrentVersion);
     }
 
     /// <inheritdoc/>
@@ -189,13 +195,125 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         IReadOnlyList<QueryMatchDefinition> semanticCandidates,
         CancellationToken cancellationToken)
     {
-        var allTexts = new List<string>(semanticCandidates.Count + 1)
-        {
-            SemanticRequestTextBuilder.Build(method, path, query, headers, body)
-        };
+        var cacheSnapshot = InvalidateCacheIfDefinitionsReloaded();
 
-        allTexts.AddRange(semanticCandidates.Select(candidate => candidate.SemanticMatch!));
-        return await _embeddingClient.GetEmbeddingsAsync(allTexts, cancellationToken);
+        var requestText = SemanticRequestTextBuilder.Build(method, path, query, headers, body);
+        var candidateTexts = semanticCandidates
+            .Select(candidate => candidate.SemanticMatch!)
+            .ToArray();
+        var missingCandidateTexts = candidateTexts
+            .Where(text => !cacheSnapshot.Embeddings.ContainsKey(text))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var textsToEmbed = new List<string>(missingCandidateTexts.Length + 1)
+        {
+            requestText
+        };
+        textsToEmbed.AddRange(missingCandidateTexts);
+
+        var embeddings = await _embeddingClient.GetEmbeddingsAsync(textsToEmbed, cancellationToken);
+        var requestEmbedding = embeddings[0];
+        IReadOnlyList<float[]> candidateEmbeddings = embeddings.Skip(1).ToArray();
+
+        if (cacheSnapshot.EmbeddingDimension.HasValue &&
+            cacheSnapshot.EmbeddingDimension.Value != requestEmbedding.Length)
+        {
+            cacheSnapshot = ReplaceCache(CandidateEmbeddingCacheState.CreateEmpty(cacheSnapshot.DefinitionVersion));
+            missingCandidateTexts = candidateTexts
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            candidateEmbeddings = missingCandidateTexts.Length == 0
+                ? []
+                : await _embeddingClient.GetEmbeddingsAsync(missingCandidateTexts, cancellationToken);
+        }
+
+        var candidateEmbeddingsByText = new Dictionary<string, float[]>(StringComparer.Ordinal);
+        var newlyFetchedEmbeddings = new Dictionary<string, float[]>(StringComparer.Ordinal);
+
+        for (var i = 0; i < missingCandidateTexts.Length; i++)
+        {
+            newlyFetchedEmbeddings[missingCandidateTexts[i]] = candidateEmbeddings[i];
+        }
+
+        var publishedCacheSnapshot = cacheSnapshot;
+
+        if (newlyFetchedEmbeddings.Count > 0)
+        {
+            publishedCacheSnapshot = PublishCandidateEmbeddings(
+                cacheSnapshot.DefinitionVersion,
+                candidateEmbeddings[0].Length,
+                newlyFetchedEmbeddings);
+        }
+
+        foreach (var text in candidateTexts.Distinct(StringComparer.Ordinal))
+        {
+            if (newlyFetchedEmbeddings.TryGetValue(text, out var embedding) ||
+                cacheSnapshot.Embeddings.TryGetValue(text, out embedding) ||
+                publishedCacheSnapshot.Embeddings.TryGetValue(text, out embedding))
+            {
+                candidateEmbeddingsByText[text] = embedding;
+            }
+        }
+
+        var allEmbeddings = new List<float[]>(semanticCandidates.Count + 1)
+        {
+            requestEmbedding
+        };
+        allEmbeddings.AddRange(candidateTexts.Select(text => candidateEmbeddingsByText[text]));
+
+        return allEmbeddings;
+    }
+
+    private CandidateEmbeddingCacheState InvalidateCacheIfDefinitionsReloaded()
+    {
+        var currentDefinitionVersion = _definitionVersionProvider.CurrentVersion;
+        var cacheSnapshot = Volatile.Read(ref _candidateEmbeddingCache);
+
+        if (currentDefinitionVersion == cacheSnapshot.DefinitionVersion)
+        {
+            return cacheSnapshot;
+        }
+
+        return ReplaceCache(CandidateEmbeddingCacheState.CreateEmpty(currentDefinitionVersion));
+    }
+
+    private CandidateEmbeddingCacheState ReplaceCache(CandidateEmbeddingCacheState nextState)
+    {
+        lock (_cacheSyncRoot)
+        {
+            Volatile.Write(ref _candidateEmbeddingCache, nextState);
+            return nextState;
+        }
+    }
+
+    private CandidateEmbeddingCacheState PublishCandidateEmbeddings(
+        long definitionVersion,
+        int embeddingDimension,
+        IReadOnlyDictionary<string, float[]> embeddings)
+    {
+        lock (_cacheSyncRoot)
+        {
+            var currentCache = Volatile.Read(ref _candidateEmbeddingCache);
+
+            if (currentCache.DefinitionVersion != definitionVersion)
+            {
+                return currentCache;
+            }
+
+            var mergedEmbeddings = new Dictionary<string, float[]>(currentCache.Embeddings, StringComparer.Ordinal);
+
+            foreach (var pair in embeddings)
+            {
+                mergedEmbeddings[pair.Key] = pair.Value;
+            }
+
+            var nextState = new CandidateEmbeddingCacheState(
+                definitionVersion,
+                embeddingDimension,
+                mergedEmbeddings);
+            Volatile.Write(ref _candidateEmbeddingCache, nextState);
+            return nextState;
+        }
     }
 
     private SemanticMatchExplanation ScoreAndLogExplanation(
@@ -264,5 +382,19 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             Threshold = semanticSettings.Threshold,
             RequiredMargin = semanticSettings.TopScoreMargin,
         };
+    }
+
+    private sealed record CandidateEmbeddingCacheState(
+        long DefinitionVersion,
+        int? EmbeddingDimension,
+        IReadOnlyDictionary<string, float[]> Embeddings)
+    {
+        public static CandidateEmbeddingCacheState CreateEmpty(long definitionVersion)
+        {
+            return new CandidateEmbeddingCacheState(
+                definitionVersion,
+                EmbeddingDimension: null,
+                new Dictionary<string, float[]>(StringComparer.Ordinal));
+        }
     }
 }

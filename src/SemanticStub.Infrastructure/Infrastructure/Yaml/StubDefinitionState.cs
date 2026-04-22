@@ -8,13 +8,14 @@ namespace SemanticStub.Infrastructure.Yaml;
 /// <summary>
 /// Holds the current process-wide YAML definition snapshot and swaps it atomically during reloads.
 /// </summary>
-public sealed class StubDefinitionState
+public sealed class StubDefinitionState : IStubDefinitionVersionProvider
 {
     private readonly IStubDefinitionLoader _loader;
     private readonly ScenarioService _scenarioService;
     private readonly ILogger<StubDefinitionState> _logger;
     private readonly object _syncRoot = new();
     private StubDocument _currentDocument;
+    private long _currentVersion;
 
     /// <summary>
     /// Initializes the process-wide definition state from the default YAML definition.
@@ -37,6 +38,9 @@ public sealed class StubDefinitionState
     {
         return Volatile.Read(ref _currentDocument);
     }
+
+    /// <inheritdoc/>
+    public long CurrentVersion => Interlocked.Read(ref _currentVersion);
 
     /// <summary>
     /// Loads response file content relative to the configured YAML definition root.
@@ -74,6 +78,7 @@ public sealed class StubDefinitionState
         _scenarioService.ExecuteLocked(() =>
         {
             Volatile.Write(ref _currentDocument, reloadedDocument);
+            Interlocked.Increment(ref _currentVersion);
             ResetScenarioStatesWithinLock(reloadedDocument);
             return 0;
         });
