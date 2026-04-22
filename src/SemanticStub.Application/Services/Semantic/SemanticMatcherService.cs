@@ -246,17 +246,29 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             candidateEmbeddingsByText[missingCandidateTexts[i]] = candidateEmbeddings[i];
         }
 
-        var refetchCandidateTexts = candidateTexts
-            .Where(text => !candidateEmbeddingsByText.ContainsKey(text) &&
-                           !_candidateEmbeddingCache.TryGetValue(text, out _))
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        var refetchCandidateTexts = new List<string>();
 
-        if (refetchCandidateTexts.Length > 0)
+        foreach (var text in candidateTexts.Distinct(StringComparer.Ordinal))
+        {
+            if (candidateEmbeddingsByText.ContainsKey(text))
+            {
+                continue;
+            }
+
+            if (_candidateEmbeddingCache.TryGetValue(text, out var cachedEmbedding))
+            {
+                candidateEmbeddingsByText[text] = cachedEmbedding;
+                continue;
+            }
+
+            refetchCandidateTexts.Add(text);
+        }
+
+        if (refetchCandidateTexts.Count > 0)
         {
             var refetchedCandidateEmbeddings = await _embeddingClient.GetEmbeddingsAsync(refetchCandidateTexts, cancellationToken);
 
-            for (var i = 0; i < refetchCandidateTexts.Length; i++)
+            for (var i = 0; i < refetchCandidateTexts.Count; i++)
             {
                 _candidateEmbeddingCache[refetchCandidateTexts[i]] = refetchedCandidateEmbeddings[i];
                 candidateEmbeddingsByText[refetchCandidateTexts[i]] = refetchedCandidateEmbeddings[i];
@@ -269,21 +281,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         {
             requestEmbedding
         };
-        allEmbeddings.AddRange(candidateTexts.Select(text =>
-        {
-            if (candidateEmbeddingsByText.TryGetValue(text, out var embedding))
-            {
-                return embedding;
-            }
-
-            if (_candidateEmbeddingCache.TryGetValue(text, out embedding))
-            {
-                candidateEmbeddingsByText[text] = embedding;
-                return embedding;
-            }
-
-            throw new InvalidOperationException($"Failed to resolve a cached embedding for semantic candidate '{text}'.");
-        }));
+        allEmbeddings.AddRange(candidateTexts.Select(text => candidateEmbeddingsByText[text]));
 
         return allEmbeddings;
     }
