@@ -783,6 +783,7 @@ public sealed class StubInspectionServiceTests
                                 Response = new QueryMatchResponseDefinition
                                 {
                                     StatusCode = 202,
+                                    DelayMilliseconds = 250,
                                     Scenario = new ScenarioDefinition
                                     {
                                         Name = "checkout",
@@ -805,6 +806,7 @@ public sealed class StubInspectionServiceTests
                             ["200"] = new()
                             {
                                 Description = "Default users",
+                                DelayMilliseconds = 150,
                             },
                             ["409"] = new()
                             {
@@ -838,12 +840,14 @@ public sealed class StubInspectionServiceTests
             response =>
             {
                 Assert.Equal("200", response.ResponseId);
+                Assert.Equal(150, response.DelayMilliseconds);
                 Assert.False(response.UsesScenario);
                 Assert.Null(response.Scenario);
             },
             response =>
             {
                 Assert.Equal("409", response.ResponseId);
+                Assert.Null(response.DelayMilliseconds);
                 Assert.True(response.UsesScenario);
                 Assert.NotNull(response.Scenario);
                 Assert.Equal("checkout", response.Scenario!.Name);
@@ -864,6 +868,7 @@ public sealed class StubInspectionServiceTests
                 Assert.True(candidate.HasBody);
                 Assert.False(candidate.UsesSemanticMatching);
                 Assert.Equal(202, candidate.ResponseStatusCode);
+                Assert.Equal(250, candidate.DelayMilliseconds);
                 Assert.True(candidate.UsesScenario);
                 Assert.NotNull(candidate.Scenario);
                 Assert.Equal("checkout", candidate.Scenario!.Name);
@@ -881,6 +886,7 @@ public sealed class StubInspectionServiceTests
                 Assert.False(candidate.HasBody);
                 Assert.True(candidate.UsesSemanticMatching);
                 Assert.Equal(200, candidate.ResponseStatusCode);
+                Assert.Null(candidate.DelayMilliseconds);
                 Assert.False(candidate.UsesScenario);
                 Assert.Null(candidate.Scenario);
             });

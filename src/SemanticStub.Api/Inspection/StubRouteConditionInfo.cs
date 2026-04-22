@@ -32,6 +32,9 @@ public sealed class StubRouteConditionInfo
     /// <summary>Gets the response status code selected by the candidate.</summary>
     public int ResponseStatusCode { get; init; }
 
+    /// <summary>Gets the configured response delay in milliseconds when present.</summary>
+    public int? DelayMilliseconds { get; init; }
+
     /// <summary>Gets whether the candidate response participates in a scenario state machine.</summary>
     public bool UsesScenario { get; init; }
 

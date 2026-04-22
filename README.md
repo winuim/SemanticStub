@@ -369,6 +369,7 @@ Excerpt from the response body for `GET /_semanticstub/runtime/routes/listUsers`
   "responses": [
     {
       "responseId": "200",
+      "delayMilliseconds": 100,
       "usesScenario": false,
       "scenario": null
     }
@@ -386,6 +387,7 @@ Excerpt from the response body for `GET /_semanticstub/runtime/routes/listUsers`
       "hasBody": false,
       "usesSemanticMatching": false,
       "responseStatusCode": 200,
+      "delayMilliseconds": null,
       "usesScenario": false,
       "scenario": null
     }
