@@ -292,7 +292,7 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
 
 - `/_semanticstub/runtime/config` はサマリ表示です。現在は snapshot timestamp、configuration hash、definitions directory、route count、semantic matching の有効状態などを返します。
 - `/_semanticstub/runtime/routes` は、現在有効な path と HTTP method の組み合わせごとに 1 件ずつ、route id、正規化済み path pattern、semantic matching の利用有無、scenario の利用有無、response 数を返します。
-- `/_semanticstub/runtime/routes/{routeId}` は、1 件の route について top-level response、設定済み response-file metadata、設定済み response media type、および正規化済み conditional match metadata を含む detail view を返します。
+- `/_semanticstub/runtime/routes/{routeId}` は、1 件の route について top-level response、設定済み response-file metadata、設定済み response media type、および正規化済み conditional match metadata を含む detail view を返します。`x-semantic-match` が設定されている場合は、簡潔な semantic-match summary も含まれます。
 - `/_semanticstub/runtime/scenarios` は、既知の scenario ごとに現在の state と active かどうかを返します。
 - `/_semanticstub/runtime/metrics` は process-local で、total request count、matched / unmatched count、fallback / semantic count、average latency、status code summary、top routes を返します。
 - `/_semanticstub/runtime/metrics/resets` と `/_semanticstub/runtime/metrics/reset` は process-local な aggregate metrics と recent request history を消去します。configuration reload、scenario state の変更、`/_semanticstub/runtime/explain/last` の消去は行いません。
@@ -349,6 +349,7 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
       "headerKeys": [],
       "hasBody": false,
       "usesSemanticMatching": false,
+      "semanticMatchSummary": null,
       "responseStatusCode": 200,
       "delayMilliseconds": null,
       "responseFile": null,
