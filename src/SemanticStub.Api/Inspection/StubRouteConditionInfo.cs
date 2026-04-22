@@ -35,6 +35,9 @@ public sealed class StubRouteConditionInfo
     /// <summary>Gets the configured response delay in milliseconds when present.</summary>
     public int? DelayMilliseconds { get; init; }
 
+    /// <summary>Gets the configured response media types in stable order.</summary>
+    public IReadOnlyList<string> MediaTypes { get; init; } = [];
+
     /// <summary>Gets whether the candidate response participates in a scenario state machine.</summary>
     public bool UsesScenario { get; init; }
 
