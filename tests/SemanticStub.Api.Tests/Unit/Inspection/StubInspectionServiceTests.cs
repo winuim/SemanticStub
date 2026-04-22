@@ -784,6 +784,7 @@ public sealed class StubInspectionServiceTests
                                 {
                                     StatusCode = 202,
                                     DelayMilliseconds = 250,
+                                    ResponseFile = "/stubs/payloads/admin-users.json",
                                     Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
                                     {
                                         ["text/plain"] = new(),
@@ -816,6 +817,7 @@ public sealed class StubInspectionServiceTests
                             {
                                 Description = "Default users",
                                 DelayMilliseconds = 150,
+                                ResponseFile = "/stubs/payloads/users.json",
                                 Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
                                 {
                                     ["text/plain"] = new(),
@@ -859,6 +861,7 @@ public sealed class StubInspectionServiceTests
             {
                 Assert.Equal("200", response.ResponseId);
                 Assert.Equal(150, response.DelayMilliseconds);
+                Assert.Equal("users.json", response.ResponseFile);
                 Assert.Equal(["application/json", "text/plain"], response.MediaTypes);
                 Assert.False(response.UsesScenario);
                 Assert.Null(response.Scenario);
@@ -867,6 +870,7 @@ public sealed class StubInspectionServiceTests
             {
                 Assert.Equal("409", response.ResponseId);
                 Assert.Null(response.DelayMilliseconds);
+                Assert.Null(response.ResponseFile);
                 Assert.Equal(["application/problem+json"], response.MediaTypes);
                 Assert.True(response.UsesScenario);
                 Assert.NotNull(response.Scenario);
@@ -889,6 +893,7 @@ public sealed class StubInspectionServiceTests
                 Assert.False(candidate.UsesSemanticMatching);
                 Assert.Equal(202, candidate.ResponseStatusCode);
                 Assert.Equal(250, candidate.DelayMilliseconds);
+                Assert.Equal("admin-users.json", candidate.ResponseFile);
                 Assert.Equal(["application/json", "text/plain"], candidate.MediaTypes);
                 Assert.True(candidate.UsesScenario);
                 Assert.NotNull(candidate.Scenario);
@@ -908,6 +913,7 @@ public sealed class StubInspectionServiceTests
                 Assert.True(candidate.UsesSemanticMatching);
                 Assert.Equal(200, candidate.ResponseStatusCode);
                 Assert.Null(candidate.DelayMilliseconds);
+                Assert.Null(candidate.ResponseFile);
                 Assert.Equal(["application/json"], candidate.MediaTypes);
                 Assert.False(candidate.UsesScenario);
                 Assert.Null(candidate.Scenario);

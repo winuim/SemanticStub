@@ -117,6 +117,7 @@ internal static class StubInspectionDocumentProjector
             {
                 ResponseId = entry.Key,
                 DelayMilliseconds = entry.Value.DelayMilliseconds,
+                ResponseFile = GetResponseFileName(entry.Value.ResponseFile),
                 MediaTypes = OrderKeys(entry.Value.Content.Keys),
                 UsesScenario = entry.Value.Scenario is not null,
                 Scenario = BuildScenario(entry.Value.Scenario),
@@ -139,6 +140,7 @@ internal static class StubInspectionDocumentProjector
                 UsesSemanticMatching = match.SemanticMatch is not null,
                 ResponseStatusCode = match.Response.StatusCode,
                 DelayMilliseconds = match.Response.DelayMilliseconds,
+                ResponseFile = GetResponseFileName(match.Response.ResponseFile),
                 MediaTypes = OrderKeys(match.Response.Content.Keys),
                 UsesScenario = match.Response.Scenario is not null,
                 Scenario = BuildScenario(match.Response.Scenario),
@@ -160,6 +162,11 @@ internal static class StubInspectionDocumentProjector
 
     private static IReadOnlyList<string> OrderKeys(IEnumerable<string> keys)
         => keys.OrderBy(key => key, StringComparer.Ordinal).ToList();
+
+    private static string? GetResponseFileName(string? responseFile)
+        => string.IsNullOrWhiteSpace(responseFile)
+            ? null
+            : Path.GetFileName(responseFile);
 
     private static IReadOnlyList<string> GetEqualsKeys(IReadOnlyDictionary<string, object?> fields)
         => fields
