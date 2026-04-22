@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Application.Infrastructure.Yaml;
@@ -14,6 +15,7 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
     private readonly ISemanticEmbeddingClient _embeddingClient;
     private readonly StubSettings _settings;
     private readonly ILogger<SemanticMatcherService> _logger;
+    private readonly ConcurrentDictionary<string, float[]> _candidateEmbeddingCache = new(StringComparer.Ordinal);
 
     public SemanticMatcherService(
         ISemanticEmbeddingClient embeddingClient,
@@ -189,13 +191,36 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
         IReadOnlyList<QueryMatchDefinition> semanticCandidates,
         CancellationToken cancellationToken)
     {
-        var allTexts = new List<string>(semanticCandidates.Count + 1)
-        {
-            SemanticRequestTextBuilder.Build(method, path, query, headers, body)
-        };
+        var requestText = SemanticRequestTextBuilder.Build(method, path, query, headers, body);
+        var candidateTexts = semanticCandidates
+            .Select(candidate => candidate.SemanticMatch!)
+            .ToArray();
+        var missingCandidateTexts = candidateTexts
+            .Where(text => !_candidateEmbeddingCache.ContainsKey(text))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
-        allTexts.AddRange(semanticCandidates.Select(candidate => candidate.SemanticMatch!));
-        return await _embeddingClient.GetEmbeddingsAsync(allTexts, cancellationToken);
+        var textsToEmbed = new List<string>(missingCandidateTexts.Length + 1)
+        {
+            requestText
+        };
+        textsToEmbed.AddRange(missingCandidateTexts);
+
+        var newEmbeddings = await _embeddingClient.GetEmbeddingsAsync(textsToEmbed, cancellationToken);
+        var requestEmbedding = newEmbeddings[0];
+
+        for (var i = 0; i < missingCandidateTexts.Length; i++)
+        {
+            _candidateEmbeddingCache[missingCandidateTexts[i]] = newEmbeddings[i + 1];
+        }
+
+        var allEmbeddings = new List<float[]>(semanticCandidates.Count + 1)
+        {
+            requestEmbedding
+        };
+        allEmbeddings.AddRange(candidateTexts.Select(text => _candidateEmbeddingCache[text]));
+
+        return allEmbeddings;
     }
 
     private SemanticMatchExplanation ScoreAndLogExplanation(
