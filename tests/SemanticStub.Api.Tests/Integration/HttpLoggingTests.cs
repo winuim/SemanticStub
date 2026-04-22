@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -92,6 +93,34 @@ public sealed class HttpLoggingTests
     }
 
     [Fact]
+    public void CreateClient_DevelopmentConfiguresSemanticMatcherCategoryAtDebug()
+    {
+        using var factory = new HttpLoggingFactory("Development");
+        using var client = factory.CreateClient();
+
+        var configuration = factory.Services.GetRequiredService<IConfiguration>();
+
+        Assert.Equal("Debug", configuration["Logging:LogLevel:SemanticStub.Application.Services.Semantic.SemanticMatcherService"]);
+    }
+
+    [Fact]
+    public void CreateClient_ConfiguresConsoleLoggingForReadableCorrelatedOutput()
+    {
+        using var factory = new HttpLoggingFactory("Production");
+        using var client = factory.CreateClient();
+
+        var loggerFactoryOptions = factory.Services.GetRequiredService<IOptions<LoggerFactoryOptions>>().Value;
+        var consoleOptions = factory.Services.GetRequiredService<IOptions<ConsoleLoggerOptions>>().Value;
+        var formatterOptions = factory.Services.GetRequiredService<IOptions<SimpleConsoleFormatterOptions>>().Value;
+
+        Assert.True(loggerFactoryOptions.ActivityTrackingOptions.HasFlag(ActivityTrackingOptions.TraceId));
+        Assert.Equal(ConsoleFormatterNames.Simple, consoleOptions.FormatterName);
+        Assert.True(formatterOptions.SingleLine);
+        Assert.True(formatterOptions.IncludeScopes);
+        Assert.Equal("yyyy-MM-dd HH:mm:ss.fff zzz ", formatterOptions.TimestampFormat);
+    }
+
+    [Fact]
     public async Task GetPlainText_WritesTextResponseBodyToHttpLogs()
     {
         using var workspace = HttpLoggingWorkspace.Create(
@@ -120,6 +149,42 @@ public sealed class HttpLoggingTests
             sink.Entries,
             entry => entry.Category.Contains("HttpLoggingMiddleware", StringComparison.Ordinal) &&
                      entry.Message.Contains("plain text response", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task GetHello_WritesRequestCompletionLogWithRouteAndMatchContext()
+    {
+        using var workspace = HttpLoggingWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /hello:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: hello
+            """);
+        var sink = new TestLoggerProvider();
+
+        using var factory = new HttpLoggingFactory("Development", sink, workspace.RootPath);
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/hello");
+
+        response.EnsureSuccessStatusCode();
+
+        Assert.Contains(
+            sink.Entries,
+            entry => entry.Category.Contains("StubController", StringComparison.Ordinal) &&
+                     entry.Message.Contains("Request completed for '/hello' GET.", StringComparison.Ordinal) &&
+                     entry.Message.Contains("StatusCode=200", StringComparison.Ordinal) &&
+                     entry.Message.Contains("RouteId=GET:/hello", StringComparison.Ordinal) &&
+                     entry.Message.Contains("MatchMode=fallback", StringComparison.Ordinal) &&
+                     entry.Message.Contains("MatchResult=Matched", StringComparison.Ordinal));
     }
 
     private sealed class HttpLoggingFactory(

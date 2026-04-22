@@ -188,6 +188,16 @@ public sealed class StubController : ControllerBase
             dispatch.Explanation,
             statusCode,
             elapsed);
+
+        _logger.LogInformation(
+            "Request completed for '{Path}' {Method}. StatusCode={StatusCode}, ElapsedMs={ElapsedMs}, RouteId={RouteId}, MatchMode={MatchMode}, MatchResult={MatchResult}.",
+            requestPath,
+            method,
+            statusCode,
+            Math.Max(0, elapsed.TotalMilliseconds),
+            dispatch.Explanation.Result.RouteId,
+            dispatch.Explanation.Result.MatchMode,
+            dispatch.Explanation.Result.MatchResult);
     }
 
 }

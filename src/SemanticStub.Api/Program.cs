@@ -2,11 +2,18 @@ using System.IO.Compression;
 using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.AspNetCore.RequestDecompression;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.Extensions.Logging;
 using SemanticStub.Api.Extensions;
 using SemanticStub.Application.Infrastructure.Yaml;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.Configure(options =>
+{
+    options.ActivityTrackingOptions =
+        ActivityTrackingOptions.SpanId |
+        ActivityTrackingOptions.TraceId;
+});
 builder.Services.AddControllers();
 builder.Services.AddHttpLogging(options =>
 {
