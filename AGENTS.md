@@ -18,6 +18,8 @@
 Refer to SKILLS.md for reusable task patterns.
 When a task name is specified, follow the corresponding skill.
 
+@SKILLS.md
+
 ## Architecture Constraints
 - Preserve existing structure (Controller / Service / Infrastructure)
 - Do not move logic across layers
