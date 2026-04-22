@@ -964,6 +964,43 @@ public sealed class StubInspectionServiceTests
     }
 
     [Fact]
+    public void GetRoute_ScenarioAdvanceFlag_IsFalseForSelfLoopScenario()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/checkout"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        OperationId = "checkout",
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "checkout-flow",
+                                    State = "confirmed",
+                                    Next = "confirmed",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        var route = CreateService(document).GetRoute("checkout");
+
+        Assert.NotNull(route);
+        var response = Assert.Single(route!.Responses);
+        Assert.NotNull(response.Scenario);
+        Assert.False(response.Scenario!.AdvancesScenarioState);
+    }
+
+    [Fact]
     public void GetRoute_UsesMethodColonPath_WhenOperationIdIsEmpty()
     {
         var document = new StubDocument
