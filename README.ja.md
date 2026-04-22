@@ -330,6 +330,7 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
   "responses": [
     {
       "responseId": "200",
+      "delayMilliseconds": 100,
       "usesScenario": false,
       "scenario": null
     }
@@ -347,6 +348,7 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
       "hasBody": false,
       "usesSemanticMatching": false,
       "responseStatusCode": 200,
+      "delayMilliseconds": null,
       "usesScenario": false,
       "scenario": null
     }

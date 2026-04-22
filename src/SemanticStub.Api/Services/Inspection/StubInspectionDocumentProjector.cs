@@ -116,6 +116,7 @@ internal static class StubInspectionDocumentProjector
             .Select(entry => new StubRouteResponseInfo
             {
                 ResponseId = entry.Key,
+                DelayMilliseconds = entry.Value.DelayMilliseconds,
                 UsesScenario = entry.Value.Scenario is not null,
                 Scenario = BuildScenario(entry.Value.Scenario),
             })
@@ -136,6 +137,7 @@ internal static class StubInspectionDocumentProjector
                 HasBody = match.Body is not null,
                 UsesSemanticMatching = match.SemanticMatch is not null,
                 ResponseStatusCode = match.Response.StatusCode,
+                DelayMilliseconds = match.Response.DelayMilliseconds,
                 UsesScenario = match.Response.Scenario is not null,
                 Scenario = BuildScenario(match.Response.Scenario),
             })

@@ -8,6 +8,9 @@ public sealed class StubRouteResponseInfo
     /// <summary>Gets the stable response identifier from the OpenAPI <c>responses</c> map key.</summary>
     public required string ResponseId { get; init; }
 
+    /// <summary>Gets the configured response delay in milliseconds when present.</summary>
+    public int? DelayMilliseconds { get; init; }
+
     /// <summary>Gets whether the response participates in a scenario state machine.</summary>
     public bool UsesScenario { get; init; }
 
