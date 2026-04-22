@@ -876,6 +876,7 @@ public sealed class StubInspectionServiceTests
                 Assert.NotNull(response.Scenario);
                 Assert.Equal("checkout", response.Scenario!.Name);
                 Assert.Equal("initial", response.Scenario.State);
+                Assert.True(response.Scenario.AdvancesScenarioState);
                 Assert.Equal("pending", response.Scenario.Next);
             });
 
@@ -900,6 +901,7 @@ public sealed class StubInspectionServiceTests
                 Assert.NotNull(candidate.Scenario);
                 Assert.Equal("checkout", candidate.Scenario!.Name);
                 Assert.Equal("pending", candidate.Scenario.State);
+                Assert.True(candidate.Scenario.AdvancesScenarioState);
                 Assert.Equal("complete", candidate.Scenario.Next);
             },
             candidate =>
@@ -959,6 +961,43 @@ public sealed class StubInspectionServiceTests
         Assert.NotNull(route);
         var candidate = Assert.Single(route!.ConditionalMatches);
         Assert.Equal("find administrator user accounts", candidate.SemanticMatchSummary);
+    }
+
+    [Fact]
+    public void GetRoute_ScenarioAdvanceFlag_IsFalseForSelfLoopScenario()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/checkout"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        OperationId = "checkout",
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Scenario = new ScenarioDefinition
+                                {
+                                    Name = "checkout-flow",
+                                    State = "confirmed",
+                                    Next = "confirmed",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        var route = CreateService(document).GetRoute("checkout");
+
+        Assert.NotNull(route);
+        var response = Assert.Single(route!.Responses);
+        Assert.NotNull(response.Scenario);
+        Assert.False(response.Scenario!.AdvancesScenarioState);
     }
 
     [Fact]

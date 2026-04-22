@@ -157,6 +157,9 @@ internal static class StubInspectionDocumentProjector
             {
                 Name = scenario.Name,
                 State = scenario.State,
+                AdvancesScenarioState =
+                    !string.IsNullOrWhiteSpace(scenario.Next)
+                    && !string.Equals(scenario.State, scenario.Next, StringComparison.Ordinal),
                 Next = scenario.Next,
             };
     }

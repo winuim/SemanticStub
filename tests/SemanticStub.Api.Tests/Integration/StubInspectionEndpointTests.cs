@@ -135,6 +135,7 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
             && response.Scenario is not null
             && response.Scenario.Name == "checkout-flow"
             && response.Scenario.State == "initial"
+            && response.Scenario.AdvancesScenarioState
             && response.Scenario.Next == "confirmed");
     }
 
