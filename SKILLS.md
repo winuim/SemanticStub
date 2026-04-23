@@ -132,6 +132,7 @@ Create clean PR
 - PR title
 - PR body
 - PR link
+- PR status (must be Ready for review, not Draft)
 
 ---
 
