@@ -130,7 +130,7 @@ server.registerTool(
     },
   },
   async () => {
-    await postNoContent("/metrics/reset");
+    await postNoContent("/metrics/resets");
 
     return toText({
       operation: "reset_metrics",
@@ -276,8 +276,8 @@ server.registerTool(
     // Reuse the existing reset endpoints so MCP does not redefine scenario mutation behavior.
     const hasScenarioName = scenarioName !== undefined;
     const path = hasScenarioName
-      ? `/scenarios/${encodeURIComponent(scenarioName)}/reset`
-      : "/scenarios/reset";
+      ? `/scenarios/${encodeURIComponent(scenarioName)}/resets`
+      : "/scenarios/resets";
 
     await postNoContent(path);
 

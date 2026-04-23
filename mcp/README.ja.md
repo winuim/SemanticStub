@@ -52,12 +52,12 @@ npm run build
 | `get_route` | `GET /_semanticstub/runtime/routes/{id}` | ルート詳細 |
 | `get_scenarios` | `GET /_semanticstub/runtime/scenarios` | シナリオ状態 |
 | `get_metrics` | `GET /_semanticstub/runtime/metrics` | メトリクス |
-| `reset_metrics` | `POST /_semanticstub/runtime/metrics/reset` | メトリクスとリクエスト履歴のリセット |
+| `reset_metrics` | `POST /_semanticstub/runtime/metrics/resets` | メトリクスとリクエスト履歴のリセット |
 | `get_requests` | `GET /_semanticstub/runtime/requests?limit=` | 件数指定つきリクエスト履歴 |
 | `test_match` | `POST /_semanticstub/runtime/test-match` | マッチ確認（副作用なし） |
 | `explain_match` | `POST /_semanticstub/runtime/explain` | マッチ詳細説明 |
 | `get_last_explain` | `GET /_semanticstub/runtime/explain/last` | 直近の explain 結果 |
-| `reset_scenario_state` | `POST /_semanticstub/runtime/scenarios/reset` / `POST /_semanticstub/runtime/scenarios/{name}/reset` | シナリオ状態のリセット |
+| `reset_scenario_state` | `POST /_semanticstub/runtime/scenarios/resets` / `POST /_semanticstub/runtime/scenarios/{name}/resets` | シナリオ状態のリセット |
 
 ## 入力メモ
 
@@ -79,6 +79,10 @@ npm run build
 # ビルドなしで直接実行
 npm run dev
 ```
+
+この MCP パッケージが依存する inspection API の契約は、
+[`tests/SemanticStub.Api.Tests/Integration/StubInspectionEndpointTests.cs`](../tests/SemanticStub.Api.Tests/Integration/StubInspectionEndpointTests.cs)
+で回帰テストしています。
 
 ## 環境変数
 

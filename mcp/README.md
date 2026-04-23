@@ -53,12 +53,12 @@ Add this server to `claude_desktop_config.json`.
 | `get_route` | `GET /_semanticstub/runtime/routes/{id}` | Detailed route information |
 | `get_scenarios` | `GET /_semanticstub/runtime/scenarios` | Current scenario state |
 | `get_metrics` | `GET /_semanticstub/runtime/metrics` | Runtime metrics |
-| `reset_metrics` | `POST /_semanticstub/runtime/metrics/reset` | Reset runtime metrics and recent request history |
+| `reset_metrics` | `POST /_semanticstub/runtime/metrics/resets` | Reset runtime metrics and recent request history |
 | `get_requests` | `GET /_semanticstub/runtime/requests?limit=` | Recent request history with limit |
 | `test_match` | `POST /_semanticstub/runtime/test-match` | Match simulation without side effects |
 | `explain_match` | `POST /_semanticstub/runtime/explain` | Detailed match explanation |
 | `get_last_explain` | `GET /_semanticstub/runtime/explain/last` | Latest real-request explanation |
-| `reset_scenario_state` | `POST /_semanticstub/runtime/scenarios/reset` / `POST /_semanticstub/runtime/scenarios/{name}/reset` | Reset scenario state |
+| `reset_scenario_state` | `POST /_semanticstub/runtime/scenarios/resets` / `POST /_semanticstub/runtime/scenarios/{name}/resets` | Reset scenario state |
 
 ## Input Notes
 
@@ -80,6 +80,9 @@ Add this server to `claude_desktop_config.json`.
 # Run without building
 npm run dev
 ```
+
+The inspection API contract used by this MCP package is regression-tested in
+[`tests/SemanticStub.Api.Tests/Integration/StubInspectionEndpointTests.cs`](../tests/SemanticStub.Api.Tests/Integration/StubInspectionEndpointTests.cs).
 
 ## Environment Variables
 
