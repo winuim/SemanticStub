@@ -372,6 +372,18 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
     }
 
     [Fact]
+    public async Task McpCompatibility_CanonicalResetEndpointsRemainAvailable()
+    {
+        var metricsResponse = await client.PostAsync("/_semanticstub/runtime/metrics/resets", content: null);
+        var scenariosResponse = await client.PostAsync("/_semanticstub/runtime/scenarios/resets", content: null);
+        var scenarioResponse = await client.PostAsync("/_semanticstub/runtime/scenarios/checkout-flow/resets", content: null);
+
+        Assert.Equal(HttpStatusCode.NoContent, metricsResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, scenariosResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, scenarioResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task TestMatch_ReturnsSimulationPayload()
     {
         var response = await client.PostAsJsonAsync("/_semanticstub/runtime/test-match", new MatchRequestInfo
@@ -388,6 +400,37 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
         Assert.True(payload.Matched);
         Assert.Equal("Matched", payload.MatchResult);
         Assert.Equal("getHello", payload.RouteId);
+    }
+
+    [Fact]
+    public async Task TestMatch_AcceptsMcpRequestShape()
+    {
+        var response = await client.PostAsJsonAsync("/_semanticstub/runtime/test-match", new
+        {
+            method = "GET",
+            path = "/users",
+            query = new Dictionary<string, string[]>
+            {
+                ["role"] = ["admin"]
+            },
+            headers = new Dictionary<string, string>
+            {
+                ["content-type"] = "application/json"
+            },
+            body = "{\"message\":\"hello\"}",
+            includeCandidates = true,
+            includeSemanticCandidates = false
+        });
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<MatchSimulationInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(payload);
+        Assert.True(payload!.Matched);
+        Assert.Equal("Matched", payload.MatchResult);
+        Assert.Equal("listUsers", payload.RouteId);
+        Assert.NotEmpty(payload.Candidates);
     }
 
     [Fact]
@@ -412,6 +455,38 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
         Assert.True(payload.PathMatched);
         Assert.True(payload.MethodMatched);
         Assert.Equal("Matched", payload.Result.MatchResult);
+        Assert.NotEmpty(payload.DeterministicCandidates);
+    }
+
+    [Fact]
+    public async Task ExplainMatch_AcceptsMcpRequestShape()
+    {
+        var response = await client.PostAsJsonAsync("/_semanticstub/runtime/explain", new
+        {
+            method = "GET",
+            path = "/users",
+            query = new Dictionary<string, string[]>
+            {
+                ["role"] = ["admin"]
+            },
+            headers = new Dictionary<string, string>
+            {
+                ["x-client"] = "mcp"
+            },
+            body = string.Empty,
+            includeCandidates = true,
+            includeSemanticCandidates = false
+        });
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<MatchExplanationInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(payload);
+        Assert.True(payload!.PathMatched);
+        Assert.True(payload.MethodMatched);
+        Assert.Equal("Matched", payload.Result.MatchResult);
+        Assert.Equal("listUsers", payload.Result.RouteId);
         Assert.NotEmpty(payload.DeterministicCandidates);
     }
 
