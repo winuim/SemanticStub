@@ -336,7 +336,7 @@ Inspection notes:
 - `/_semanticstub/runtime/metrics` is process-local and currently returns total request count, matched and unmatched counts, fallback and semantic counts, average latency, status-code summaries, and top routes.
 - `/_semanticstub/runtime/metrics/resets` and `/_semanticstub/runtime/metrics/reset` clear process-local aggregate metrics and recent request history without reloading configuration, changing scenario state, or clearing `/_semanticstub/runtime/explain/last`.
 - `/_semanticstub/runtime/requests` is process-local and currently returns up to 100 recent real requests in newest-first order. Each item includes timestamp, method, path, resolved route id when available, status code, elapsed time, match mode, and failure reason for unmatched requests. The `limit` query parameter defaults to `20`.
-- `/_semanticstub/runtime/test-match` and `/_semanticstub/runtime/explain` accept a virtual request payload with method, path, optional query/header/body values, and optional candidate-detail flags.
+- `/_semanticstub/runtime/test-match` and `/_semanticstub/runtime/explain` accept a virtual request payload with method, path, optional query/header/body values, and optional candidate-detail flags. Their result payload also includes the selected response id, status code, response source (`responses` or `x-match`), and candidate index when applicable.
 - `/_semanticstub/runtime/explain/last` is process-local and only updates after a real request produces a matched stub response.
 - `/_semanticstub/runtime/scenarios/resets`, `/_semanticstub/runtime/scenarios/reset`, `/_semanticstub/runtime/scenarios/{name}/resets`, and `/_semanticstub/runtime/scenarios/{name}/reset` mutate only in-memory scenario state for the current process.
 - These endpoints do not expose raw YAML, internal domain objects, or full response payload bodies.
@@ -381,8 +381,6 @@ Excerpt from the response body for `GET /_semanticstub/runtime/routes/listUsers`
       "candidateIndex": 0,
       "hasExactQuery": true,
       "exactQueryKeys": ["role"],
-      "hasPartialQuery": false,
-      "partialQueryKeys": [],
       "hasRegexQuery": false,
       "regexQueryKeys": [],
       "headerKeys": [],
@@ -425,7 +423,8 @@ Example response body for `GET /_semanticstub/runtime/requests?limit=1`:
 Configuration notes:
 
 - `appsettings.json` provides the default runtime settings.
-- `appsettings.Development.json` is applied only when the app runs with the `Development` environment, for example to enable local semantic matching settings or more verbose logging.
+- `appsettings.Development.json` is applied only when the app runs with the `Development` environment. It enables local semantic matching settings and more detailed HTTP logging, including request and response bodies.
+- Console logs use a readable single-line format with trace and span correlation metadata so local request flows are easier to follow.
 - The sample requests in `SemanticStub.http` assume the app is running locally and may be easier to verify with the `Development` environment enabled.
 
 Sample files:
@@ -458,13 +457,21 @@ docker compose build
 Run SemanticStub and the embedding service in the background:
 
 ```sh
-docker compose up -d tei semantic-stub
+docker compose up -d
 ```
 
 This setup exposes SemanticStub on `http://localhost:8080`. The `samples/`
 directory is mounted into the container, so editing stub YAML files does not
 require rebuilding the image. The TEI service stays on the internal Docker
 network only.
+
+Build the MCP server before registering it with Claude Desktop:
+
+```sh
+cd mcp
+npm install
+npm run build
+```
 
 Add the MCP server to Claude Desktop:
 
