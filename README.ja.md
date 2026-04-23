@@ -297,7 +297,7 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
 - `/_semanticstub/runtime/metrics` は process-local で、total request count、matched / unmatched count、fallback / semantic count、average latency、status code summary、top routes を返します。
 - `/_semanticstub/runtime/metrics/resets` と `/_semanticstub/runtime/metrics/reset` は process-local な aggregate metrics と recent request history を消去します。configuration reload、scenario state の変更、`/_semanticstub/runtime/explain/last` の消去は行いません。
 - `/_semanticstub/runtime/requests` は process-local で、最大 100 件の recent request history を新しい順で返します。各 item には timestamp、method、path、利用可能な場合の route id、status code、elapsed time、match mode、および unmatched request の failure reason が含まれます。`limit` query parameter のデフォルトは `20` です。
-- `/_semanticstub/runtime/test-match` と `/_semanticstub/runtime/explain` は、method、path、省略可能な query / header / body、および省略可能な candidate detail flag を持つ virtual request payload を受け取ります。
+- `/_semanticstub/runtime/test-match` と `/_semanticstub/runtime/explain` は、method、path、省略可能な query / header / body、および省略可能な candidate detail flag を持つ virtual request payload を受け取ります。結果には、該当する場合に selected response の id、status code、response source（`responses` または `x-match`）、candidate index も含まれます。
 - `/_semanticstub/runtime/explain/last` は process-local で、実リクエストが stub response に match した後だけ更新されます。
 - `/_semanticstub/runtime/scenarios/resets`、`/_semanticstub/runtime/scenarios/reset`、`/_semanticstub/runtime/scenarios/{name}/resets`、`/_semanticstub/runtime/scenarios/{name}/reset` は、現在のプロセスの in-memory scenario state だけを変更します。
 - これらの endpoint は、raw YAML、内部 domain object、完全な response payload body は公開しません。
@@ -342,8 +342,6 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
       "candidateIndex": 0,
       "hasExactQuery": true,
       "exactQueryKeys": ["role"],
-      "hasPartialQuery": false,
-      "partialQueryKeys": [],
       "hasRegexQuery": false,
       "regexQueryKeys": [],
       "headerKeys": [],
@@ -387,7 +385,8 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
 設定に関する補足:
 
 - `appsettings.json` はデフォルトの実行時設定です。
-- `appsettings.Development.json` は `Development` 環境で起動したときだけ反映され、ローカルでの semantic matching 設定や詳細なログ出力の確認に向いています。
+- `appsettings.Development.json` は `Development` 環境で起動したときだけ反映され、ローカルでの semantic matching 設定や、request / response body を含むより詳細な HTTP ログの確認に向いています。
+- コンソールログは、trace / span の相関情報を含む single-line 形式で出力され、ローカルでのリクエスト追跡をしやすくしています。
 - `SemanticStub.http` のサンプルリクエストはローカル起動を前提としており、`Development` 環境を有効にすると確認しやすいケースがあります。
 
 サンプルファイル:
@@ -420,13 +419,21 @@ docker compose build
 SemanticStub と埋め込みサービスをバックグラウンドで起動します:
 
 ```sh
-docker compose up -d tei semantic-stub
+docker compose up -d
 ```
 
 この構成では SemanticStub を `http://localhost:8080` で公開します。
 `samples/` ディレクトリはコンテナへマウントされるため、stub YAML を編集しても
 イメージの再ビルドは不要です。TEI は Docker 内部ネットワークだけで使用され、
 ホストには公開しません。
+
+Claude Desktop に登録する前に、MCP サーバーをビルドします:
+
+```sh
+cd mcp
+npm install
+npm run build
+```
 
 Claude Desktop には次のように MCP サーバーを追加します:
 

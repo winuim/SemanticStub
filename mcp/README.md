@@ -48,23 +48,25 @@ Add this server to `claude_desktop_config.json`.
 
 | Tool | Endpoint | Description |
 |---|---|---|
-| `get_config` | `GET /runtime/config` | Configuration snapshot metadata |
-| `list_routes` | `GET /runtime/routes` | Active route list |
-| `get_route` | `GET /runtime/routes/{id}` | Detailed route information |
-| `get_scenarios` | `GET /runtime/scenarios` | Current scenario state |
-| `get_metrics` | `GET /runtime/metrics` | Runtime metrics |
-| `reset_metrics` | `POST /runtime/metrics/reset` | Reset runtime metrics and recent request history |
-| `get_requests` | `GET /runtime/requests?limit=` | Recent request history with limit |
-| `test_match` | `POST /runtime/test-match` | Match simulation without side effects |
-| `explain_match` | `POST /runtime/explain` | Detailed match explanation |
-| `get_last_explain` | `GET /runtime/explain/last` | Latest real-request explanation |
-| `reset_scenario_state` | `POST /runtime/scenarios/reset` / `POST /runtime/scenarios/{name}/reset` | Reset scenario state |
+| `get_config` | `GET /_semanticstub/runtime/config` | Configuration snapshot metadata |
+| `list_routes` | `GET /_semanticstub/runtime/routes` | Active route list |
+| `get_route` | `GET /_semanticstub/runtime/routes/{id}` | Detailed route information |
+| `get_scenarios` | `GET /_semanticstub/runtime/scenarios` | Current scenario state |
+| `get_metrics` | `GET /_semanticstub/runtime/metrics` | Runtime metrics |
+| `reset_metrics` | `POST /_semanticstub/runtime/metrics/reset` | Reset runtime metrics and recent request history |
+| `get_requests` | `GET /_semanticstub/runtime/requests?limit=` | Recent request history with limit |
+| `test_match` | `POST /_semanticstub/runtime/test-match` | Match simulation without side effects |
+| `explain_match` | `POST /_semanticstub/runtime/explain` | Detailed match explanation |
+| `get_last_explain` | `GET /_semanticstub/runtime/explain/last` | Latest real-request explanation |
+| `reset_scenario_state` | `POST /_semanticstub/runtime/scenarios/reset` / `POST /_semanticstub/runtime/scenarios/{name}/reset` | Reset scenario state |
 
 ## Input Notes
 
 - The `body` field for `test_match` and `explain_match` must be a raw string, not a JSON object.
 - If you want to send JSON content, stringify it first, for example `"{\"message\":\"hello\"}"`.
+- `test_match` defaults `includeCandidates` to `false`, while `explain_match` defaults it to `true`.
 - Set `includeSemanticCandidates` to include semantic candidate scores when semantic matching is attempted.
+- The result payload for `test_match` and `explain_match` includes selected response metadata such as response id, status code, source (`responses` or `x-match`), and candidate index when applicable.
 
 ## Constraints
 
