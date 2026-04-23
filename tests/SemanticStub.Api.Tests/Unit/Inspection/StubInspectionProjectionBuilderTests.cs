@@ -76,6 +76,185 @@ public sealed class StubInspectionProjectionBuilderTests
     }
 
     [Fact]
+    public void CreateCandidateInfo_QueryMismatch_PropagatesMismatchReasons()
+    {
+        var builder = new StubInspectionProjectionBuilder(new ScenarioService());
+        var candidate = new QueryMatchDefinition
+        {
+            Response = new QueryMatchResponseDefinition
+            {
+                StatusCode = 200,
+                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                {
+                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["ok"] = true } }
+                }
+            }
+        };
+        var evaluation = new QueryMatchCandidateEvaluation
+        {
+            Candidate = candidate,
+            QueryMatched = false,
+            HeaderMatched = true,
+            BodyMatched = true,
+            MismatchReasons =
+            [
+                new SemanticStub.Application.Services.MatchDimensionMismatch
+                {
+                    Dimension = "query",
+                    Key = "role",
+                    Expected = "admin",
+                    Actual = "user",
+                    Kind = "unequal",
+                }
+            ]
+        };
+
+        var info = builder.CreateCandidateInfo(evaluation, 0, new Dictionary<string, ScenarioStateSnapshot>());
+
+        Assert.False(info.Matched);
+        var mismatch = Assert.Single(info.MismatchReasons);
+        Assert.Equal("query", mismatch.Dimension);
+        Assert.Equal("role", mismatch.Key);
+        Assert.Equal("admin", mismatch.Expected);
+        Assert.Equal("user", mismatch.Actual);
+        Assert.Equal("unequal", mismatch.Kind);
+    }
+
+    [Fact]
+    public void CreateCandidateInfo_ScenarioMismatch_EmitsScenarioDimensionEntry()
+    {
+        var builder = new StubInspectionProjectionBuilder(new ScenarioService());
+        var candidate = new QueryMatchDefinition
+        {
+            Response = new QueryMatchResponseDefinition
+            {
+                StatusCode = 202,
+                Scenario = new ScenarioDefinition { Name = "billing", State = "ready" },
+                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                {
+                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["result"] = "ok" } }
+                }
+            }
+        };
+        var evaluation = new QueryMatchCandidateEvaluation
+        {
+            Candidate = candidate,
+            QueryMatched = true,
+            HeaderMatched = true,
+            BodyMatched = true,
+        };
+        var snapshots = new Dictionary<string, ScenarioStateSnapshot>(StringComparer.Ordinal)
+        {
+            ["billing"] = new("initial", DateTimeOffset.UtcNow)
+        };
+
+        var info = builder.CreateCandidateInfo(evaluation, 0, snapshots);
+
+        Assert.False(info.ScenarioMatched);
+        Assert.False(info.Matched);
+        var mismatch = Assert.Single(info.MismatchReasons);
+        Assert.Equal("scenario", mismatch.Dimension);
+        Assert.Equal("billing", mismatch.Key);
+        Assert.Equal("ready", mismatch.Expected);
+        Assert.Equal("initial", mismatch.Actual);
+        Assert.Equal("missing", mismatch.Kind);
+    }
+
+    [Fact]
+    public void CreateCandidateInfo_ScenarioStateWrongValue_EmitsUnequalKind()
+    {
+        var builder = new StubInspectionProjectionBuilder(new ScenarioService());
+        var candidate = new QueryMatchDefinition
+        {
+            Response = new QueryMatchResponseDefinition
+            {
+                StatusCode = 202,
+                Scenario = new ScenarioDefinition { Name = "billing", State = "ready" },
+                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                {
+                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["result"] = "ok" } }
+                }
+            }
+        };
+        var evaluation = new QueryMatchCandidateEvaluation
+        {
+            Candidate = candidate,
+            QueryMatched = true,
+            HeaderMatched = true,
+            BodyMatched = true,
+        };
+        var snapshots = new Dictionary<string, ScenarioStateSnapshot>(StringComparer.Ordinal)
+        {
+            ["billing"] = new("pending", DateTimeOffset.UtcNow)
+        };
+
+        var info = builder.CreateCandidateInfo(evaluation, 0, snapshots);
+
+        var mismatch = Assert.Single(info.MismatchReasons);
+        Assert.Equal("scenario", mismatch.Dimension);
+        Assert.Equal("pending", mismatch.Actual);
+        Assert.Equal("unequal", mismatch.Kind);
+    }
+
+    [Fact]
+    public void CreateCandidateInfo_ResponseNotConfigured_EmitsResponseDimensionEntry()
+    {
+        var builder = new StubInspectionProjectionBuilder(new ScenarioService());
+        var candidate = new QueryMatchDefinition
+        {
+            Query = new Dictionary<string, object?>(StringComparer.Ordinal) { ["role"] = "admin" },
+            Response = new QueryMatchResponseDefinition
+            {
+                StatusCode = 0,
+            }
+        };
+        var evaluation = new QueryMatchCandidateEvaluation
+        {
+            Candidate = candidate,
+            QueryMatched = true,
+            HeaderMatched = true,
+            BodyMatched = true,
+        };
+
+        var info = builder.CreateCandidateInfo(evaluation, 0, new Dictionary<string, ScenarioStateSnapshot>());
+
+        Assert.False(info.ResponseConfigured);
+        var mismatch = Assert.Single(info.MismatchReasons);
+        Assert.Equal("response", mismatch.Dimension);
+        Assert.Null(mismatch.Key);
+        Assert.Equal("notConfigured", mismatch.Kind);
+    }
+
+    [Fact]
+    public void CreateCandidateInfo_FullMatch_EmptyMismatchReasons()
+    {
+        var builder = new StubInspectionProjectionBuilder(new ScenarioService());
+        var candidate = new QueryMatchDefinition
+        {
+            Response = new QueryMatchResponseDefinition
+            {
+                StatusCode = 200,
+                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                {
+                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["ok"] = true } }
+                }
+            }
+        };
+        var evaluation = new QueryMatchCandidateEvaluation
+        {
+            Candidate = candidate,
+            QueryMatched = true,
+            HeaderMatched = true,
+            BodyMatched = true,
+        };
+
+        var info = builder.CreateCandidateInfo(evaluation, 0, new Dictionary<string, ScenarioStateSnapshot>());
+
+        Assert.True(info.Matched);
+        Assert.Empty(info.MismatchReasons);
+    }
+
+    [Fact]
     public void CreateSemanticMatchInfo_ProjectsCandidateIndexesWhenRequested()
     {
         var builder = new StubInspectionProjectionBuilder(new ScenarioService());

@@ -76,6 +76,9 @@ internal sealed class StubInspectionProjectionBuilder
             : null;
         var scenarioMatched = IsScenarioMatch(evaluation.Candidate.Response.Scenario, scenarioSnapshots);
         var responseConfigured = IsConfiguredResponse(evaluation.Candidate.Response);
+        var matched = evaluation.Matched && scenarioMatched;
+
+        var mismatchReasons = BuildMismatchReasons(evaluation, scenarioMatched, responseConfigured, matched, scenarioSnapshots);
 
         return new MatchCandidateInfo
         {
@@ -85,10 +88,70 @@ internal sealed class StubInspectionProjectionBuilder
             BodyMatched = evaluation.BodyMatched,
             ScenarioMatched = scenarioMatched,
             ResponseConfigured = responseConfigured,
-            Matched = evaluation.Matched && scenarioMatched,
+            Matched = matched,
             ResponseId = responseStatusCode?.ToString(),
             ResponseStatusCode = responseStatusCode,
+            MismatchReasons = mismatchReasons,
         };
+    }
+
+    private static IReadOnlyList<MatchDimensionMismatchInfo> BuildMismatchReasons(
+        QueryMatchCandidateEvaluation evaluation,
+        bool scenarioMatched,
+        bool responseConfigured,
+        bool matched,
+        IReadOnlyDictionary<string, ScenarioStateSnapshot> scenarioSnapshots)
+    {
+        if (matched && responseConfigured)
+        {
+            return [];
+        }
+
+        var reasons = new List<MatchDimensionMismatchInfo>();
+
+        foreach (var mismatch in evaluation.MismatchReasons)
+        {
+            reasons.Add(new MatchDimensionMismatchInfo
+            {
+                Dimension = mismatch.Dimension,
+                Key = mismatch.Key,
+                Expected = mismatch.Expected,
+                Actual = mismatch.Actual,
+                Kind = mismatch.Kind,
+            });
+        }
+
+        if (!scenarioMatched && evaluation.Candidate.Response.Scenario is { } scenario)
+        {
+            var currentState = scenarioSnapshots.TryGetValue(scenario.Name, out var snapshot)
+                ? snapshot.State
+                : "initial";
+
+            reasons.Add(new MatchDimensionMismatchInfo
+            {
+                Dimension = "scenario",
+                Key = scenario.Name,
+                Expected = scenario.State,
+                Actual = currentState,
+                Kind = string.Equals(currentState, "initial", StringComparison.Ordinal) && !string.Equals(scenario.State, "initial", StringComparison.Ordinal)
+                    ? "missing"
+                    : "unequal",
+            });
+        }
+
+        if (!responseConfigured && evaluation.Matched && scenarioMatched)
+        {
+            reasons.Add(new MatchDimensionMismatchInfo
+            {
+                Dimension = "response",
+                Key = null,
+                Expected = null,
+                Actual = null,
+                Kind = "notConfigured",
+            });
+        }
+
+        return reasons;
     }
 
     public SemanticMatchInfo CreateSemanticMatchInfo(
