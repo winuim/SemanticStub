@@ -61,16 +61,18 @@ public static class CurlExporter
 
     private static string BuildUrl(string baseUrl, string path, IReadOnlyDictionary<string, string[]>? query)
     {
+        var encodedPath = string.Join("/", path.Split('/').Select(Uri.EscapeDataString));
+
         if (query is null || query.Count == 0)
         {
-            return baseUrl + path;
+            return baseUrl + encodedPath;
         }
 
         var queryString = string.Join("&", query
             .OrderBy(p => p.Key, StringComparer.Ordinal)
             .SelectMany(p => p.Value.Select(v => $"{HttpUtility.UrlEncode(p.Key)}={HttpUtility.UrlEncode(v)}")));
 
-        return $"{baseUrl}{path}?{queryString}";
+        return $"{baseUrl}{encodedPath}?{queryString}";
     }
 
     private static string EscapeSingleQuote(string value) => value.Replace("'", "'\\''");

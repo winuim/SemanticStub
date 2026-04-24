@@ -137,13 +137,13 @@ public sealed class CurlExporterTests
     }
 
     [Fact]
-    public void Export_EscapesSingleQuotesInUrl()
+    public void Export_EncodesReservedCharsInPath_IncludingSingleQuote()
     {
         var request = MakeRequest("GET", "/it's/a/path");
 
         var result = CurlExporter.Export(request, "http://localhost:5000");
 
-        Assert.Contains("it'\\''s", result);
+        Assert.Contains("it%27s", result);
     }
 
     [Fact]
@@ -292,5 +292,37 @@ public sealed class CurlExporterTests
         var result = CurlExporter.Export(request, "http://localhost:5000");
 
         Assert.Contains("q=hello+world", result);
+    }
+
+    [Fact]
+    public void Export_WithSpaceInPath_EncodesPathSegment()
+    {
+        var request = MakeRequest("GET", "/search/hello world");
+
+        var result = CurlExporter.Export(request, "http://localhost:5000");
+
+        Assert.Contains("/search/hello%20world", result);
+        Assert.DoesNotContain("hello world", result);
+    }
+
+    [Fact]
+    public void Export_WithHashInPath_EncodesPathSegment()
+    {
+        var request = MakeRequest("GET", "/items/item#1");
+
+        var result = CurlExporter.Export(request, "http://localhost:5000");
+
+        Assert.Contains("/items/item%231", result);
+    }
+
+    [Fact]
+    public void Export_WithNormalAsciiPath_PreservesSlashSeparators()
+    {
+        var request = MakeRequest("GET", "/users/123/orders");
+
+        var result = CurlExporter.Export(request, "http://localhost:5000");
+
+        Assert.Contains("'http://localhost:5000/users/123/orders'", result);
+        Assert.DoesNotContain("%2F", result);
     }
 }
