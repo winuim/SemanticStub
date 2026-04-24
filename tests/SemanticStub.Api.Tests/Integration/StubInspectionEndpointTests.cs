@@ -542,6 +542,64 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
         await AssertNotFoundProblemDetails(response, "Last match explanation not found");
     }
 
+    [Fact]
+    public async Task ExportRequestAsCurl_ReturnsNotFound_WhenNoRequestsRecorded()
+    {
+        await using var factory = new WebApplicationFactory<Program>();
+        using var freshClient = factory.CreateClient();
+
+        var response = await freshClient.GetAsync("/_semanticstub/runtime/requests/0/export/curl");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExportRequestAsCurl_ReturnsNotFound_WhenIndexOutOfRange()
+    {
+        var routedResponse = await client.GetAsync("/hello");
+        routedResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync("/_semanticstub/runtime/requests/99/export/curl");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExportRequestAsCurl_ReturnsPlainTextCurlCommand_ForMostRecentRequest()
+    {
+        var routedResponse = await client.GetAsync("/hello");
+        routedResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync("/_semanticstub/runtime/requests/0/export/curl");
+        response.EnsureSuccessStatusCode();
+
+        Assert.Equal("text/plain", response.Content.Headers.ContentType?.MediaType);
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.StartsWith("curl -X GET", content);
+        Assert.Contains("/hello", content);
+    }
+
+    [Fact]
+    public async Task ExportRequestAsCurl_IncludesQueryParameters_WhenPresent()
+    {
+        var routedResponse = await client.GetAsync("/users?role=admin");
+        routedResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync("/_semanticstub/runtime/requests/0/export/curl");
+        response.EnsureSuccessStatusCode();
+
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("role=admin", content);
+    }
+
+    [Fact]
+    public async Task ExportRequestAsCurl_ReturnsNotFound_WhenIndexIsNegative()
+    {
+        var response = await client.GetAsync("/_semanticstub/runtime/requests/-1/export/curl");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private static async Task AssertNotFoundProblemDetails(HttpResponseMessage response, string expectedTitle)
     {
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);

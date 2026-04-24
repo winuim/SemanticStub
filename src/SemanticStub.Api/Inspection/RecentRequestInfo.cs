@@ -44,4 +44,19 @@ public sealed class RecentRequestInfo
     /// Gets the failure reason when the request did not produce a matched response.
     /// </summary>
     public string? FailureReason { get; init; }
+
+    /// <summary>
+    /// Gets the query parameters captured from the original request, when available.
+    /// </summary>
+    public IReadOnlyDictionary<string, string[]>? Query { get; init; }
+
+    /// <summary>
+    /// Gets the request headers captured from the original request, when available.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Headers { get; init; }
+
+    /// <summary>
+    /// Gets the request body captured from the original request, when present.
+    /// </summary>
+    public string? Body { get; init; }
 }

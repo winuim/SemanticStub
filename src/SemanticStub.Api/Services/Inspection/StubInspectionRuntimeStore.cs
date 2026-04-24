@@ -8,6 +8,15 @@ namespace SemanticStub.Api.Services;
 internal sealed class StubInspectionRuntimeStore
 {
     private const int MaxRecentRequestCount = 100;
+    private const int MaxBodyLengthChars = 4096;
+
+    private static readonly HashSet<string> _sensitiveHeaders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Authorization",
+        "Cookie",
+        "Set-Cookie",
+        "Proxy-Authorization",
+    };
     private readonly object _lastMatchSyncRoot = new();
     private readonly object _metricsSyncRoot = new();
     private readonly Dictionary<int, long> _statusCodeCounts = [];
@@ -146,7 +155,16 @@ internal sealed class StubInspectionRuntimeStore
         }
     }
 
-    public void RecordRecentRequest(DateTimeOffset timestamp, string method, string path, MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
+    public void RecordRecentRequest(
+        DateTimeOffset timestamp,
+        string method,
+        string path,
+        MatchExplanationInfo explanation,
+        int statusCode,
+        TimeSpan elapsed,
+        IReadOnlyDictionary<string, string[]>? query = null,
+        IReadOnlyDictionary<string, string>? headers = null,
+        string? body = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(method);
         ArgumentException.ThrowIfNullOrEmpty(path);
@@ -171,7 +189,41 @@ internal sealed class StubInspectionRuntimeStore
                 FailureReason = explanation.Result.Matched || string.IsNullOrWhiteSpace(explanation.SelectionReason)
                     ? null
                     : explanation.SelectionReason,
+                Query = query,
+                Headers = RedactSensitiveHeaders(headers),
+                Body = TruncateBody(body),
             });
         }
+    }
+
+    private static IReadOnlyDictionary<string, string>? RedactSensitiveHeaders(IReadOnlyDictionary<string, string>? headers)
+    {
+        if (headers is null || headers.Count == 0)
+        {
+            return headers;
+        }
+
+        Dictionary<string, string>? redacted = null;
+
+        foreach (var (key, value) in headers)
+        {
+            if (_sensitiveHeaders.Contains(key))
+            {
+                redacted ??= new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase);
+                redacted[key] = "[redacted]";
+            }
+        }
+
+        return redacted ?? headers;
+    }
+
+    private static string? TruncateBody(string? body)
+    {
+        if (string.IsNullOrEmpty(body) || body.Length <= MaxBodyLengthChars)
+        {
+            return body;
+        }
+
+        return body[..MaxBodyLengthChars] + "...[truncated]";
     }
 }
