@@ -61,7 +61,8 @@ Accept: application/json
   "query": {
     "role": ["admin"]
   },
-  "includeCandidates": true
+  "includeCandidates": true,
+  "includeSemanticCandidates": true
 }
 
 ### Runtime inspection explain last real request

@@ -22,8 +22,16 @@ internal static class SemanticMatchSelector
             return new SemanticMatchExplanation
             {
                 Attempted = true,
+                BestCandidate = scoringResult.HighestScoringCandidate,
+                BestScore = scoringResult.HighestScore,
                 Threshold = threshold,
                 RequiredMargin = requiredMargin,
+                SelectionStatus = scoringResult.HighestScore is null
+                    ? SemanticSelectionStatus.Unavailable
+                    : SemanticSelectionStatus.BelowThreshold,
+                NonSelectionReason = scoringResult.HighestScore is null
+                    ? SemanticSelectionStatus.Unavailable
+                    : SemanticSelectionStatus.BelowThreshold,
                 CandidateScores = scoringResult.CandidateScores,
             };
         }
@@ -38,11 +46,16 @@ internal static class SemanticMatchSelector
             return new SemanticMatchExplanation
             {
                 Attempted = true,
+                BestCandidate = scoringResult.HighestScoringCandidate,
+                BestScore = scoringResult.HighestScore,
+                SecondBestCandidate = scoringResult.SecondBestCandidate,
                 Threshold = threshold,
                 RequiredMargin = requiredMargin,
                 SelectedScore = scoringResult.BestScore,
                 SecondBestScore = scoringResult.SecondBestScore,
                 MarginToSecondBest = marginToSecondBest,
+                SelectionStatus = SemanticSelectionStatus.Ambiguous,
+                NonSelectionReason = SemanticSelectionStatus.Ambiguous,
                 CandidateScores = scoringResult.CandidateScores,
             };
         }
@@ -51,11 +64,15 @@ internal static class SemanticMatchSelector
         {
             Attempted = true,
             SelectedCandidate = scoringResult.BestCandidate,
+            BestCandidate = scoringResult.HighestScoringCandidate,
+            BestScore = scoringResult.HighestScore,
+            SecondBestCandidate = scoringResult.SecondBestCandidate,
             SelectedScore = scoringResult.BestScore,
             Threshold = threshold,
             RequiredMargin = requiredMargin,
             SecondBestScore = scoringResult.SecondBestScore,
             MarginToSecondBest = marginToSecondBest,
+            SelectionStatus = SemanticSelectionStatus.Selected,
             CandidateScores = scoringResult.CandidateScores,
         };
     }

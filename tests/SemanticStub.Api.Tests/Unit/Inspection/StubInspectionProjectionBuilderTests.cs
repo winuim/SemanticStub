@@ -267,8 +267,15 @@ public sealed class StubInspectionProjectionBuilderTests
         var explanation = new SemanticMatchExplanation
         {
             Attempted = true,
+            SelectedCandidate = secondCandidate,
+            BestCandidate = secondCandidate,
+            BestScore = 0.97d,
+            SecondBestCandidate = firstCandidate,
             SelectedScore = 0.97d,
+            SecondBestScore = 0.81d,
+            MarginToSecondBest = 0.16d,
             Threshold = 0.8d,
+            SelectionStatus = SemanticSelectionStatus.Selected,
             CandidateScores =
             [
                 new SemanticCandidateScore
@@ -284,9 +291,108 @@ public sealed class StubInspectionProjectionBuilderTests
         var info = builder.CreateSemanticMatchInfo(explanation, operation, includeCandidates: true);
 
         Assert.True(info.Attempted);
+        Assert.Equal("selected", info.SelectionStatus);
+        Assert.Null(info.NonSelectionReason);
+        Assert.Equal(1, info.BestCandidateIndex);
+        Assert.Equal(0.97d, info.BestScore);
+        Assert.Equal(0, info.SecondBestCandidateIndex);
         Assert.Single(info.Candidates);
         Assert.Equal(1, info.Candidates[0].CandidateIndex);
         Assert.True(info.Candidates[0].Eligible);
         Assert.Equal(0.97d, info.Candidates[0].Score);
+    }
+
+    [Fact]
+    public void CreateSemanticMatchInfo_WhenScoreBelowThreshold_SetsBelowThresholdStatus()
+    {
+        var builder = new StubInspectionProjectionBuilder(new ScenarioService());
+        var candidate = new QueryMatchDefinition { Response = new QueryMatchResponseDefinition { StatusCode = 200 } };
+        var operation = new OperationDefinition
+        {
+            Matches = [candidate]
+        };
+        var explanation = new SemanticMatchExplanation
+        {
+            Attempted = true,
+            BestCandidate = candidate,
+            BestScore = 0.72d,
+            Threshold = 0.8d,
+            RequiredMargin = 0.03d,
+            SelectionStatus = SemanticSelectionStatus.BelowThreshold,
+            NonSelectionReason = SemanticSelectionStatus.BelowThreshold,
+        };
+
+        var info = builder.CreateSemanticMatchInfo(explanation, operation, includeCandidates: false);
+
+        Assert.Equal("belowThreshold", info.SelectionStatus);
+        Assert.Equal("belowThreshold", info.NonSelectionReason);
+        Assert.Equal(0, info.BestCandidateIndex);
+        Assert.Equal(0.72d, info.BestScore);
+        Assert.Null(info.SelectedScore);
+        Assert.Empty(info.Candidates);
+    }
+
+    [Fact]
+    public void CreateSemanticMatchInfo_WhenOnlyOneCandidateIsAboveThreshold_LeavesSecondBestIndexNull()
+    {
+        var builder = new StubInspectionProjectionBuilder(new ScenarioService());
+        var selectedCandidate = new QueryMatchDefinition { Response = new QueryMatchResponseDefinition { StatusCode = 200 } };
+        var belowThresholdCandidate = new QueryMatchDefinition { Response = new QueryMatchResponseDefinition { StatusCode = 201 } };
+        var operation = new OperationDefinition
+        {
+            Matches = [selectedCandidate, belowThresholdCandidate]
+        };
+        var explanation = new SemanticMatchExplanation
+        {
+            Attempted = true,
+            SelectedCandidate = selectedCandidate,
+            BestCandidate = selectedCandidate,
+            BestScore = 0.95d,
+            SelectedScore = 0.95d,
+            Threshold = 0.8d,
+            RequiredMargin = 0.03d,
+            SelectionStatus = SemanticSelectionStatus.Selected,
+        };
+
+        var info = builder.CreateSemanticMatchInfo(explanation, operation, includeCandidates: false);
+
+        Assert.Equal("selected", info.SelectionStatus);
+        Assert.Equal(0, info.BestCandidateIndex);
+        Assert.Null(info.SecondBestCandidateIndex);
+        Assert.Null(info.SecondBestScore);
+    }
+
+    [Fact]
+    public void CreateSemanticMatchInfo_WhenMarginTooSmall_SetsAmbiguousStatus()
+    {
+        var builder = new StubInspectionProjectionBuilder(new ScenarioService());
+        var firstCandidate = new QueryMatchDefinition { Response = new QueryMatchResponseDefinition { StatusCode = 200 } };
+        var secondCandidate = new QueryMatchDefinition { Response = new QueryMatchResponseDefinition { StatusCode = 201 } };
+        var operation = new OperationDefinition
+        {
+            Matches = [firstCandidate, secondCandidate]
+        };
+        var explanation = new SemanticMatchExplanation
+        {
+            Attempted = true,
+            BestCandidate = firstCandidate,
+            BestScore = 0.95d,
+            SecondBestCandidate = secondCandidate,
+            SelectedScore = 0.95d,
+            SecondBestScore = 0.93d,
+            MarginToSecondBest = 0.02d,
+            Threshold = 0.8d,
+            RequiredMargin = 0.03d,
+            SelectionStatus = SemanticSelectionStatus.Ambiguous,
+            NonSelectionReason = SemanticSelectionStatus.Ambiguous,
+        };
+
+        var info = builder.CreateSemanticMatchInfo(explanation, operation, includeCandidates: false);
+
+        Assert.Equal("ambiguous", info.SelectionStatus);
+        Assert.Equal("ambiguous", info.NonSelectionReason);
+        Assert.Equal(0, info.BestCandidateIndex);
+        Assert.Equal(1, info.SecondBestCandidateIndex);
+        Assert.Equal(0.02d, info.MarginToSecondBest);
     }
 }

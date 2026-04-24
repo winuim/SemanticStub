@@ -31,6 +31,9 @@ internal static class SemanticCandidateScorer
 
         QueryMatchDefinition? bestCandidate = null;
         double? bestScore = null;
+        QueryMatchDefinition? highestScoringCandidate = null;
+        double? highestScore = null;
+        QueryMatchDefinition? secondBestCandidate = null;
         double? secondBestScore = null;
 
         for (var i = 0; i < candidates.Count; i++)
@@ -48,6 +51,12 @@ internal static class SemanticCandidateScorer
                 AboveThreshold = score >= threshold,
             });
 
+            if (highestScore is null || score > highestScore.Value)
+            {
+                highestScore = score;
+                highestScoringCandidate = candidate;
+            }
+
             if (score < threshold)
             {
                 continue;
@@ -56,18 +65,23 @@ internal static class SemanticCandidateScorer
             if (bestScore is null || score > bestScore.Value)
             {
                 secondBestScore = bestScore;
+                secondBestCandidate = bestCandidate;
                 bestScore = score;
                 bestCandidate = candidate;
             }
             else if (secondBestScore is null || score > secondBestScore.Value)
             {
                 secondBestScore = score;
+                secondBestCandidate = candidate;
             }
         }
 
         return new SemanticCandidateScoringResult(
             bestCandidate,
             bestScore,
+            highestScoringCandidate,
+            highestScore,
+            secondBestCandidate,
             secondBestScore,
             candidateScores ?? []);
     }
@@ -108,5 +122,8 @@ internal static class SemanticCandidateScorer
 internal sealed record SemanticCandidateScoringResult(
     QueryMatchDefinition? BestCandidate,
     double? BestScore,
+    QueryMatchDefinition? HighestScoringCandidate,
+    double? HighestScore,
+    QueryMatchDefinition? SecondBestCandidate,
     double? SecondBestScore,
     IReadOnlyList<SemanticCandidateScore> CandidateScores);

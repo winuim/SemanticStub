@@ -18,6 +18,21 @@ public sealed class SemanticMatchExplanation
     public QueryMatchDefinition? SelectedCandidate { get; init; }
 
     /// <summary>
+    /// Gets the highest-scoring candidate when semantic scores were calculated.
+    /// </summary>
+    public QueryMatchDefinition? BestCandidate { get; init; }
+
+    /// <summary>
+    /// Gets the highest semantic score when semantic scores were calculated.
+    /// </summary>
+    public double? BestScore { get; init; }
+
+    /// <summary>
+    /// Gets the second-highest scoring candidate that satisfied the configured threshold when available.
+    /// </summary>
+    public QueryMatchDefinition? SecondBestCandidate { get; init; }
+
+    /// <summary>
     /// Gets the selected candidate score when one was selected.
     /// </summary>
     public double? SelectedScore { get; init; }
@@ -33,19 +48,50 @@ public sealed class SemanticMatchExplanation
     public double? RequiredMargin { get; init; }
 
     /// <summary>
-    /// Gets the second-best score when available.
+    /// Gets the second-best above-threshold score when available.
     /// </summary>
     public double? SecondBestScore { get; init; }
 
     /// <summary>
-    /// Gets the score gap between the selected and second-best candidates when available.
+    /// Gets the score gap between the selected and second-best above-threshold candidates when available.
     /// </summary>
     public double? MarginToSecondBest { get; init; }
+
+    /// <summary>
+    /// Gets the machine-readable semantic selection outcome.
+    /// </summary>
+    public string SelectionStatus { get; init; } = SemanticSelectionStatus.NotAttempted;
+
+    /// <summary>
+    /// Gets the machine-readable reason why no semantic candidate was selected.
+    /// </summary>
+    public string? NonSelectionReason { get; init; }
 
     /// <summary>
     /// Gets the per-candidate semantic scores when requested.
     /// </summary>
     public IReadOnlyList<SemanticCandidateScore> CandidateScores { get; init; } = [];
+}
+
+/// <summary>
+/// Defines machine-readable semantic selection outcomes.
+/// </summary>
+public static class SemanticSelectionStatus
+{
+    /// <summary>Semantic matching was not attempted.</summary>
+    public const string NotAttempted = "notAttempted";
+
+    /// <summary>A semantic candidate was selected.</summary>
+    public const string Selected = "selected";
+
+    /// <summary>No candidate reached the configured similarity threshold.</summary>
+    public const string BelowThreshold = "belowThreshold";
+
+    /// <summary>The top candidates were too close to select safely.</summary>
+    public const string Ambiguous = "ambiguous";
+
+    /// <summary>Semantic matching was attempted, but no score could be produced.</summary>
+    public const string Unavailable = "unavailable";
 }
 
 /// <summary>

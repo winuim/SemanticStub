@@ -299,6 +299,7 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
 - `/_semanticstub/runtime/requests` は process-local で、最大 100 件の recent request history を新しい順で返します。各 item には timestamp、method、path、利用可能な場合の route id、status code、elapsed time、match mode、および unmatched request の failure reason が含まれます。`limit` query parameter のデフォルトは `20` です。
 - `/_semanticstub/runtime/test-match` と `/_semanticstub/runtime/explain` は、method、path、省略可能な query / header / body、および省略可能な candidate detail flag を持つ virtual request payload を受け取ります。結果には、該当する場合に selected response の id、status code、response source（`responses` または `x-match`）、candidate index も含まれます。
 - `deterministicCandidates` array の各 deterministic candidate は、match しなかった場合に `mismatchReasons` list を持ちます。各 entry には `dimension`（`query`、`header`、`body`、`scenario`、`response`）、失敗した parameter / header / JSON body path / scenario を示す `key`、stub definition の `expected`、request の `actual`（key または JSON path が存在しない場合は `null`）、および `kind`（`missing`、`unequal`、`notConfigured`）が含まれます。Body mismatch の path は `$.user.profile.role` のような bounded JSON path-style form です。Candidate が match した場合または選択された場合、この list は空です。
+- semantic fallback が評価された場合、`semanticEvaluation.selectionStatus` は `selected`、`belowThreshold`、`ambiguous`、`unavailable` のいずれかです。Semantic candidate が選択されなかった場合は `nonSelectionReason` も含まれ、利用可能な場合は best candidate metadata と second-best above-threshold candidate metadata も返すため、threshold failure と low-margin ambiguity を matching behavior を変えずに比較できます。
 - `/_semanticstub/runtime/explain/last` は process-local で、実リクエストが stub response に match した後だけ更新されます。
 - `/_semanticstub/runtime/scenarios/resets`、`/_semanticstub/runtime/scenarios/reset`、`/_semanticstub/runtime/scenarios/{name}/resets`、`/_semanticstub/runtime/scenarios/{name}/reset` は、現在のプロセスの in-memory scenario state だけを変更します。
 - これらの endpoint は、raw YAML、内部 domain object、完全な response payload body は公開しません。
@@ -314,6 +315,26 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
     "role": ["admin"]
   },
   "includeCandidates": true
+}
+```
+
+Semantic fallback detail には machine-readable な比較 metadata が含まれます:
+
+```json
+{
+  "semanticEvaluation": {
+    "attempted": true,
+    "selectionStatus": "ambiguous",
+    "nonSelectionReason": "ambiguous",
+    "threshold": 0.8,
+    "requiredMargin": 0.03,
+    "selectedScore": 0.95,
+    "secondBestScore": 0.93,
+    "marginToSecondBest": 0.02,
+    "bestCandidateIndex": 0,
+    "bestScore": 0.95,
+    "secondBestCandidateIndex": 1
+  }
 }
 ```
 

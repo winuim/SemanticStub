@@ -32,6 +32,7 @@ public sealed class SemanticMatcherServiceTests
             [CreateCandidate("find admin users")]);
 
         Assert.Null(explanation.SelectedCandidate);
+        Assert.Equal(SemanticSelectionStatus.NotAttempted, explanation.SelectionStatus);
     }
 
     [Fact]
@@ -200,15 +201,24 @@ public sealed class SemanticMatcherServiceTests
                 ["find admin users"] = "[0.9,0.1]"
             }));
 
+        var candidate = CreateCandidate("find admin users");
+
         var explanation = await service.ExplainMatchAsync(
             "POST",
             "/search",
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             "admin search",
-            [CreateCandidate("find admin users")]);
+            [candidate],
+            includeCandidateScores: true);
 
         Assert.Null(explanation.SelectedCandidate);
+        Assert.Same(candidate, explanation.BestCandidate);
+        Assert.Equal(SemanticSelectionStatus.BelowThreshold, explanation.SelectionStatus);
+        Assert.Equal(SemanticSelectionStatus.BelowThreshold, explanation.NonSelectionReason);
+        Assert.NotNull(explanation.BestScore);
+        Assert.True(explanation.BestScore < explanation.Threshold);
+        Assert.Contains(explanation.CandidateScores, score => ReferenceEquals(score.Candidate, candidate) && !score.AboveThreshold);
     }
 
     [Fact]
@@ -258,7 +268,7 @@ public sealed class SemanticMatcherServiceTests
             {
                 ["method: POST\npath: /search\nbody:\nadmin search"] = "[1.0,0.0]",
                 ["find admin users"] = "[0.95,0.05]",
-                ["show invoices"] = "[0.60,0.40]"
+                ["show invoices"] = "[0.40,0.60]"
             }));
 
         var adminCandidate = CreateCandidate("find admin users");
@@ -275,6 +285,12 @@ public sealed class SemanticMatcherServiceTests
 
         Assert.True(explanation.Attempted);
         Assert.Same(adminCandidate, explanation.SelectedCandidate);
+        Assert.Same(adminCandidate, explanation.BestCandidate);
+        Assert.Equal(SemanticSelectionStatus.Selected, explanation.SelectionStatus);
+        Assert.Null(explanation.NonSelectionReason);
+        Assert.Equal(explanation.SelectedScore, explanation.BestScore);
+        Assert.Null(explanation.SecondBestCandidate);
+        Assert.Null(explanation.SecondBestScore);
         Assert.Equal(0.8d, explanation.Threshold);
         Assert.Equal(2, explanation.CandidateScores.Count);
         Assert.Contains(explanation.CandidateScores, score => ReferenceEquals(score.Candidate, adminCandidate) && score.AboveThreshold);
@@ -315,6 +331,11 @@ public sealed class SemanticMatcherServiceTests
 
         Assert.True(explanation.Attempted);
         Assert.Null(explanation.SelectedCandidate);
+        Assert.Same(firstCandidate, explanation.BestCandidate);
+        Assert.Same(secondCandidate, explanation.SecondBestCandidate);
+        Assert.Equal(SemanticSelectionStatus.Ambiguous, explanation.SelectionStatus);
+        Assert.Equal(SemanticSelectionStatus.Ambiguous, explanation.NonSelectionReason);
+        Assert.Equal(explanation.SelectedScore, explanation.BestScore);
         Assert.NotNull(explanation.SelectedScore);
         Assert.NotNull(explanation.SecondBestScore);
         Assert.NotNull(explanation.MarginToSecondBest);
