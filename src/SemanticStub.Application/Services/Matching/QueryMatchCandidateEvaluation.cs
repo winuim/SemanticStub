@@ -31,4 +31,10 @@ public sealed class QueryMatchCandidateEvaluation
     /// Gets whether all deterministic dimensions matched.
     /// </summary>
     public bool Matched => QueryMatched && HeaderMatched && BodyMatched;
+
+    /// <summary>
+    /// Gets the per-key mismatch details for query and header dimensions.
+    /// Empty when the candidate matched or when no individual key failures were collected.
+    /// </summary>
+    public IReadOnlyList<MatchDimensionMismatch> MismatchReasons { get; init; } = [];
 }

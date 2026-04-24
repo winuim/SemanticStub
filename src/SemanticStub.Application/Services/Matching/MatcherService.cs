@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Text.Json;
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Application.Models;
@@ -86,12 +87,28 @@ public sealed class MatcherService
 
         foreach (var candidate in operation.Matches)
         {
+            var queryMatched = IsQueryMatch(candidate, matchContext);
+            var headerMatched = IsHeaderMatch(candidate.Headers, matchContext.Headers);
+            var bodyMatched = IsBodyMatch(candidate.Body, matchContext);
+
+            var mismatches = new List<MatchDimensionMismatch>();
+            if (!queryMatched)
+            {
+                mismatches.AddRange(ComputeQueryMismatches(candidate, matchContext));
+            }
+
+            if (!headerMatched)
+            {
+                mismatches.AddRange(ComputeHeaderMismatches(candidate, matchContext.Headers));
+            }
+
             evaluations.Add(new QueryMatchCandidateEvaluation
             {
                 Candidate = candidate,
-                QueryMatched = IsQueryMatch(candidate, matchContext),
-                HeaderMatched = IsHeaderMatch(candidate.Headers, matchContext.Headers),
-                BodyMatched = IsBodyMatch(candidate.Body, matchContext),
+                QueryMatched = queryMatched,
+                HeaderMatched = headerMatched,
+                BodyMatched = bodyMatched,
+                MismatchReasons = mismatches,
             });
         }
 
@@ -176,6 +193,122 @@ public sealed class MatcherService
 
         return _queryValueMatcher.IsExactMatch(expected, actualValues, new Dictionary<string, string>(StringComparer.Ordinal)) &&
                _regexQueryMatcher.IsMatch(expected, actualValues);
+    }
+
+    private IReadOnlyList<MatchDimensionMismatch> ComputeQueryMismatches(
+        QueryMatchDefinition candidate,
+        MatchEvaluationContext matchContext)
+    {
+        return ComputeDimensionMismatches(
+            "query",
+            candidate.Query,
+            matchContext.Query,
+            matchContext.QueryParameterTypes);
+    }
+
+    private IReadOnlyList<MatchDimensionMismatch> ComputeHeaderMismatches(
+        QueryMatchDefinition candidate,
+        IReadOnlyDictionary<string, string> actualHeaders)
+    {
+        var actualValues = actualHeaders.ToDictionary(
+            entry => entry.Key,
+            entry => new StringValues(entry.Value),
+            StringComparer.OrdinalIgnoreCase);
+
+        return ComputeDimensionMismatches(
+            "header",
+            candidate.Headers,
+            actualValues,
+            new Dictionary<string, string>(StringComparer.Ordinal));
+    }
+
+    private IReadOnlyList<MatchDimensionMismatch> ComputeDimensionMismatches(
+        string dimension,
+        IReadOnlyDictionary<string, object?> expected,
+        IReadOnlyDictionary<string, StringValues> actual,
+        IReadOnlyDictionary<string, string> queryParameterTypes)
+    {
+        var mismatches = new List<MatchDimensionMismatch>();
+
+        foreach (var pair in expected)
+        {
+            if (MatchOperatorDefinition.TryGetRegex(pair.Value, out var regexPattern))
+            {
+                var singleKey = new Dictionary<string, object?>(StringComparer.Ordinal) { [pair.Key] = pair.Value };
+                var expectedPattern = ConvertExpectedValueToString(regexPattern);
+                if (!actual.TryGetValue(pair.Key, out var actualValue))
+                {
+                    mismatches.Add(new MatchDimensionMismatch
+                    {
+                        Dimension = dimension,
+                        Key = pair.Key,
+                        Expected = expectedPattern,
+                        Actual = null,
+                        Kind = "missing",
+                    });
+                }
+                else if (!_regexQueryMatcher.IsMatch(singleKey, actual))
+                {
+                    mismatches.Add(new MatchDimensionMismatch
+                    {
+                        Dimension = dimension,
+                        Key = pair.Key,
+                        Expected = expectedPattern,
+                        Actual = actualValue.ToString(),
+                        Kind = "unequal",
+                    });
+                }
+
+                continue;
+            }
+
+            if (!MatchOperatorDefinition.TryGetEquals(pair.Value, out var expectedValue))
+            {
+                continue;
+            }
+
+            var singleExact = new Dictionary<string, object?>(StringComparer.Ordinal) { [pair.Key] = pair.Value };
+            var expectedString = ConvertExpectedValueToString(expectedValue);
+            if (!actual.TryGetValue(pair.Key, out var actualExact))
+            {
+                mismatches.Add(new MatchDimensionMismatch
+                {
+                    Dimension = dimension,
+                    Key = pair.Key,
+                    Expected = expectedString,
+                    Actual = null,
+                    Kind = "missing",
+                });
+            }
+            else if (!_queryValueMatcher.IsExactMatch(singleExact, actual, queryParameterTypes))
+            {
+                mismatches.Add(new MatchDimensionMismatch
+                {
+                    Dimension = dimension,
+                    Key = pair.Key,
+                    Expected = expectedString,
+                    Actual = actualExact.ToString(),
+                    Kind = "unequal",
+                });
+            }
+        }
+
+        return mismatches;
+    }
+
+    private static string? ConvertExpectedValueToString(object? value)
+    {
+        return value switch
+        {
+            null => null,
+            string text => text,
+            bool boolean => boolean ? "true" : "false",
+            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal
+                => Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture),
+            IEnumerable sequence => string.Join(", ", sequence.Cast<object?>().Select(item => ConvertExpectedValueToString(item) ?? "null")),
+            IFormattable formattable => formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
+            _ => value.ToString(),
+        };
     }
 
     private readonly struct MatchEvaluationContext : IDisposable

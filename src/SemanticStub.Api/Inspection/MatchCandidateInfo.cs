@@ -49,4 +49,11 @@ public sealed class MatchCandidateInfo
     /// Gets the selected response status code for the candidate when available.
     /// </summary>
     public int? ResponseStatusCode { get; init; }
+
+    /// <summary>
+    /// Gets the per-key mismatch details for failed dimensions.
+    /// Covers query, header, scenario, and response-configuration failures.
+    /// Empty when the candidate matched or when no individual key failures were collected.
+    /// </summary>
+    public IReadOnlyList<MatchDimensionMismatchInfo> MismatchReasons { get; init; } = [];
 }
