@@ -102,6 +102,11 @@ public sealed class MatcherService
                 mismatches.AddRange(ComputeHeaderMismatches(candidate, matchContext.Headers));
             }
 
+            if (!bodyMatched)
+            {
+                mismatches.AddRange(ComputeBodyMismatches(candidate.Body, matchContext));
+            }
+
             evaluations.Add(new QueryMatchCandidateEvaluation
             {
                 Candidate = candidate,
@@ -220,6 +225,15 @@ public sealed class MatcherService
             candidate.Headers,
             actualValues,
             new Dictionary<string, string>(StringComparer.Ordinal));
+    }
+
+    private IReadOnlyList<MatchDimensionMismatch> ComputeBodyMismatches(
+        object? expectedBody,
+        MatchEvaluationContext matchContext)
+    {
+        return matchContext.RequestForm is not null && _formBodyMatcher.HasFormCondition(expectedBody)
+            ? []
+            : _jsonBodyMatcher.CollectMismatches(expectedBody, matchContext.RequestBody);
     }
 
     private IReadOnlyList<MatchDimensionMismatch> ComputeDimensionMismatches(

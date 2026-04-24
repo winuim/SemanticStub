@@ -6,12 +6,12 @@ namespace SemanticStub.Application.Services;
 public sealed class MatchDimensionMismatch
 {
     /// <summary>
-    /// Gets the matching dimension that failed. One of <c>query</c> or <c>header</c>.
+    /// Gets the matching dimension that failed. One of <c>query</c>, <c>header</c>, or <c>body</c>.
     /// </summary>
     public string Dimension { get; init; } = string.Empty;
 
     /// <summary>
-    /// Gets the parameter or header name that did not satisfy the configured constraint.
+    /// Gets the parameter name, header name, or JSON body path that did not satisfy the configured constraint.
     /// </summary>
     public string Key { get; init; } = string.Empty;
 
