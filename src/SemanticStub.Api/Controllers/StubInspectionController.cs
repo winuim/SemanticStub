@@ -79,7 +79,7 @@ public sealed class StubInspectionController : ControllerBase
             return NotFoundProblem("Request not found", $"No recorded request at index {index}.");
         }
 
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var baseUrl = $"{Request.Scheme}://{Request.Host}{Request.PathBase}";
         var curl = CurlExporter.Export(requests[index], baseUrl);
         return Content(curl, "text/plain");
     }
