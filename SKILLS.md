@@ -173,6 +173,11 @@ Apply review fixes
 ### Goal
 Update PR after fixes
 
+### Rules
+- Prefer a normal follow-up commit for review fixes
+- Do not amend reviewed commits unless explicitly requested
+- Do not force push unless necessary; use `--force-with-lease` when force push is required
+
 ### Output
 - commit message
 - updated PR description (if any)
@@ -193,6 +198,9 @@ Safely merge PR
 - Latest remote fetched
 - Local main is up to date
 - No conflicts
+
+### Rules
+- Do not rewrite PR branch history before squash merge unless explicitly requested
 
 ### Workflow
 1. Fetch latest
