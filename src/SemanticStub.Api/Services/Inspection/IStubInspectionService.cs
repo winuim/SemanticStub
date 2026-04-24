@@ -81,7 +81,19 @@ public interface IStubInspectionService
     /// <param name="explanation">The explanation captured from the same dispatch evaluation.</param>
     /// <param name="statusCode">The final HTTP status code returned to the caller.</param>
     /// <param name="elapsed">The end-to-end elapsed time observed by the controller for the request.</param>
-    void RecordRecentRequest(DateTimeOffset timestamp, string method, string path, MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed);
+    /// <param name="query">The query parameters captured from the original request.</param>
+    /// <param name="headers">The request headers captured from the original request.</param>
+    /// <param name="body">The request body captured from the original request.</param>
+    void RecordRecentRequest(
+        DateTimeOffset timestamp,
+        string method,
+        string path,
+        MatchExplanationInfo explanation,
+        int statusCode,
+        TimeSpan elapsed,
+        IReadOnlyDictionary<string, string[]>? query = null,
+        IReadOnlyDictionary<string, string>? headers = null,
+        string? body = null);
 
     /// <summary>
     /// Resets aggregate runtime metrics and recent request history for the current process.

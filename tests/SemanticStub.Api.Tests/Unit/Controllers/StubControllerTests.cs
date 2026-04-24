@@ -420,7 +420,16 @@ public sealed class StubControllerTests
             RecordRequestMetricsCallCount++;
         }
 
-        public void RecordRecentRequest(DateTimeOffset timestamp, string method, string path, MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
+        public void RecordRecentRequest(
+            DateTimeOffset timestamp,
+            string method,
+            string path,
+            MatchExplanationInfo explanation,
+            int statusCode,
+            TimeSpan elapsed,
+            IReadOnlyDictionary<string, string[]>? query = null,
+            IReadOnlyDictionary<string, string>? headers = null,
+            string? body = null)
         {
             LastRecentRequestMethod = method;
             LastRecentRequestPath = path;
@@ -434,6 +443,9 @@ public sealed class StubControllerTests
                 ElapsedMilliseconds = elapsed.TotalMilliseconds,
                 MatchMode = explanation.Result.MatchMode,
                 FailureReason = explanation.SelectionReason,
+                Query = query,
+                Headers = headers,
+                Body = body,
             };
             RecordRecentRequestCallCount++;
         }

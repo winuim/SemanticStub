@@ -74,7 +74,10 @@ public sealed class StubController : ControllerBase
     {
         var stopwatch = Stopwatch.StartNew();
         var requestPath = NormalizeRequestPath(path);
-        var dispatch = await DispatchRequestAsync(method, requestPath);
+        var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
+        var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
+        var requestBody = await StubRequestBodyReader.ReadAsync(Request, _logger);
+        var dispatch = await _stubService.DispatchAsync(method, requestPath, query, headers, requestBody, HttpContext.RequestAborted);
         int? statusCode = null;
 
         try
@@ -87,7 +90,8 @@ public sealed class StubController : ControllerBase
 
             if (statusCode.HasValue)
             {
-                RecordRequestObservation(dispatch, method, requestPath, statusCode.Value, stopwatch.Elapsed);
+                var querySnapshot = query.ToDictionary(e => e.Key, e => e.Value.OfType<string>().ToArray(), StringComparer.Ordinal);
+                RecordRequestObservation(dispatch, method, requestPath, statusCode.Value, stopwatch.Elapsed, querySnapshot, headers, requestBody);
             }
         }
     }
@@ -95,14 +99,6 @@ public sealed class StubController : ControllerBase
     private static string NormalizeRequestPath(string? path)
     {
         return string.IsNullOrEmpty(path) ? "/" : "/" + path;
-    }
-
-    private async Task<StubDispatchResult> DispatchRequestAsync(string method, string requestPath)
-    {
-        var query = Request.Query.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
-        var headers = Request.Headers.ToDictionary(entry => entry.Key, entry => entry.Value.ToString(), StringComparer.OrdinalIgnoreCase);
-        var requestBody = await StubRequestBodyReader.ReadAsync(Request, _logger);
-        return await _stubService.DispatchAsync(method, requestPath, query, headers, requestBody, HttpContext.RequestAborted);
     }
 
     private async Task<IActionResult> CreateActionResultAsync(StubDispatchResult dispatch, string requestPath, Action<int> setStatusCode)
@@ -178,7 +174,15 @@ public sealed class StubController : ControllerBase
         }
     }
 
-    private void RecordRequestObservation(StubDispatchResult dispatch, string method, string requestPath, int statusCode, TimeSpan elapsed)
+    private void RecordRequestObservation(
+        StubDispatchResult dispatch,
+        string method,
+        string requestPath,
+        int statusCode,
+        TimeSpan elapsed,
+        IReadOnlyDictionary<string, string[]> query,
+        IReadOnlyDictionary<string, string> headers,
+        string? body)
     {
         _inspectionService.RecordRequestMetrics(dispatch.Explanation, statusCode, elapsed);
         _inspectionService.RecordRecentRequest(
@@ -187,7 +191,10 @@ public sealed class StubController : ControllerBase
             requestPath,
             dispatch.Explanation,
             statusCode,
-            elapsed);
+            elapsed,
+            query,
+            headers,
+            body);
 
         _logger.LogInformation(
             "Request completed for '{Path}' {Method}. StatusCode={StatusCode}, ElapsedMs={ElapsedMs}, RouteId={RouteId}, MatchMode={MatchMode}, MatchResult={MatchResult}.",

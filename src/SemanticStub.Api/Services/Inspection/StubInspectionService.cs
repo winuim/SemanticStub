@@ -112,9 +112,18 @@ internal sealed class StubInspectionService : IStubInspectionService
     }
 
     /// <inheritdoc/>
-    public void RecordRecentRequest(DateTimeOffset timestamp, string method, string path, MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
+    public void RecordRecentRequest(
+        DateTimeOffset timestamp,
+        string method,
+        string path,
+        MatchExplanationInfo explanation,
+        int statusCode,
+        TimeSpan elapsed,
+        IReadOnlyDictionary<string, string[]>? query = null,
+        IReadOnlyDictionary<string, string>? headers = null,
+        string? body = null)
     {
-        _runtimeStore.RecordRecentRequest(timestamp, method, path, explanation, statusCode, elapsed);
+        _runtimeStore.RecordRecentRequest(timestamp, method, path, explanation, statusCode, elapsed, query, headers, body);
     }
 
     /// <inheritdoc/>

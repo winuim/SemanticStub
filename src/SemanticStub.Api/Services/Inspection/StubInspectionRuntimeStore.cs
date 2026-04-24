@@ -146,7 +146,16 @@ internal sealed class StubInspectionRuntimeStore
         }
     }
 
-    public void RecordRecentRequest(DateTimeOffset timestamp, string method, string path, MatchExplanationInfo explanation, int statusCode, TimeSpan elapsed)
+    public void RecordRecentRequest(
+        DateTimeOffset timestamp,
+        string method,
+        string path,
+        MatchExplanationInfo explanation,
+        int statusCode,
+        TimeSpan elapsed,
+        IReadOnlyDictionary<string, string[]>? query = null,
+        IReadOnlyDictionary<string, string>? headers = null,
+        string? body = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(method);
         ArgumentException.ThrowIfNullOrEmpty(path);
@@ -171,6 +180,9 @@ internal sealed class StubInspectionRuntimeStore
                 FailureReason = explanation.Result.Matched || string.IsNullOrWhiteSpace(explanation.SelectionReason)
                     ? null
                     : explanation.SelectionReason,
+                Query = query,
+                Headers = headers,
+                Body = body,
             });
         }
     }

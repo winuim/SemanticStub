@@ -62,6 +62,28 @@ public sealed class StubInspectionController : ControllerBase
     [HttpGet("requests")]
     public IActionResult GetRecentRequests([FromQuery] int limit = 20) => Ok(_inspectionService.GetRecentRequests(limit));
 
+    /// <summary>Exports a recorded real request as a runnable curl command.</summary>
+    /// <param name="index">Zero-based index into the recent request history (0 = most recent).</param>
+    [HttpGet("requests/{index:int}/export/curl")]
+    public IActionResult ExportRequestAsCurl(int index)
+    {
+        if (index < 0)
+        {
+            return NotFoundProblem("Request not found", $"No recorded request at index {index}.");
+        }
+
+        var requests = _inspectionService.GetRecentRequests(index + 1);
+
+        if (index >= requests.Count)
+        {
+            return NotFoundProblem("Request not found", $"No recorded request at index {index}.");
+        }
+
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        var curl = CurlExporter.Export(requests[index], baseUrl);
+        return Content(curl, "text/plain");
+    }
+
     /// <summary>Simulates how the runtime would match a virtual request without executing a response.</summary>
     [HttpPost("test-match")]
     public async Task<IActionResult> TestMatch([FromBody] MatchRequestInfo request)
