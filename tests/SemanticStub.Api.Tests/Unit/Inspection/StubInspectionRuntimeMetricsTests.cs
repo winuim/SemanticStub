@@ -419,4 +419,114 @@ public sealed class StubInspectionRuntimeMetricsTests
 
         Assert.Same(explanation, store.GetLastMatchExplanation());
     }
+
+    [Fact]
+    public void RecordRecentRequest_RedactsSensitiveHeaders_BeforeStoring()
+    {
+        var store = new StubInspectionRuntimeStore();
+        var explanation = CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "listUsers");
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Authorization"] = "Bearer secret-token",
+            ["Cookie"] = "session=abc123",
+            ["Proxy-Authorization"] = "Basic dXNlcjpwYXNz",
+            ["Set-Cookie"] = "id=xyz; HttpOnly",
+            ["Content-Type"] = "application/json",
+            ["Accept"] = "application/json",
+        };
+
+        store.RecordRecentRequest(
+            DateTimeOffset.UtcNow,
+            HttpMethods.Get,
+            "/users",
+            explanation,
+            StatusCodes.Status200OK,
+            TimeSpan.FromMilliseconds(10),
+            headers: headers);
+
+        var requests = store.GetRecentRequests(1);
+        var stored = Assert.Single(requests);
+
+        Assert.NotNull(stored.Headers);
+        Assert.Equal("[redacted]", stored.Headers!["Authorization"]);
+        Assert.Equal("[redacted]", stored.Headers["Cookie"]);
+        Assert.Equal("[redacted]", stored.Headers["Proxy-Authorization"]);
+        Assert.Equal("[redacted]", stored.Headers["Set-Cookie"]);
+        Assert.Equal("application/json", stored.Headers["Content-Type"]);
+        Assert.Equal("application/json", stored.Headers["Accept"]);
+    }
+
+    [Fact]
+    public void RecordRecentRequest_TruncatesLargeBody_BeforeStoring()
+    {
+        var store = new StubInspectionRuntimeStore();
+        var explanation = CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "createOrder");
+        var largeBody = new string('x', 5000);
+
+        store.RecordRecentRequest(
+            DateTimeOffset.UtcNow,
+            HttpMethods.Post,
+            "/orders",
+            explanation,
+            StatusCodes.Status201Created,
+            TimeSpan.FromMilliseconds(20),
+            body: largeBody);
+
+        var requests = store.GetRecentRequests(1);
+        var stored = Assert.Single(requests);
+
+        Assert.NotNull(stored.Body);
+        Assert.True(stored.Body!.Length < largeBody.Length);
+        Assert.EndsWith("...[truncated]", stored.Body);
+    }
+
+    [Fact]
+    public void RecordRecentRequest_DoesNotTruncate_WhenBodyIsWithinLimit()
+    {
+        var store = new StubInspectionRuntimeStore();
+        var explanation = CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "createOrder");
+        var smallBody = "{\"name\":\"test\"}";
+
+        store.RecordRecentRequest(
+            DateTimeOffset.UtcNow,
+            HttpMethods.Post,
+            "/orders",
+            explanation,
+            StatusCodes.Status201Created,
+            TimeSpan.FromMilliseconds(20),
+            body: smallBody);
+
+        var requests = store.GetRecentRequests(1);
+        var stored = Assert.Single(requests);
+
+        Assert.Equal(smallBody, stored.Body);
+    }
+
+    [Fact]
+    public void RecordRecentRequest_PreservesNonSensitiveHeaders_Unchanged()
+    {
+        var store = new StubInspectionRuntimeStore();
+        var explanation = CreateRecordedExplanation(matched: true, matchResult: "Matched", routeId: "listUsers");
+        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Content-Type"] = "application/json",
+            ["X-Correlation-Id"] = "abc-123",
+        };
+
+        store.RecordRecentRequest(
+            DateTimeOffset.UtcNow,
+            HttpMethods.Get,
+            "/users",
+            explanation,
+            StatusCodes.Status200OK,
+            TimeSpan.FromMilliseconds(10),
+            headers: headers);
+
+        var requests = store.GetRecentRequests(1);
+        var stored = Assert.Single(requests);
+
+        Assert.NotNull(stored.Headers);
+        Assert.Equal("application/json", stored.Headers!["Content-Type"]);
+        Assert.Equal("abc-123", stored.Headers["X-Correlation-Id"]);
+    }
 }
