@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Text.Json;
 using Microsoft.Extensions.Primitives;
 using SemanticStub.Application.Models;
@@ -234,13 +235,14 @@ public sealed class MatcherService
             if (MatchOperatorDefinition.TryGetRegex(pair.Value, out var regexPattern))
             {
                 var singleKey = new Dictionary<string, object?>(StringComparer.Ordinal) { [pair.Key] = pair.Value };
+                var expectedPattern = ConvertExpectedValueToString(regexPattern);
                 if (!actual.TryGetValue(pair.Key, out var actualValue))
                 {
                     mismatches.Add(new MatchDimensionMismatch
                     {
                         Dimension = dimension,
                         Key = pair.Key,
-                        Expected = regexPattern?.ToString(),
+                        Expected = expectedPattern,
                         Actual = null,
                         Kind = "missing",
                     });
@@ -251,7 +253,7 @@ public sealed class MatcherService
                     {
                         Dimension = dimension,
                         Key = pair.Key,
-                        Expected = regexPattern?.ToString(),
+                        Expected = expectedPattern,
                         Actual = actualValue.ToString(),
                         Kind = "unequal",
                     });
@@ -303,6 +305,7 @@ public sealed class MatcherService
             bool boolean => boolean ? "true" : "false",
             byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal
                 => Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture),
+            IEnumerable sequence => string.Join(", ", sequence.Cast<object?>().Select(item => ConvertExpectedValueToString(item) ?? "null")),
             IFormattable formattable => formattable.ToString(null, System.Globalization.CultureInfo.InvariantCulture),
             _ => value.ToString(),
         };

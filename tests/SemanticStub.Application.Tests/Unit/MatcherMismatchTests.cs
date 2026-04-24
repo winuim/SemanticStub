@@ -211,6 +211,65 @@ public sealed class MatcherMismatchTests
     }
 
     [Fact]
+    public void EvaluateCandidates_MultiValueQueryExpected_SerializesExpectedAsJoinedString()
+    {
+        var matcher = CreateMatcherService();
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["tag"] = new List<object?> { "alpha", "beta" }
+                    },
+                }
+            ]
+        };
+
+        var evaluations = matcher.EvaluateCandidates([], operation, Query(("tag", "gamma")), Headers(), body: null);
+
+        var mismatch = Assert.Single(evaluations[0].MismatchReasons);
+        Assert.Equal("query", mismatch.Dimension);
+        Assert.Equal("tag", mismatch.Key);
+        Assert.Equal("alpha, beta", mismatch.Expected);
+        Assert.NotNull(mismatch.Actual);
+        Assert.Equal("unequal", mismatch.Kind);
+    }
+
+    [Fact]
+    public void EvaluateCandidates_MultiValueRegexExpected_SerializesExpectedAsJoinedString()
+    {
+        var matcher = CreateMatcherService();
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Query = new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["token"] = new Dictionary<string, object?>(StringComparer.Ordinal)
+                        {
+                            ["regex"] = new List<object?> { "^A.*", "^B.*" }
+                        }
+                    },
+                }
+            ]
+        };
+
+        var evaluations = matcher.EvaluateCandidates([], operation, Query(("token", "lowercase")), Headers(), body: null);
+
+        var mismatch = Assert.Single(evaluations[0].MismatchReasons);
+        Assert.Equal("query", mismatch.Dimension);
+        Assert.Equal("token", mismatch.Key);
+        Assert.Equal("^A.*, ^B.*", mismatch.Expected);
+        Assert.Equal("lowercase", mismatch.Actual);
+        Assert.Equal("unequal", mismatch.Kind);
+    }
+
+    [Fact]
     public void EvaluateCandidates_AllDimensionsMatch_EmptyMismatchReasons()
     {
         var matcher = CreateMatcherService();
