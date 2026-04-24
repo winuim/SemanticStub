@@ -52,7 +52,7 @@ public sealed class MatchCandidateInfo
 
     /// <summary>
     /// Gets the per-key mismatch details for failed dimensions.
-    /// Covers query, header, scenario, and response-configuration failures.
+    /// Covers query, header, body, scenario, and response-configuration failures.
     /// Empty when the candidate matched or when no individual key failures were collected.
     /// </summary>
     public IReadOnlyList<MatchDimensionMismatchInfo> MismatchReasons { get; init; } = [];

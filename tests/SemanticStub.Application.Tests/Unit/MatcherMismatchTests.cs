@@ -270,6 +270,84 @@ public sealed class MatcherMismatchTests
     }
 
     [Fact]
+    public void EvaluateCandidates_JsonBodyMissingNestedProperty_EmitsBodyMissingMismatch()
+    {
+        var matcher = CreateMatcherService();
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Body = new Dictionary<object, object?>
+                    {
+                        ["user"] = new Dictionary<object, object?>
+                        {
+                            ["profile"] = new Dictionary<object, object?>
+                            {
+                                ["role"] = "admin"
+                            }
+                        }
+                    },
+                }
+            ]
+        };
+
+        var evaluations = matcher.EvaluateCandidates(
+            [],
+            operation,
+            Query(),
+            Headers(),
+            body: "{\"user\":{\"profile\":{}}}");
+
+        var mismatch = Assert.Single(evaluations[0].MismatchReasons);
+        Assert.Equal("body", mismatch.Dimension);
+        Assert.Equal("$.user.profile.role", mismatch.Key);
+        Assert.Equal("admin", mismatch.Expected);
+        Assert.Null(mismatch.Actual);
+        Assert.Equal("missing", mismatch.Kind);
+    }
+
+    [Fact]
+    public void EvaluateCandidates_JsonBodyNestedValueDiffers_EmitsBodyUnequalMismatch()
+    {
+        var matcher = CreateMatcherService();
+        var operation = new OperationDefinition
+        {
+            Matches =
+            [
+                new QueryMatchDefinition
+                {
+                    Body = new Dictionary<object, object?>
+                    {
+                        ["user"] = new Dictionary<object, object?>
+                        {
+                            ["profile"] = new Dictionary<object, object?>
+                            {
+                                ["role"] = "admin"
+                            }
+                        }
+                    },
+                }
+            ]
+        };
+
+        var evaluations = matcher.EvaluateCandidates(
+            [],
+            operation,
+            Query(),
+            Headers(),
+            body: "{\"user\":{\"profile\":{\"role\":\"user\"}}}");
+
+        var mismatch = Assert.Single(evaluations[0].MismatchReasons);
+        Assert.Equal("body", mismatch.Dimension);
+        Assert.Equal("$.user.profile.role", mismatch.Key);
+        Assert.Equal("admin", mismatch.Expected);
+        Assert.Equal("user", mismatch.Actual);
+        Assert.Equal("unequal", mismatch.Kind);
+    }
+
+    [Fact]
     public void EvaluateCandidates_AllDimensionsMatch_EmptyMismatchReasons()
     {
         var matcher = CreateMatcherService();

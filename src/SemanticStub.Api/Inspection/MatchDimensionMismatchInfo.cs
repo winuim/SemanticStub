@@ -6,12 +6,12 @@ namespace SemanticStub.Api.Inspection;
 public sealed class MatchDimensionMismatchInfo
 {
     /// <summary>
-    /// Gets the matching dimension that failed. One of <c>query</c>, <c>header</c>, <c>scenario</c>, or <c>response</c>.
+    /// Gets the matching dimension that failed. One of <c>query</c>, <c>header</c>, <c>body</c>, <c>scenario</c>, or <c>response</c>.
     /// </summary>
     public string Dimension { get; init; } = string.Empty;
 
     /// <summary>
-    /// Gets the parameter or header name, or the scenario name for scenario dimension failures.
+    /// Gets the parameter name, header name, JSON body path, or scenario name for scenario dimension failures.
     /// <see langword="null"/> for <c>response</c> dimension entries.
     /// </summary>
     public string? Key { get; init; }

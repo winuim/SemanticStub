@@ -1212,6 +1212,84 @@ public sealed class StubInspectionServiceTests
     }
 
     [Fact]
+    public async Task ExplainMatchAsync_JsonBodyMismatch_ReturnsBodyMismatchReasons()
+    {
+        var document = new StubDocument
+        {
+            Paths = new Dictionary<string, PathItemDefinition>(StringComparer.Ordinal)
+            {
+                ["/users"] = new()
+                {
+                    Post = new OperationDefinition
+                    {
+                        OperationId = "createUser",
+                        Matches =
+                        [
+                            new QueryMatchDefinition
+                            {
+                                Body = new Dictionary<object, object?>
+                                {
+                                    ["user"] = new Dictionary<object, object?>
+                                    {
+                                        ["profile"] = new Dictionary<object, object?>
+                                        {
+                                            ["role"] = "admin",
+                                            ["active"] = true
+                                        }
+                                    }
+                                },
+                                Response = new QueryMatchResponseDefinition
+                                {
+                                    StatusCode = 201,
+                                    Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                    {
+                                        ["application/json"] = new() { Example = new Dictionary<object, object> { ["ok"] = true } }
+                                    }
+                                }
+                            }
+                        ],
+                        Responses = new Dictionary<string, ResponseDefinition>(StringComparer.Ordinal)
+                        {
+                            ["200"] = new()
+                            {
+                                Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+                                {
+                                    ["application/json"] = new() { Example = new Dictionary<object, object> { ["fallback"] = true } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var service = CreateService(document);
+
+        var explanation = await service.ExplainMatchAsync(new MatchRequestInfo
+        {
+            Method = "POST",
+            Path = "/users",
+            Body = "{\"user\":{\"profile\":{\"role\":\"user\"}}}",
+            IncludeCandidates = true
+        });
+
+        var candidate = Assert.Single(explanation.DeterministicCandidates);
+        Assert.False(candidate.BodyMatched);
+        Assert.Contains(candidate.MismatchReasons, mismatch =>
+            mismatch.Dimension == "body" &&
+            mismatch.Key == "$.user.profile.role" &&
+            mismatch.Expected == "admin" &&
+            mismatch.Actual == "user" &&
+            mismatch.Kind == "unequal");
+        Assert.Contains(candidate.MismatchReasons, mismatch =>
+            mismatch.Dimension == "body" &&
+            mismatch.Key == "$.user.profile.active" &&
+            mismatch.Expected == "true" &&
+            mismatch.Actual is null &&
+            mismatch.Kind == "missing");
+    }
+
+    [Fact]
     public async Task ExplainMatchAsync_DoesNotExposeSemanticPromptInDeterministicCandidates()
     {
         var document = new StubDocument
