@@ -28,7 +28,7 @@ public sealed class SemanticMatchExplanation
     public double? BestScore { get; init; }
 
     /// <summary>
-    /// Gets the second-highest scoring candidate when available.
+    /// Gets the second-highest scoring candidate that satisfied the configured threshold when available.
     /// </summary>
     public QueryMatchDefinition? SecondBestCandidate { get; init; }
 
@@ -48,12 +48,12 @@ public sealed class SemanticMatchExplanation
     public double? RequiredMargin { get; init; }
 
     /// <summary>
-    /// Gets the second-best score when available.
+    /// Gets the second-best above-threshold score when available.
     /// </summary>
     public double? SecondBestScore { get; init; }
 
     /// <summary>
-    /// Gets the score gap between the selected and second-best candidates when available.
+    /// Gets the score gap between the selected and second-best above-threshold candidates when available.
     /// </summary>
     public double? MarginToSecondBest { get; init; }
 

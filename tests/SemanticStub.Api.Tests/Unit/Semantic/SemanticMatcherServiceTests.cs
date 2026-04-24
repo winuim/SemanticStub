@@ -268,7 +268,7 @@ public sealed class SemanticMatcherServiceTests
             {
                 ["method: POST\npath: /search\nbody:\nadmin search"] = "[1.0,0.0]",
                 ["find admin users"] = "[0.95,0.05]",
-                ["show invoices"] = "[0.60,0.40]"
+                ["show invoices"] = "[0.40,0.60]"
             }));
 
         var adminCandidate = CreateCandidate("find admin users");
@@ -289,6 +289,8 @@ public sealed class SemanticMatcherServiceTests
         Assert.Equal(SemanticSelectionStatus.Selected, explanation.SelectionStatus);
         Assert.Null(explanation.NonSelectionReason);
         Assert.Equal(explanation.SelectedScore, explanation.BestScore);
+        Assert.Null(explanation.SecondBestCandidate);
+        Assert.Null(explanation.SecondBestScore);
         Assert.Equal(0.8d, explanation.Threshold);
         Assert.Equal(2, explanation.CandidateScores.Count);
         Assert.Contains(explanation.CandidateScores, score => ReferenceEquals(score.Candidate, adminCandidate) && score.AboveThreshold);

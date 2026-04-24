@@ -36,12 +36,12 @@ public sealed class SemanticMatchInfo
     public double? SelectedScore { get; init; }
 
     /// <summary>
-    /// Gets the second-best score when available.
+    /// Gets the second-best above-threshold score when available.
     /// </summary>
     public double? SecondBestScore { get; init; }
 
     /// <summary>
-    /// Gets the score gap between the selected candidate and the second-best candidate when available.
+    /// Gets the score gap between the selected candidate and the second-best above-threshold candidate when available.
     /// </summary>
     public double? MarginToSecondBest { get; init; }
 
@@ -56,7 +56,7 @@ public sealed class SemanticMatchInfo
     public double? BestScore { get; init; }
 
     /// <summary>
-    /// Gets the second-highest scoring candidate index when available.
+    /// Gets the second-highest scoring above-threshold candidate index when available.
     /// </summary>
     public int? SecondBestCandidateIndex { get; init; }
 

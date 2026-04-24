@@ -303,7 +303,7 @@ public sealed class StubInspectionProjectionBuilderTests
     }
 
     [Fact]
-    public void CreateSemanticMatchInfo_ProjectsBelowThresholdReason()
+    public void CreateSemanticMatchInfo_WhenScoreBelowThreshold_SetsBelowThresholdStatus()
     {
         var builder = new StubInspectionProjectionBuilder(new ScenarioService());
         var candidate = new QueryMatchDefinition { Response = new QueryMatchResponseDefinition { StatusCode = 200 } };
@@ -333,7 +333,37 @@ public sealed class StubInspectionProjectionBuilderTests
     }
 
     [Fact]
-    public void CreateSemanticMatchInfo_ProjectsAmbiguousReason()
+    public void CreateSemanticMatchInfo_WhenOnlyOneCandidateIsAboveThreshold_LeavesSecondBestIndexNull()
+    {
+        var builder = new StubInspectionProjectionBuilder(new ScenarioService());
+        var selectedCandidate = new QueryMatchDefinition { Response = new QueryMatchResponseDefinition { StatusCode = 200 } };
+        var belowThresholdCandidate = new QueryMatchDefinition { Response = new QueryMatchResponseDefinition { StatusCode = 201 } };
+        var operation = new OperationDefinition
+        {
+            Matches = [selectedCandidate, belowThresholdCandidate]
+        };
+        var explanation = new SemanticMatchExplanation
+        {
+            Attempted = true,
+            SelectedCandidate = selectedCandidate,
+            BestCandidate = selectedCandidate,
+            BestScore = 0.95d,
+            SelectedScore = 0.95d,
+            Threshold = 0.8d,
+            RequiredMargin = 0.03d,
+            SelectionStatus = SemanticSelectionStatus.Selected,
+        };
+
+        var info = builder.CreateSemanticMatchInfo(explanation, operation, includeCandidates: false);
+
+        Assert.Equal("selected", info.SelectionStatus);
+        Assert.Equal(0, info.BestCandidateIndex);
+        Assert.Null(info.SecondBestCandidateIndex);
+        Assert.Null(info.SecondBestScore);
+    }
+
+    [Fact]
+    public void CreateSemanticMatchInfo_WhenMarginTooSmall_SetsAmbiguousStatus()
     {
         var builder = new StubInspectionProjectionBuilder(new ScenarioService());
         var firstCandidate = new QueryMatchDefinition { Response = new QueryMatchResponseDefinition { StatusCode = 200 } };

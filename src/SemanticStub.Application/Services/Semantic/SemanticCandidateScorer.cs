@@ -33,8 +33,7 @@ internal static class SemanticCandidateScorer
         double? bestScore = null;
         QueryMatchDefinition? highestScoringCandidate = null;
         double? highestScore = null;
-        QueryMatchDefinition? secondHighestScoringCandidate = null;
-        double? secondHighestScore = null;
+        QueryMatchDefinition? secondBestCandidate = null;
         double? secondBestScore = null;
 
         for (var i = 0; i < candidates.Count; i++)
@@ -54,15 +53,8 @@ internal static class SemanticCandidateScorer
 
             if (highestScore is null || score > highestScore.Value)
             {
-                secondHighestScore = highestScore;
-                secondHighestScoringCandidate = highestScoringCandidate;
                 highestScore = score;
                 highestScoringCandidate = candidate;
-            }
-            else if (secondHighestScore is null || score > secondHighestScore.Value)
-            {
-                secondHighestScore = score;
-                secondHighestScoringCandidate = candidate;
             }
 
             if (score < threshold)
@@ -73,12 +65,14 @@ internal static class SemanticCandidateScorer
             if (bestScore is null || score > bestScore.Value)
             {
                 secondBestScore = bestScore;
+                secondBestCandidate = bestCandidate;
                 bestScore = score;
                 bestCandidate = candidate;
             }
             else if (secondBestScore is null || score > secondBestScore.Value)
             {
                 secondBestScore = score;
+                secondBestCandidate = candidate;
             }
         }
 
@@ -87,8 +81,7 @@ internal static class SemanticCandidateScorer
             bestScore,
             highestScoringCandidate,
             highestScore,
-            secondHighestScoringCandidate,
-            secondHighestScore,
+            secondBestCandidate,
             secondBestScore,
             candidateScores ?? []);
     }
@@ -131,7 +124,6 @@ internal sealed record SemanticCandidateScoringResult(
     double? BestScore,
     QueryMatchDefinition? HighestScoringCandidate,
     double? HighestScore,
-    QueryMatchDefinition? SecondHighestScoringCandidate,
-    double? SecondHighestScore,
+    QueryMatchDefinition? SecondBestCandidate,
     double? SecondBestScore,
     IReadOnlyList<SemanticCandidateScore> CandidateScores);
