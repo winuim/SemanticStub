@@ -31,6 +31,10 @@ internal static class SemanticCandidateScorer
 
         QueryMatchDefinition? bestCandidate = null;
         double? bestScore = null;
+        QueryMatchDefinition? highestScoringCandidate = null;
+        double? highestScore = null;
+        QueryMatchDefinition? secondHighestScoringCandidate = null;
+        double? secondHighestScore = null;
         double? secondBestScore = null;
 
         for (var i = 0; i < candidates.Count; i++)
@@ -47,6 +51,19 @@ internal static class SemanticCandidateScorer
                 Score = score,
                 AboveThreshold = score >= threshold,
             });
+
+            if (highestScore is null || score > highestScore.Value)
+            {
+                secondHighestScore = highestScore;
+                secondHighestScoringCandidate = highestScoringCandidate;
+                highestScore = score;
+                highestScoringCandidate = candidate;
+            }
+            else if (secondHighestScore is null || score > secondHighestScore.Value)
+            {
+                secondHighestScore = score;
+                secondHighestScoringCandidate = candidate;
+            }
 
             if (score < threshold)
             {
@@ -68,6 +85,10 @@ internal static class SemanticCandidateScorer
         return new SemanticCandidateScoringResult(
             bestCandidate,
             bestScore,
+            highestScoringCandidate,
+            highestScore,
+            secondHighestScoringCandidate,
+            secondHighestScore,
             secondBestScore,
             candidateScores ?? []);
     }
@@ -108,5 +129,9 @@ internal static class SemanticCandidateScorer
 internal sealed record SemanticCandidateScoringResult(
     QueryMatchDefinition? BestCandidate,
     double? BestScore,
+    QueryMatchDefinition? HighestScoringCandidate,
+    double? HighestScore,
+    QueryMatchDefinition? SecondHighestScoringCandidate,
+    double? SecondHighestScore,
     double? SecondBestScore,
     IReadOnlyList<SemanticCandidateScore> CandidateScores);

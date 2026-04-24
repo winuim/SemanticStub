@@ -162,16 +162,21 @@ internal sealed class StubInspectionProjectionBuilder
         return new SemanticMatchInfo
         {
             Attempted = explanation.Attempted,
+            SelectionStatus = explanation.SelectionStatus,
+            NonSelectionReason = explanation.NonSelectionReason,
             Threshold = explanation.Threshold,
             RequiredMargin = explanation.RequiredMargin,
             SelectedScore = explanation.SelectedScore,
             SecondBestScore = explanation.SecondBestScore,
             MarginToSecondBest = explanation.MarginToSecondBest,
+            BestCandidateIndex = GetCandidateIndex(operation, explanation.BestCandidate),
+            BestScore = explanation.BestScore,
+            SecondBestCandidateIndex = GetCandidateIndex(operation, explanation.SecondBestCandidate),
             Candidates = includeCandidates
                 ? explanation.CandidateScores
                     .Select(score => new SemanticCandidateInfo
                     {
-                        CandidateIndex = operation.Matches.FindIndex(candidate => ReferenceEquals(candidate, score.Candidate)),
+                        CandidateIndex = GetCandidateIndex(operation, score.Candidate) ?? -1,
                         Eligible = score.Eligible,
                         Score = score.Score,
                         AboveThreshold = score.AboveThreshold,
@@ -179,6 +184,17 @@ internal sealed class StubInspectionProjectionBuilder
                     .ToList()
                 : [],
         };
+    }
+
+    private static int? GetCandidateIndex(OperationDefinition operation, QueryMatchDefinition? candidate)
+    {
+        if (candidate is null)
+        {
+            return null;
+        }
+
+        var index = operation.Matches.FindIndex(match => ReferenceEquals(match, candidate));
+        return index >= 0 ? index : null;
     }
 
     public static bool IsConfiguredResponse(QueryMatchResponseDefinition response)

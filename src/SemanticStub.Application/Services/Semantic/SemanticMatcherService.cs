@@ -381,6 +381,8 @@ public sealed class SemanticMatcherService : ISemanticMatcherService
             Attempted = true,
             Threshold = semanticSettings.Threshold,
             RequiredMargin = semanticSettings.TopScoreMargin,
+            SelectionStatus = SemanticSelectionStatus.Unavailable,
+            NonSelectionReason = SemanticSelectionStatus.Unavailable,
         };
     }
 

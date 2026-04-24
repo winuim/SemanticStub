@@ -338,6 +338,7 @@ Inspection notes:
 - `/_semanticstub/runtime/requests` is process-local and currently returns up to 100 recent real requests in newest-first order. Each item includes timestamp, method, path, resolved route id when available, status code, elapsed time, match mode, and failure reason for unmatched requests. The `limit` query parameter defaults to `20`.
 - `/_semanticstub/runtime/test-match` and `/_semanticstub/runtime/explain` accept a virtual request payload with method, path, optional query/header/body values, and optional candidate-detail flags. Their result payload also includes the selected response id, status code, response source (`responses` or `x-match`), and candidate index when applicable.
 - Each deterministic candidate in the `deterministicCandidates` array carries a `mismatchReasons` list when it did not match. Each entry has a `dimension` (`query`, `header`, `body`, `scenario`, or `response`), a `key` identifying which parameter, header, JSON body path, or scenario failed, the `expected` value from the stub definition, the `actual` value from the request (or `null` when the key or JSON path was absent), and a `kind` of `missing`, `unequal`, or `notConfigured`. Body mismatch paths use a bounded JSON path-style form such as `$.user.profile.role`. The list is empty for candidates that matched or were selected.
+- When semantic fallback is evaluated, `semanticEvaluation.selectionStatus` is `selected`, `belowThreshold`, `ambiguous`, or `unavailable`. Non-selected semantic outcomes also include `nonSelectionReason`, plus best and second-best candidate indexes and scores when available so threshold failures and low-margin ambiguity can be compared without changing matching behavior.
 - `/_semanticstub/runtime/explain/last` is process-local and only updates after a real request produces a matched stub response.
 - `/_semanticstub/runtime/scenarios/resets`, `/_semanticstub/runtime/scenarios/reset`, `/_semanticstub/runtime/scenarios/{name}/resets`, and `/_semanticstub/runtime/scenarios/{name}/reset` mutate only in-memory scenario state for the current process.
 - These endpoints do not expose raw YAML, internal domain objects, or full response payload bodies.
@@ -353,6 +354,26 @@ Example request body for `POST /_semanticstub/runtime/test-match` and
     "role": ["admin"]
   },
   "includeCandidates": true
+}
+```
+
+Semantic fallback details include machine-readable comparison metadata:
+
+```json
+{
+  "semanticEvaluation": {
+    "attempted": true,
+    "selectionStatus": "ambiguous",
+    "nonSelectionReason": "ambiguous",
+    "threshold": 0.8,
+    "requiredMargin": 0.03,
+    "selectedScore": 0.95,
+    "secondBestScore": 0.93,
+    "marginToSecondBest": 0.02,
+    "bestCandidateIndex": 0,
+    "bestScore": 0.95,
+    "secondBestCandidateIndex": 1
+  }
 }
 ```
 
