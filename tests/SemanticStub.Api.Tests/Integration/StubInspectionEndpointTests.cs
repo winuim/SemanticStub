@@ -600,6 +600,103 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task ReplayRequest_WhenNoRequestsRecorded_ReturnsNotFound()
+    {
+        await using var factory = new WebApplicationFactory<Program>();
+        using var freshClient = factory.CreateClient();
+
+        var response = await freshClient.PostAsync("/_semanticstub/runtime/requests/0/replay", content: null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReplayRequest_WhenIndexIsNegative_ReturnsNotFound()
+    {
+        var response = await client.PostAsync("/_semanticstub/runtime/requests/-1/replay", content: null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReplayRequest_WhenIndexOutOfRange_ReturnsNotFound()
+    {
+        var routedResponse = await client.GetAsync("/hello");
+        routedResponse.EnsureSuccessStatusCode();
+
+        var response = await client.PostAsync("/_semanticstub/runtime/requests/99/replay", content: null);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReplayRequest_AfterRealRequest_ReturnsOk()
+    {
+        var routedResponse = await client.GetAsync("/hello");
+        routedResponse.EnsureSuccessStatusCode();
+
+        var response = await client.PostAsync("/_semanticstub/runtime/requests/0/replay", content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReplayRequest_AfterRealRequest_ResponseDeserializesToReplayResultInfo()
+    {
+        var routedResponse = await client.GetAsync("/hello");
+        routedResponse.EnsureSuccessStatusCode();
+
+        var response = await client.PostAsync("/_semanticstub/runtime/requests/0/replay", content: null);
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<ReplayResultInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(payload);
+        Assert.NotNull(payload!.Request);
+        Assert.NotNull(payload.Explanation);
+    }
+
+    [Fact]
+    public async Task ReplayRequest_AfterRealRequest_ReplayMatchesOriginalRequest()
+    {
+        var routedResponse = await client.GetAsync("/users?role=admin");
+        routedResponse.EnsureSuccessStatusCode();
+
+        var response = await client.PostAsync("/_semanticstub/runtime/requests/0/replay", content: null);
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<ReplayResultInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(payload);
+        Assert.Equal("GET", payload!.Request.Method);
+        Assert.Equal("/users", payload.Request.Path);
+        Assert.NotNull(payload.Request.Query);
+        Assert.Contains("role", payload.Request.Query!.Keys);
+        Assert.Equal("Matched", payload.Explanation.Result.MatchResult);
+        Assert.Equal("listUsers", payload.Explanation.Result.RouteId);
+        Assert.True(payload.Explanation.PathMatched);
+        Assert.True(payload.Explanation.MethodMatched);
+    }
+
+    [Fact]
+    public async Task ReplayRequest_ExplanationIncludesCandidates()
+    {
+        var routedResponse = await client.GetAsync("/users?role=admin");
+        routedResponse.EnsureSuccessStatusCode();
+
+        var response = await client.PostAsync("/_semanticstub/runtime/requests/0/replay", content: null);
+        response.EnsureSuccessStatusCode();
+
+        var payload = await response.Content.ReadFromJsonAsync<ReplayResultInfo>(
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        Assert.NotNull(payload);
+        Assert.NotEmpty(payload!.Explanation.DeterministicCandidates);
+    }
+
     private static async Task AssertNotFoundProblemDetails(HttpResponseMessage response, string expectedTitle)
     {
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
