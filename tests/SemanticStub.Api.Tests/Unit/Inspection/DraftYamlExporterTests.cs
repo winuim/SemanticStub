@@ -458,8 +458,90 @@ public sealed class DraftYamlExporterTests
     }
 
     [Fact]
+    public void Export_MultipleRequestsWithSameMethodAndPath_GroupsAsOneOperation()
+    {
+        var requests = new[]
+        {
+            MakeRequest("GET", "/users", query: new Dictionary<string, string[]>
+            {
+                ["role"] = ["admin"],
+            }),
+            MakeRequest("GET", "/users", query: new Dictionary<string, string[]>
+            {
+                ["role"] = ["guest"],
+            }),
+        };
+
+        var result = DraftYamlExporter.Export(requests);
+
+        Assert.Equal(1, CountOccurrences(result, "    get:"));
+        Assert.Equal(2, CountOccurrences(result, "      - query:"));
+        Assert.Contains("role: admin", result);
+        Assert.Contains("role: guest", result);
+    }
+
+    [Fact]
+    public void Export_MultipleRequestsWithDifferentPaths_KeepsSeparateRoutes()
+    {
+        var requests = new[]
+        {
+            MakeRequest("GET", "/users"),
+            MakeRequest("GET", "/orders"),
+        };
+
+        var result = DraftYamlExporter.Export(requests);
+
+        Assert.Contains("  /users:", result);
+        Assert.Contains("  /orders:", result);
+        Assert.Contains("operationId: getUsers", result);
+        Assert.Contains("operationId: getOrders", result);
+    }
+
+    [Fact]
+    public void Export_MultipleRequestsWithDifferentMethodsOnSamePath_KeepsSeparateOperations()
+    {
+        var requests = new[]
+        {
+            MakeRequest("GET", "/users"),
+            MakeRequest("POST", "/users",
+                headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Content-Type"] = "application/json",
+                },
+                body: """{"name":"demo"}"""),
+        };
+
+        var result = DraftYamlExporter.Export(requests);
+
+        Assert.Contains("    get:", result);
+        Assert.Contains("    post:", result);
+        Assert.Contains("operationId: getUsers", result);
+        Assert.Contains("operationId: postUsers", result);
+    }
+
+    [Fact]
+    public void Export_MultipleRequests_ThrowsWhenRequestsIsNull()
+    {
+        Assert.Throws<ArgumentNullException>(() => DraftYamlExporter.Export((IEnumerable<ReplayReadyRequestInfo>)null!));
+    }
+
+    [Fact]
     public void Export_ThrowsWhenRequestIsNull()
     {
-        Assert.Throws<ArgumentNullException>(() => DraftYamlExporter.Export(null!));
+        Assert.Throws<ArgumentNullException>(() => DraftYamlExporter.Export((ReplayReadyRequestInfo)null!));
+    }
+
+    private static int CountOccurrences(string value, string search)
+    {
+        var count = 0;
+        var index = 0;
+
+        while ((index = value.IndexOf(search, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += search.Length;
+        }
+
+        return count;
     }
 }
