@@ -40,9 +40,9 @@ public static class DraftYamlExporter
         ArgumentNullException.ThrowIfNull(request);
 
         var matchHeaders = BuildMatchHeaders(request.Headers);
-        var (matchBody, hasSkippedNestedFields) = BuildMatchBody(request.Body, request.Headers);
+        var (matchBody, hasSkippedBodyFields) = BuildMatchBody(request.Body, request.Headers);
         var hasXMatch = request.Query is { Count: > 0 } || matchHeaders.Count > 0
-            || matchBody is not null || hasSkippedNestedFields;
+            || matchBody is not null || hasSkippedBodyFields;
 
         var operation = new Dictionary<string, object>
         {
@@ -147,7 +147,7 @@ public static class DraftYamlExporter
 
         var yaml = _serializer.Serialize(document);
 
-        if (hasSkippedNestedFields)
+        if (hasSkippedBodyFields)
         {
             yaml += "# TODO: body contained nested fields that were skipped — complete x-match.body manually\n";
         }
@@ -192,7 +192,7 @@ public static class DraftYamlExporter
             .ToDictionary(h => h.Key, h => h.Value, StringComparer.OrdinalIgnoreCase);
     }
 
-    private static (Dictionary<string, object?>? body, bool hasSkippedNestedFields) BuildMatchBody(
+    private static (Dictionary<string, object?>? body, bool hasSkippedBodyFields) BuildMatchBody(
         string? body, IReadOnlyDictionary<string, string>? headers)
     {
         if (string.IsNullOrEmpty(body))
@@ -219,30 +219,17 @@ public static class DraftYamlExporter
 
             foreach (var property in doc.RootElement.EnumerateObject())
             {
-                switch (property.Value.ValueKind)
+                if (property.Value.ValueKind == JsonValueKind.String)
                 {
-                    case JsonValueKind.String:
-                        result[property.Name] = property.Value.GetString() ?? string.Empty;
-                        break;
-                    case JsonValueKind.Number:
-                        // Use the raw JSON token to avoid any floating-point conversion loss.
-                        // JsonBodyMatcher compares numbers via GetRawText(), so the YAML value
-                        // must round-trip to the same token string.
-                        result[property.Name] = property.Value.GetRawText();
-                        break;
-                    case JsonValueKind.True:
-                        result[property.Name] = true;
-                        break;
-                    case JsonValueKind.False:
-                        result[property.Name] = false;
-                        break;
-                    case JsonValueKind.Null:
-                        result[property.Name] = null;
-                        break;
-                    default:
-                        // Object and Array cannot be mapped to scalar conditions.
-                        skipped = true;
-                        break;
+                    result[property.Name] = property.Value.GetString() ?? string.Empty;
+                }
+                else
+                {
+                    // Non-string scalars (numbers, booleans, null) and nested structures are
+                    // skipped: StubDefinitionLoader deserializes all YAML scalars as strings,
+                    // so a typed condition like `count: 42` would be loaded as the string "42"
+                    // and fail to match the JSON number 42 in JsonBodyMatcher.
+                    skipped = true;
                 }
             }
 

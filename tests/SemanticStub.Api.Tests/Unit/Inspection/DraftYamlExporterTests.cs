@@ -374,54 +374,41 @@ public sealed class DraftYamlExporterTests
     }
 
     [Fact]
-    public void Export_WithNumericJsonBody_SerializesAsNumber()
+    public void Export_WithNumericJsonBodyField_SkipsAndEmitsTodo()
     {
         var request = MakeRequest("POST", "/data",
             headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["Content-Type"] = "application/json",
             },
-            body: """{"count":42,"ratio":1.5}""");
+            body: """{"count":42}""");
 
         var result = DraftYamlExporter.Export(request);
 
-        Assert.Contains("count: 42", result);
-        Assert.Contains("ratio: 1.5", result);
+        // Numeric values are skipped: StubDefinitionLoader loads all YAML scalars as strings,
+        // which causes a type mismatch against JSON number values in JsonBodyMatcher.
+        Assert.DoesNotContain("count:", result);
+        Assert.Contains("TODO", result);
     }
 
     [Fact]
-    public void Export_WithHighPrecisionNumber_PreservesRawToken()
+    public void Export_WithBooleanJsonBodyField_SkipsAndEmitsTodo()
     {
         var request = MakeRequest("POST", "/data",
             headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["Content-Type"] = "application/json",
             },
-            body: """{"price":1.2345678901234567}""");
+            body: """{"active":true}""");
 
         var result = DraftYamlExporter.Export(request);
 
-        Assert.Contains("1.2345678901234567", result);
+        Assert.DoesNotContain("active:", result);
+        Assert.Contains("TODO", result);
     }
 
     [Fact]
-    public void Export_WithBooleanJsonBody_SerializesAsBoolean()
-    {
-        var request = MakeRequest("POST", "/data",
-            headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Content-Type"] = "application/json",
-            },
-            body: """{"active":true,"deleted":false}""");
-
-        var result = DraftYamlExporter.Export(request);
-
-        Assert.Contains("active: true", result);
-        Assert.Contains("deleted: false", result);
-    }
-
-    [Fact]
-    public void Export_WithNullJsonBodyField_IncludesNullConstraint()
+    public void Export_WithNullJsonBodyField_SkipsAndEmitsTodo()
     {
         var request = MakeRequest("POST", "/data",
             headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -433,7 +420,8 @@ public sealed class DraftYamlExporterTests
         var result = DraftYamlExporter.Export(request);
 
         Assert.Contains("name: demo", result);
-        Assert.Contains("middleName:", result);
+        Assert.DoesNotContain("middleName:", result);
+        Assert.Contains("TODO", result);
     }
 
     [Fact]
