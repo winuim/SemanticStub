@@ -301,7 +301,7 @@ public sealed class DraftYamlExporterTests
         var result = DraftYamlExporter.Export(request);
 
         Assert.Contains("responses:", result);
-        Assert.Contains("'200':", result);
+        Assert.Contains("200:", result);
         Assert.Contains("description: TODO", result);
     }
 
@@ -360,7 +360,7 @@ public sealed class DraftYamlExporterTests
     }
 
     [Fact]
-    public void Export_YamlScalar_EscapesApostropheWithDoubleApostrophe()
+    public void Export_QueryValueWithApostrophe_IsPreservedInOutput()
     {
         var request = MakeRequest("GET", "/users", query: new Dictionary<string, string[]>
         {
@@ -369,8 +369,41 @@ public sealed class DraftYamlExporterTests
 
         var result = DraftYamlExporter.Export(request);
 
-        // YAML single-quoted scalar: apostrophe is escaped as ''
-        Assert.Contains("q: 'it''s'", result);
+        // YamlDotNet serializes the value correctly; the apostrophe is preserved.
+        Assert.Contains("it's", result);
+    }
+
+    [Fact]
+    public void Export_WithVendorJsonContentType_IncludesBodyInXMatch()
+    {
+        var request = MakeRequest("POST", "/api",
+            headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = "application/vnd.api+json",
+            },
+            body: """{"name":"test"}""");
+
+        var result = DraftYamlExporter.Export(request);
+
+        Assert.Contains("x-match:", result);
+        Assert.Contains("body:", result);
+        Assert.Contains("name: test", result);
+    }
+
+    [Fact]
+    public void Export_WithAllNestedJsonBody_EmitsTodoComment()
+    {
+        var request = MakeRequest("POST", "/data",
+            headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = "application/json",
+            },
+            body: """{"address":{"city":"Tokyo"},"meta":{"version":1}}""");
+
+        var result = DraftYamlExporter.Export(request);
+
+        // All fields are nested — x-match should still appear and TODO should be emitted.
+        Assert.Contains("TODO", result);
     }
 
     [Fact]

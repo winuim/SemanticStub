@@ -1,5 +1,6 @@
-using System.Text;
 using System.Text.Json;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace SemanticStub.Api.Inspection;
 
@@ -9,6 +10,11 @@ namespace SemanticStub.Api.Inspection;
 /// </summary>
 public static class DraftYamlExporter
 {
+    private static readonly ISerializer _serializer = new SerializerBuilder()
+        .WithNamingConvention(NullNamingConvention.Instance)
+        .DisableAliases()
+        .Build();
+
     // Headers excluded from x-match because they are sensitive or unreliable for stub matching.
     private static readonly HashSet<string> _excludedHeaders = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -33,108 +39,120 @@ public static class DraftYamlExporter
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var method = request.Method.ToLowerInvariant();
-        var operationId = BuildOperationId(request.Method, request.Path);
         var matchHeaders = BuildMatchHeaders(request.Headers);
         var (matchBody, hasSkippedNestedFields) = BuildMatchBody(request.Body, request.Headers);
-        var hasXMatch = request.Query is { Count: > 0 } || matchHeaders.Count > 0 || matchBody is not null;
-        var contentType = DetectContentType(request.Headers);
+        var hasXMatch = request.Query is { Count: > 0 } || matchHeaders.Count > 0
+            || matchBody is not null || hasSkippedNestedFields;
 
-        var sb = new StringBuilder();
-        sb.AppendLine("openapi: 3.1.0");
-        sb.AppendLine("info:");
-        sb.AppendLine("  title: Draft Stub");
-        sb.AppendLine("  version: 0.0.0");
-        sb.AppendLine("paths:");
-        sb.AppendLine($"  {request.Path}:");
-        sb.AppendLine($"    {method}:");
-        sb.AppendLine($"      operationId: {operationId}");
+        var operation = new Dictionary<string, object>
+        {
+            ["operationId"] = BuildOperationId(request.Method, request.Path),
+        };
 
         if (hasXMatch)
         {
-            sb.AppendLine("      x-match:");
-            sb.Append("        -");
-
-            var firstCondition = true;
+            var matchEntry = new Dictionary<string, object>();
 
             if (request.Query is { Count: > 0 })
             {
-                AppendConditionKey(sb, "query", ref firstCondition);
+                var queryMap = new Dictionary<string, object>();
                 foreach (var (key, values) in request.Query.OrderBy(q => q.Key, StringComparer.Ordinal))
                 {
-                    if (values.Length == 1)
-                    {
-                        sb.AppendLine($"            {key}: {YamlScalar(values[0])}");
-                    }
-                    else
-                    {
-                        sb.AppendLine($"            {key}:");
-                        foreach (var v in values)
-                        {
-                            sb.AppendLine($"              - {YamlScalar(v)}");
-                        }
-                    }
+                    queryMap[key] = values.Length == 1 ? (object)values[0] : values;
                 }
+                matchEntry["query"] = queryMap;
             }
 
             if (matchHeaders.Count > 0)
             {
-                AppendConditionKey(sb, "headers", ref firstCondition);
+                var headerMap = new Dictionary<string, object>();
                 foreach (var (key, value) in matchHeaders.OrderBy(h => h.Key, StringComparer.OrdinalIgnoreCase))
                 {
-                    sb.AppendLine($"            {key}: {YamlScalar(value)}");
+                    headerMap[key] = value;
                 }
+                matchEntry["headers"] = headerMap;
             }
 
             if (matchBody is not null)
             {
-                AppendConditionKey(sb, "body", ref firstCondition);
+                var bodyMap = new Dictionary<string, object>();
                 foreach (var (key, value) in matchBody.OrderBy(p => p.Key, StringComparer.Ordinal))
                 {
-                    sb.AppendLine($"            {key}: {YamlScalar(value)}");
+                    bodyMap[key] = value;
                 }
-                if (hasSkippedNestedFields)
-                {
-                    sb.AppendLine("            # TODO: nested fields were skipped — add them manually");
-                }
+                matchEntry["body"] = bodyMap;
             }
 
-            sb.AppendLine("          response:");
-            sb.AppendLine("            statusCode: 200");
-            sb.AppendLine("            content:");
-            sb.AppendLine("              application/json:");
-            sb.AppendLine("                example: {}");
+            matchEntry["response"] = new Dictionary<string, object>
+            {
+                ["statusCode"] = 200,
+                ["content"] = new Dictionary<string, object>
+                {
+                    ["application/json"] = new Dictionary<string, object>
+                    {
+                        ["example"] = new Dictionary<string, object>(),
+                    },
+                },
+            };
+
+            operation["x-match"] = new List<object> { matchEntry };
         }
 
+        var contentType = DetectContentType(request.Headers);
         if (!string.IsNullOrEmpty(request.Body) && contentType is not null)
         {
-            sb.AppendLine("      requestBody:");
-            sb.AppendLine("        content:");
-            sb.AppendLine($"          {contentType}:");
-            sb.AppendLine("            example: {}");
+            operation["requestBody"] = new Dictionary<string, object>
+            {
+                ["content"] = new Dictionary<string, object>
+                {
+                    [contentType] = new Dictionary<string, object>
+                    {
+                        ["example"] = new Dictionary<string, object>(),
+                    },
+                },
+            };
         }
 
-        sb.AppendLine("      responses:");
-        sb.AppendLine("        '200':");
-        sb.AppendLine("          description: TODO");
-        sb.AppendLine("          content:");
-        sb.AppendLine("            application/json:");
-        sb.Append("              example: {}");
-
-        return sb.ToString();
-    }
-
-    private static void AppendConditionKey(StringBuilder sb, string key, ref bool firstCondition)
-    {
-        if (firstCondition)
+        operation["responses"] = new Dictionary<string, object>
         {
-            sb.AppendLine($" {key}:");
-            firstCondition = false;
-        }
-        else
+            ["200"] = new Dictionary<string, object>
+            {
+                ["description"] = "TODO",
+                ["content"] = new Dictionary<string, object>
+                {
+                    ["application/json"] = new Dictionary<string, object>
+                    {
+                        ["example"] = new Dictionary<string, object>(),
+                    },
+                },
+            },
+        };
+
+        var document = new Dictionary<string, object>
         {
-            sb.AppendLine($"          {key}:");
+            ["openapi"] = "3.1.0",
+            ["info"] = new Dictionary<string, object>
+            {
+                ["title"] = "Draft Stub",
+                ["version"] = "0.0.0",
+            },
+            ["paths"] = new Dictionary<string, object>
+            {
+                [request.Path] = new Dictionary<string, object>
+                {
+                    [request.Method.ToLowerInvariant()] = operation,
+                },
+            },
+        };
+
+        var yaml = _serializer.Serialize(document);
+
+        if (hasSkippedNestedFields)
+        {
+            yaml += "# TODO: body contained nested fields that were skipped — complete x-match.body manually\n";
         }
+
+        return yaml;
     }
 
     private static string BuildOperationId(string method, string path)
@@ -183,7 +201,7 @@ public static class DraftYamlExporter
         }
 
         var contentType = DetectContentType(headers);
-        if (contentType is null || !contentType.Contains("application/json", StringComparison.OrdinalIgnoreCase))
+        if (!IsJsonContentType(contentType))
         {
             return (null, false);
         }
@@ -220,7 +238,8 @@ public static class DraftYamlExporter
                 }
             }
 
-            return result.Count > 0 ? (result, skipped) : (null, false);
+            // Preserve the skipped signal even when no scalar fields were extracted.
+            return result.Count > 0 ? (result, skipped) : (null, skipped);
         }
         catch (JsonException)
         {
@@ -238,23 +257,9 @@ public static class DraftYamlExporter
         return headers.TryGetValue("Content-Type", out var ct) ? ct.Split(';')[0].Trim() : null;
     }
 
-    private static string YamlScalar(string value)
-    {
-        if (value.Length == 0)
-        {
-            return "''";
-        }
-
-        // Quote if value contains characters that would break YAML parsing.
-        if (value.Contains(':') || value.Contains('#') || value.Contains('\'')
-            || value.StartsWith('{') || value.StartsWith('[') || value.StartsWith('"')
-            || value == "true" || value == "false"
-            || value == "null" || value.StartsWith(' ') || value.EndsWith(' '))
-        {
-            // YAML single-quoted scalars escape apostrophes by doubling them.
-            return $"'{value.Replace("'", "''")}'";
-        }
-
-        return value;
-    }
+    // P1: treat any +json media type (e.g. application/vnd.api+json) as JSON.
+    private static bool IsJsonContentType(string? contentType) =>
+        contentType is not null &&
+        (contentType.Equals("application/json", StringComparison.OrdinalIgnoreCase) ||
+         contentType.EndsWith("+json", StringComparison.OrdinalIgnoreCase));
 }

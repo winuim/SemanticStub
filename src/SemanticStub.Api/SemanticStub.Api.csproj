@@ -9,4 +9,8 @@
     <ProjectReference Include="..\SemanticStub.Application\SemanticStub.Application.csproj" />
     <ProjectReference Include="..\SemanticStub.Infrastructure\SemanticStub.Infrastructure.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
 </Project>
