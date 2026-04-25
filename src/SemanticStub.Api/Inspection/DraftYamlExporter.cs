@@ -75,7 +75,7 @@ public static class DraftYamlExporter
 
             if (matchBody is not null)
             {
-                var bodyMap = new Dictionary<string, object>();
+                var bodyMap = new Dictionary<string, object?>();
                 foreach (var (key, value) in matchBody.OrderBy(p => p.Key, StringComparer.Ordinal))
                 {
                     bodyMap[key] = value;
@@ -192,7 +192,7 @@ public static class DraftYamlExporter
             .ToDictionary(h => h.Key, h => h.Value, StringComparer.OrdinalIgnoreCase);
     }
 
-    private static (Dictionary<string, string>? body, bool hasSkippedNestedFields) BuildMatchBody(
+    private static (Dictionary<string, object?>? body, bool hasSkippedNestedFields) BuildMatchBody(
         string? body, IReadOnlyDictionary<string, string>? headers)
     {
         if (string.IsNullOrEmpty(body))
@@ -214,31 +214,36 @@ public static class DraftYamlExporter
                 return (null, false);
             }
 
-            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            var result = new Dictionary<string, object?>(StringComparer.Ordinal);
             var skipped = false;
 
             foreach (var property in doc.RootElement.EnumerateObject())
             {
-                var value = property.Value.ValueKind switch
+                switch (property.Value.ValueKind)
                 {
-                    JsonValueKind.String => property.Value.GetString() ?? string.Empty,
-                    JsonValueKind.Number => property.Value.GetRawText(),
-                    JsonValueKind.True => "true",
-                    JsonValueKind.False => "false",
-                    _ => null,
-                };
-
-                if (value is not null)
-                {
-                    result[property.Name] = value;
-                }
-                else
-                {
-                    skipped = true;
+                    case JsonValueKind.String:
+                        result[property.Name] = property.Value.GetString() ?? string.Empty;
+                        break;
+                    case JsonValueKind.Number:
+                        result[property.Name] = property.Value.TryGetInt64(out var l) ? (object)l : property.Value.GetDouble();
+                        break;
+                    case JsonValueKind.True:
+                        result[property.Name] = true;
+                        break;
+                    case JsonValueKind.False:
+                        result[property.Name] = false;
+                        break;
+                    case JsonValueKind.Null:
+                        result[property.Name] = null;
+                        break;
+                    default:
+                        // Object and Array cannot be mapped to scalar conditions.
+                        skipped = true;
+                        break;
                 }
             }
 
-            // Preserve the skipped signal even when no scalar fields were extracted.
+            // Preserve the skipped signal even when no mappable fields were extracted.
             return result.Count > 0 ? (result, skipped) : (null, skipped);
         }
         catch (JsonException)

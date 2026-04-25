@@ -374,6 +374,54 @@ public sealed class DraftYamlExporterTests
     }
 
     [Fact]
+    public void Export_WithNumericJsonBody_SerializesAsNumber()
+    {
+        var request = MakeRequest("POST", "/data",
+            headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = "application/json",
+            },
+            body: """{"count":42,"ratio":1.5}""");
+
+        var result = DraftYamlExporter.Export(request);
+
+        Assert.Contains("count: 42", result);
+        Assert.Contains("ratio: 1.5", result);
+    }
+
+    [Fact]
+    public void Export_WithBooleanJsonBody_SerializesAsBoolean()
+    {
+        var request = MakeRequest("POST", "/data",
+            headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = "application/json",
+            },
+            body: """{"active":true,"deleted":false}""");
+
+        var result = DraftYamlExporter.Export(request);
+
+        Assert.Contains("active: true", result);
+        Assert.Contains("deleted: false", result);
+    }
+
+    [Fact]
+    public void Export_WithNullJsonBodyField_IncludesNullConstraint()
+    {
+        var request = MakeRequest("POST", "/data",
+            headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = "application/json",
+            },
+            body: """{"name":"demo","middleName":null}""");
+
+        var result = DraftYamlExporter.Export(request);
+
+        Assert.Contains("name: demo", result);
+        Assert.Contains("middleName:", result);
+    }
+
+    [Fact]
     public void Export_WithVendorJsonContentType_IncludesBodyInXMatch()
     {
         var request = MakeRequest("POST", "/api",
