@@ -5,7 +5,7 @@ using YamlDotNet.Serialization.NamingConventions;
 namespace SemanticStub.Api.Inspection;
 
 /// <summary>
-/// Generates a reviewable draft YAML stub definition from a single recorded request.
+/// Generates reviewable draft YAML stub definitions from recorded requests.
 /// The output follows OpenAPI 3.1 conventions with x-* extensions used by SemanticStub.
 /// </summary>
 public static class DraftYamlExporter
@@ -39,77 +39,99 @@ public static class DraftYamlExporter
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var matchHeaders = BuildMatchHeaders(request.Headers);
-        var (matchBody, hasSkippedBodyFields) = BuildMatchBody(request.Body, request.Headers);
-        var hasXMatch = request.Query is { Count: > 0 } || matchHeaders.Count > 0
-            || matchBody is not null || hasSkippedBodyFields;
+        return Export([request]);
+    }
+
+    /// <summary>
+    /// Exports recorded requests as grouped draft YAML stub suggestions.
+    /// </summary>
+    /// <param name="requests">The recorded requests to use as a basis for the suggestions.</param>
+    /// <returns>A YAML string containing reviewable OpenAPI 3.1 stub suggestions.</returns>
+    public static string Export(IEnumerable<ReplayReadyRequestInfo> requests)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+
+        var requestList = requests.ToList();
+        if (requestList.Any(request => request is null))
+        {
+            throw new ArgumentException("Requests must not contain null entries.", nameof(requests));
+        }
+
+        var paths = new Dictionary<string, object>(StringComparer.Ordinal);
+        var hasSkippedBodyFields = false;
+
+        foreach (var pathGroup in requestList.GroupBy(r => r.Path, StringComparer.Ordinal))
+        {
+            var pathItem = new Dictionary<string, object>(StringComparer.Ordinal);
+
+            foreach (var operationGroup in pathGroup.GroupBy(r => r.Method, StringComparer.OrdinalIgnoreCase))
+            {
+                var operationRequests = operationGroup.ToList();
+                var operation = BuildOperation(operationRequests, out var operationHasSkippedBodyFields);
+                pathItem[operationGroup.Key.ToLowerInvariant()] = operation;
+                hasSkippedBodyFields |= operationHasSkippedBodyFields;
+            }
+
+            paths[pathGroup.Key] = pathItem;
+        }
+
+        var document = new Dictionary<string, object>
+        {
+            ["openapi"] = "3.1.0",
+            ["info"] = new Dictionary<string, object>
+            {
+                ["title"] = "Draft Stub",
+                ["version"] = "0.0.0",
+            },
+            ["paths"] = paths,
+        };
+
+        var yaml = _serializer.Serialize(document);
+
+        if (hasSkippedBodyFields)
+        {
+            yaml += "# TODO: body contained nested fields that were skipped — complete x-match.body manually\n";
+        }
+
+        return yaml;
+    }
+
+    private static Dictionary<string, object> BuildOperation(
+        IReadOnlyList<ReplayReadyRequestInfo> requests,
+        out bool hasSkippedBodyFields)
+    {
+        var firstRequest = requests[0];
 
         var operation = new Dictionary<string, object>
         {
-            ["operationId"] = BuildOperationId(request.Method, request.Path),
+            ["operationId"] = BuildOperationId(firstRequest.Method, firstRequest.Path),
         };
 
-        if (hasXMatch)
+        var matchEntries = new List<object>();
+        hasSkippedBodyFields = false;
+
+        foreach (var request in requests)
         {
-            var matchEntry = new Dictionary<string, object>();
+            var matchEntry = BuildMatchEntry(request, out var requestHasSkippedBodyFields);
+            hasSkippedBodyFields |= requestHasSkippedBodyFields;
 
-            if (request.Query is { Count: > 0 })
+            if (matchEntry is not null)
             {
-                var queryMap = new Dictionary<string, object>();
-                foreach (var (key, values) in request.Query.OrderBy(q => q.Key, StringComparer.Ordinal))
-                {
-                    queryMap[key] = values.Length == 1 ? (object)values[0] : values;
-                }
-                matchEntry["query"] = queryMap;
+                matchEntries.Add(matchEntry);
             }
-
-            if (matchHeaders.Count > 0)
-            {
-                var headerMap = new Dictionary<string, object>();
-                foreach (var (key, value) in matchHeaders.OrderBy(h => h.Key, StringComparer.OrdinalIgnoreCase))
-                {
-                    headerMap[key] = value;
-                }
-                matchEntry["headers"] = headerMap;
-            }
-
-            if (matchBody is not null)
-            {
-                var bodyMap = new Dictionary<string, object?>();
-                foreach (var (key, value) in matchBody.OrderBy(p => p.Key, StringComparer.Ordinal))
-                {
-                    bodyMap[key] = value;
-                }
-                matchEntry["body"] = bodyMap;
-            }
-
-            matchEntry["response"] = new Dictionary<string, object>
-            {
-                ["statusCode"] = 200,
-                ["content"] = new Dictionary<string, object>
-                {
-                    ["application/json"] = new Dictionary<string, object>
-                    {
-                        ["example"] = new Dictionary<string, object>(),
-                    },
-                },
-            };
-
-            operation["x-match"] = new List<object> { matchEntry };
         }
 
-        var contentType = DetectContentType(request.Headers);
-        if (!string.IsNullOrEmpty(request.Body) && contentType is not null)
+        if (matchEntries.Count > 0)
+        {
+            operation["x-match"] = matchEntries;
+        }
+
+        var requestBodyContent = BuildRequestBodyContent(requests);
+        if (requestBodyContent.Count > 0)
         {
             operation["requestBody"] = new Dictionary<string, object>
             {
-                ["content"] = new Dictionary<string, object>
-                {
-                    [contentType] = new Dictionary<string, object>
-                    {
-                        ["example"] = new Dictionary<string, object>(),
-                    },
-                },
+                ["content"] = requestBodyContent,
             };
         }
 
@@ -128,31 +150,89 @@ public static class DraftYamlExporter
             },
         };
 
-        var document = new Dictionary<string, object>
+        return operation;
+    }
+
+    private static Dictionary<string, object>? BuildMatchEntry(
+        ReplayReadyRequestInfo request,
+        out bool hasSkippedBodyFields)
+    {
+        var matchHeaders = BuildMatchHeaders(request.Headers);
+        var (matchBody, skippedBodyFields) = BuildMatchBody(request.Body, request.Headers);
+        hasSkippedBodyFields = skippedBodyFields;
+
+        if (request.Query is not { Count: > 0 } && matchHeaders.Count == 0
+            && matchBody is null && !hasSkippedBodyFields)
         {
-            ["openapi"] = "3.1.0",
-            ["info"] = new Dictionary<string, object>
+            return null;
+        }
+
+        var matchEntry = new Dictionary<string, object>();
+
+        if (request.Query is { Count: > 0 })
+        {
+            var queryMap = new Dictionary<string, object>();
+            foreach (var (key, values) in request.Query.OrderBy(q => q.Key, StringComparer.Ordinal))
             {
-                ["title"] = "Draft Stub",
-                ["version"] = "0.0.0",
-            },
-            ["paths"] = new Dictionary<string, object>
+                queryMap[key] = values.Length == 1 ? (object)values[0] : values;
+            }
+            matchEntry["query"] = queryMap;
+        }
+
+        if (matchHeaders.Count > 0)
+        {
+            var headerMap = new Dictionary<string, object>();
+            foreach (var (key, value) in matchHeaders.OrderBy(h => h.Key, StringComparer.OrdinalIgnoreCase))
             {
-                [request.Path] = new Dictionary<string, object>
+                headerMap[key] = value;
+            }
+            matchEntry["headers"] = headerMap;
+        }
+
+        if (matchBody is not null)
+        {
+            var bodyMap = new Dictionary<string, object?>();
+            foreach (var (key, value) in matchBody.OrderBy(p => p.Key, StringComparer.Ordinal))
+            {
+                bodyMap[key] = value;
+            }
+            matchEntry["body"] = bodyMap;
+        }
+
+        matchEntry["response"] = new Dictionary<string, object>
+        {
+            ["statusCode"] = 200,
+            ["content"] = new Dictionary<string, object>
+            {
+                ["application/json"] = new Dictionary<string, object>
                 {
-                    [request.Method.ToLowerInvariant()] = operation,
+                    ["example"] = new Dictionary<string, object>(),
                 },
             },
         };
 
-        var yaml = _serializer.Serialize(document);
+        return matchEntry;
+    }
 
-        if (hasSkippedBodyFields)
+    private static Dictionary<string, object> BuildRequestBodyContent(IEnumerable<ReplayReadyRequestInfo> requests)
+    {
+        var content = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var request in requests)
         {
-            yaml += "# TODO: body contained nested fields that were skipped — complete x-match.body manually\n";
+            var contentType = DetectContentType(request.Headers);
+            if (string.IsNullOrEmpty(request.Body) || contentType is null || content.ContainsKey(contentType))
+            {
+                continue;
+            }
+
+            content[contentType] = new Dictionary<string, object>
+            {
+                ["example"] = new Dictionary<string, object>(),
+            };
         }
 
-        return yaml;
+        return content;
     }
 
     private static string BuildOperationId(string method, string path)

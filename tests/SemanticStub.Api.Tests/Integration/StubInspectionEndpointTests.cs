@@ -554,6 +554,37 @@ public sealed class StubInspectionEndpointTests : IClassFixture<WebApplicationFa
     }
 
     [Fact]
+    public async Task ExportRequestsAsYaml_ReturnsNotFound_WhenNoRequestsRecorded()
+    {
+        await using var factory = new WebApplicationFactory<Program>();
+        using var freshClient = factory.CreateClient();
+
+        var response = await freshClient.GetAsync("/_semanticstub/runtime/requests/export/yaml");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExportRequestsAsYaml_GroupsRecentRequestsIntoYamlSuggestions()
+    {
+        var adminResponse = await client.GetAsync("/users?role=admin");
+        adminResponse.EnsureSuccessStatusCode();
+        var guestResponse = await client.GetAsync("/users?role=guest");
+        guestResponse.EnsureSuccessStatusCode();
+
+        var response = await client.GetAsync("/_semanticstub/runtime/requests/export/yaml?limit=2");
+        response.EnsureSuccessStatusCode();
+
+        Assert.Equal("application/yaml", response.Content.Headers.ContentType?.MediaType);
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("openapi: 3.1.0", content);
+        Assert.Contains("  /users:", content);
+        Assert.Contains("operationId: getUsers", content);
+        Assert.Contains("role: admin", content);
+        Assert.Contains("role: guest", content);
+    }
+
+    [Fact]
     public async Task ExportRequestAsCurl_ReturnsNotFound_WhenIndexOutOfRange()
     {
         var routedResponse = await client.GetAsync("/hello");

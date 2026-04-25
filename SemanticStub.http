@@ -36,6 +36,10 @@ Accept: application/json
 GET {{host}}/_semanticstub/runtime/requests?limit=5
 Accept: application/json
 
+### Runtime inspection grouped draft YAML suggestions from recent requests
+GET {{host}}/_semanticstub/runtime/requests/export/yaml?limit=5
+Accept: application/yaml
+
 ### Runtime inspection test-match
 POST {{host}}/_semanticstub/runtime/test-match
 Content-Type: application/json

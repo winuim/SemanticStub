@@ -62,6 +62,20 @@ public sealed class StubInspectionController : ControllerBase
     [HttpGet("requests")]
     public IActionResult GetRecentRequests([FromQuery] int limit = 20) => Ok(_inspectionService.GetRecentRequests(limit));
 
+    /// <summary>Exports recent real requests as grouped draft YAML stub suggestions.</summary>
+    [HttpGet("requests/export/yaml")]
+    public IActionResult ExportRequestsAsYaml([FromQuery] int limit = 20)
+    {
+        var requests = _inspectionService.GetRecentRequests(limit);
+        if (requests.Count == 0)
+        {
+            return NotFoundProblem("Request not found", "No recorded requests are available for YAML suggestions.");
+        }
+
+        var yaml = DraftYamlExporter.Export(requests.Select(ReplayRequestExporter.Export));
+        return Content(yaml, "application/yaml");
+    }
+
     /// <summary>Exports a recorded real request as a runnable curl command.</summary>
     /// <param name="index">Zero-based index into the recent request history (0 = most recent).</param>
     [HttpGet("requests/{index:int}/export/curl")]
