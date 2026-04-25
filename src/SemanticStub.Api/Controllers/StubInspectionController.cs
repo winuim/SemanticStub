@@ -84,6 +84,27 @@ public sealed class StubInspectionController : ControllerBase
         return Content(curl, "text/plain");
     }
 
+    /// <summary>Exports a recorded real request as a draft YAML stub definition.</summary>
+    /// <param name="index">Zero-based index into the recent request history (0 = most recent).</param>
+    [HttpGet("requests/{index:int}/export/yaml")]
+    public IActionResult ExportRequestAsYaml(int index)
+    {
+        if (index < 0)
+        {
+            return NotFoundProblem("Request not found", $"No recorded request at index {index}.");
+        }
+
+        var requests = _inspectionService.GetRecentRequests(index + 1);
+
+        if (index >= requests.Count)
+        {
+            return NotFoundProblem("Request not found", $"No recorded request at index {index}.");
+        }
+
+        var yaml = DraftYamlExporter.Export(ReplayRequestExporter.Export(requests[index]));
+        return Content(yaml, "application/yaml");
+    }
+
     /// <summary>Exports a recorded real request as a replay-ready structured model.</summary>
     /// <param name="index">Zero-based index into the recent request history (0 = most recent).</param>
     [HttpGet("requests/{index:int}/export/replay")]
