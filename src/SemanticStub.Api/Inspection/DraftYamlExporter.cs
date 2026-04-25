@@ -225,7 +225,10 @@ public static class DraftYamlExporter
                         result[property.Name] = property.Value.GetString() ?? string.Empty;
                         break;
                     case JsonValueKind.Number:
-                        result[property.Name] = property.Value.TryGetInt64(out var l) ? (object)l : property.Value.GetDouble();
+                        // Use the raw JSON token to avoid any floating-point conversion loss.
+                        // JsonBodyMatcher compares numbers via GetRawText(), so the YAML value
+                        // must round-trip to the same token string.
+                        result[property.Name] = property.Value.GetRawText();
                         break;
                     case JsonValueKind.True:
                         result[property.Name] = true;

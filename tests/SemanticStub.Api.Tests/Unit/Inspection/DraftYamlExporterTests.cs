@@ -390,6 +390,21 @@ public sealed class DraftYamlExporterTests
     }
 
     [Fact]
+    public void Export_WithHighPrecisionNumber_PreservesRawToken()
+    {
+        var request = MakeRequest("POST", "/data",
+            headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Content-Type"] = "application/json",
+            },
+            body: """{"price":1.2345678901234567}""");
+
+        var result = DraftYamlExporter.Export(request);
+
+        Assert.Contains("1.2345678901234567", result);
+    }
+
+    [Fact]
     public void Export_WithBooleanJsonBody_SerializesAsBoolean()
     {
         var request = MakeRequest("POST", "/data",
