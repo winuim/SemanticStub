@@ -70,7 +70,7 @@ public static class MatchImprovementAnalyzer
 
             var failedMatchDimensions = candidate.MismatchReasons
                 .Select(m => m.Dimension)
-                .Where(d => d is not "response" and not "scenario")
+                .Where(d => d is not "response")
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
 
@@ -80,6 +80,12 @@ public static class MatchImprovementAnalyzer
             }
 
             var dimension = failedMatchDimensions[0];
+
+            // scenario failures are not correctable via x-match conditions
+            if (dimension is "scenario")
+            {
+                continue;
+            }
             var firstMismatch = candidate.MismatchReasons.FirstOrDefault(m => m.Dimension == dimension);
 
             var keyDetail = firstMismatch?.Key is { Length: > 0 } key ? $" (key: '{key}')" : string.Empty;

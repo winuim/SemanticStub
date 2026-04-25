@@ -165,6 +165,46 @@ public sealed class MatchImprovementAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_WhenCandidateMissesOnScenarioAndOneDimension_DoesNotSuggestNearMiss()
+    {
+        var candidate = MakeCandidate(
+            index: 0,
+            matched: false,
+            mismatches:
+            [
+                MakeMismatch("scenario", "myScenario"),
+                MakeMismatch("query", "status"),
+            ]);
+
+        var explanation = MakeExplanation(
+            matchMode: null,
+            matched: false,
+            deterministicCandidates: [candidate]);
+
+        var report = MatchImprovementAnalyzer.Analyze(explanation);
+
+        Assert.DoesNotContain(report.Suggestions, s => s.Kind == "NearMissCandidate");
+    }
+
+    [Fact]
+    public void Analyze_WhenCandidateMissesOnScenarioOnly_DoesNotSuggestNearMiss()
+    {
+        var candidate = MakeCandidate(
+            index: 0,
+            matched: false,
+            mismatches: [MakeMismatch("scenario", "myScenario")]);
+
+        var explanation = MakeExplanation(
+            matchMode: null,
+            matched: false,
+            deterministicCandidates: [candidate]);
+
+        var report = MatchImprovementAnalyzer.Analyze(explanation);
+
+        Assert.DoesNotContain(report.Suggestions, s => s.Kind == "NearMissCandidate");
+    }
+
+    [Fact]
     public void Analyze_WhenResponseDimensionOnlyMismatch_DoesNotSuggestNearMiss()
     {
         var candidate = MakeCandidate(
