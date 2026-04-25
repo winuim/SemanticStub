@@ -104,6 +104,53 @@ public sealed class StubInspectionController : ControllerBase
         return Ok(ReplayRequestExporter.Export(requests[index]));
     }
 
+    /// <summary>Replays a recorded real request through the stub matching pipeline and returns the result.</summary>
+    /// <param name="index">Zero-based index into the recent request history (0 = most recent).</param>
+    /// <remarks>
+    /// Replay is a dry run: it evaluates matching without executing a response or advancing scenario state.
+    /// The replayed body and headers reflect what was captured at recording time.
+    /// Bodies longer than 4096 characters and sensitive headers are redacted by the recording pipeline.
+    /// </remarks>
+    [HttpPost("requests/{index:int}/replay")]
+    public async Task<IActionResult> ReplayRequest(int index)
+    {
+        if (index < 0)
+        {
+            return NotFoundProblem("Request not found", $"No recorded request at index {index}.");
+        }
+
+        var requests = _inspectionService.GetRecentRequests(index + 1);
+
+        if (index >= requests.Count)
+        {
+            return NotFoundProblem("Request not found", $"No recorded request at index {index}.");
+        }
+
+        var replayRequest = ReplayRequestExporter.Export(requests[index]);
+
+        var matchRequest = new MatchRequestInfo
+        {
+            Method = replayRequest.Method,
+            Path = replayRequest.Path,
+            Query = replayRequest.Query is { Count: > 0 }
+                ? new Dictionary<string, string[]>(replayRequest.Query, StringComparer.Ordinal)
+                : new Dictionary<string, string[]>(),
+            Headers = replayRequest.Headers is { Count: > 0 }
+                ? new Dictionary<string, string>(replayRequest.Headers, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            Body = replayRequest.Body,
+            IncludeCandidates = true,
+        };
+
+        var explanation = await _inspectionService.ExplainMatchAsync(matchRequest, HttpContext.RequestAborted);
+
+        return Ok(new ReplayResultInfo
+        {
+            Request = replayRequest,
+            Explanation = explanation,
+        });
+    }
+
     /// <summary>Simulates how the runtime would match a virtual request without executing a response.</summary>
     [HttpPost("test-match")]
     public async Task<IActionResult> TestMatch([FromBody] MatchRequestInfo request)
