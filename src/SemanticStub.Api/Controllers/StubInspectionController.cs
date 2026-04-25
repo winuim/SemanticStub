@@ -84,6 +84,26 @@ public sealed class StubInspectionController : ControllerBase
         return Content(curl, "text/plain");
     }
 
+    /// <summary>Exports a recorded real request as a replay-ready structured model.</summary>
+    /// <param name="index">Zero-based index into the recent request history (0 = most recent).</param>
+    [HttpGet("requests/{index:int}/export/replay")]
+    public IActionResult ExportRequestAsReplay(int index)
+    {
+        if (index < 0)
+        {
+            return NotFoundProblem("Request not found", $"No recorded request at index {index}.");
+        }
+
+        var requests = _inspectionService.GetRecentRequests(index + 1);
+
+        if (index >= requests.Count)
+        {
+            return NotFoundProblem("Request not found", $"No recorded request at index {index}.");
+        }
+
+        return Ok(ReplayRequestExporter.Export(requests[index]));
+    }
+
     /// <summary>Simulates how the runtime would match a virtual request without executing a response.</summary>
     [HttpPost("test-match")]
     public async Task<IActionResult> TestMatch([FromBody] MatchRequestInfo request)
