@@ -290,6 +290,112 @@ server.registerTool(
   }
 );
 
+server.registerTool(
+  "export_stubs_as_yaml",
+  {
+    description:
+      "Export recorded real requests as draft YAML stub definitions. " +
+      "If `index` is provided, exports that single recorded request as a YAML draft. " +
+      "Otherwise, exports the most recent `limit` requests grouped by path and method into a combined YAML document. " +
+      "The output is a reviewable OpenAPI 3.1 draft — copy it into your stub YAML and fill in the TODO placeholders before activating.",
+    inputSchema: {
+      index: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          "Zero-based index into the recent request history (0 = most recent). " +
+          "Omit to export all recent requests grouped into a single YAML document."
+        ),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .default(20)
+        .describe("Number of recent requests to include when `index` is omitted (default: 20, max: 100)."),
+    },
+    annotations: {
+      readOnlyHint: true,
+    },
+  },
+  async ({ index, limit }) => {
+    const path = index !== undefined
+      ? `/requests/${index}/export/yaml`
+      : `/requests/export/yaml?limit=${limit}`;
+
+    const res = await callApi(path);
+
+    if (!res.ok) {
+      throw new Error(await formatApiError(res));
+    }
+
+    const yaml = await res.text();
+    return { content: [{ type: "text" as const, text: yaml }] };
+  }
+);
+
+server.registerTool(
+  "suggest_improvements",
+  {
+    description:
+      "Analyze a request against the active stub definitions and return actionable YAML improvement suggestions. " +
+      "Detects ambiguous or low-quality matches such as semantic fallback usage, missing x-match conditions, " +
+      "near-miss candidates, and undefined routes. " +
+      "If `index` is provided, the recorded real request at that index is analyzed. " +
+      "Otherwise, a virtual request is constructed from the supplied `method` and `path` fields.",
+    inputSchema: {
+      index: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          "Zero-based index into the recent request history (0 = most recent). " +
+          "When provided, analyzes that recorded request. Omit to analyze a virtual request instead."
+        ),
+      method: z
+        .string()
+        .optional()
+        .describe("HTTP method for the virtual request (required when `index` is omitted)."),
+      path: z
+        .string()
+        .optional()
+        .describe("Request path for the virtual request (required when `index` is omitted)."),
+      query: z
+        .record(z.array(z.string()))
+        .optional()
+        .describe("Query parameters for the virtual request."),
+      headers: z
+        .record(z.string())
+        .optional()
+        .describe("Request headers for the virtual request."),
+      body: z
+        .string()
+        .optional()
+        .describe("Raw request body string for the virtual request. JSON payloads should be stringified first."),
+    },
+    annotations: {
+      readOnlyHint: true,
+    },
+  },
+  async ({ index, method, path, query, headers, body }) => {
+    if (index !== undefined) {
+      return toText(await readJson(`/requests/${index}/suggest-improvements`));
+    }
+
+    if (!method || !path) {
+      throw new Error("Either `index` or both `method` and `path` must be provided.");
+    }
+
+    return toText(
+      await readJson("/suggest-improvements", "POST", { method, path, query, headers, body })
+    );
+  }
+);
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
 const transport = new StdioServerTransport();

@@ -1,7 +1,7 @@
 # semantic-stub-mcp
 
 SemanticStub の Runtime Inspection API を MCP 経由で利用するための TypeScript 製サーバーです。
-Claude Desktop など tool 中心のクライアントで使いやすいように、runtime inspection / match simulation / scenario reset を tool として公開します。
+Claude Desktop など tool 中心のクライアントで使いやすいように、runtime inspection / match simulation / stub generation / match improvement suggestions / scenario reset を tool として公開します。
 
 英語版は [README.md](./README.md) を参照してください。
 
@@ -58,14 +58,18 @@ npm run build
 | `explain_match` | `POST /_semanticstub/runtime/explain` | マッチ詳細説明 |
 | `get_last_explain` | `GET /_semanticstub/runtime/explain/last` | 直近の explain 結果 |
 | `reset_scenario_state` | `POST /_semanticstub/runtime/scenarios/resets` / `POST /_semanticstub/runtime/scenarios/{name}/resets` | シナリオ状態のリセット |
+| `export_stubs_as_yaml` | `GET /_semanticstub/runtime/requests/export/yaml` / `GET /_semanticstub/runtime/requests/{index}/export/yaml` | 記録済みリクエストを YAML スタブドラフトとして出力 |
+| `suggest_improvements` | `GET /_semanticstub/runtime/requests/{index}/suggest-improvements` / `POST /_semanticstub/runtime/suggest-improvements` | あいまいな定義に対する YAML 改善候補を提示 |
 
 ## 入力メモ
 
-- `test_match` と `explain_match` の `body` は JSON object ではなく raw string です。
+- `test_match` / `explain_match` / `suggest_improvements` の `body` は JSON object ではなく raw string です。
 - JSON body を送りたい場合は、たとえば `"{\"message\":\"hello\"}"` のように文字列化して渡してください。
 - `includeCandidates` のデフォルトは `test_match` では `false`、`explain_match` では `true` です。
 - `includeSemanticCandidates` を指定すると、semantic matching 実行時の候補スコアを含められます。
 - `test_match` と `explain_match` の結果には、該当する場合に response id、status code、source（`responses` または `x-match`）、candidate index などの selected response 情報も含まれます。
+- `export_stubs_as_yaml` は YAML テキストをそのまま返します。出力はドラフトなので、`TODO` プレースホルダーを埋めてから利用してください。
+- `suggest_improvements` は `index`（記録済みリクエストを分析）または `method` + `path`（仮想リクエストを分析）のいずれかで呼び出します。`method`/`path` を使う場合は両方必須です。
 
 ## 制約
 
