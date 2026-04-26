@@ -310,7 +310,7 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
 - `/_semanticstub/runtime/explain/last` は process-local で、実リクエストが stub response に match した後だけ更新されます。
 - `/_semanticstub/runtime/scenarios/resets`、`/_semanticstub/runtime/scenarios/reset`、`/_semanticstub/runtime/scenarios/{name}/resets`、`/_semanticstub/runtime/scenarios/{name}/reset` は、現在のプロセスの in-memory scenario state だけを変更します。
 - `/_semanticstub/runtime/requests/{index}/export/yaml` と `/_semanticstub/runtime/requests/export/yaml` は raw YAML テキスト（`application/yaml`）を返します。出力は `TODO` プレースホルダーを含むレビュー用ドラフトで、そのままアクティブ化できる stub 定義ではありません。
-- `/_semanticstub/runtime/requests/{index}/replay` は実リクエストと同じパイプラインでマッチングを評価しますが、レスポンスの実行や scenario state の変更は行いません。4096 文字を超えるボディとセンシティブなヘッダーは記録時に редактировано されます。
+- `/_semanticstub/runtime/requests/{index}/replay` は実リクエストと同じパイプラインでマッチングを評価しますが、レスポンスの実行や scenario state の変更は行いません。4096 文字を超えるボディとセンシティブなヘッダーは記録時に編集（redact）されます。
 - `/_semanticstub/runtime/suggest-improvements` と `/_semanticstub/runtime/requests/{index}/suggest-improvements` は `MatchImprovementReportInfo` を返します。各改善候補は `kind`（`NoMatchFound`、`SemanticFallbackUsed`、`NoConditionsOnRoute`、`NearMissCandidate`）、人間が読める `reason`、および YAML への変更内容を示す `yamlHint` を持ちます。提案はアドバイザリーです — YAML やルーティングの動作を自動変更しません。
 - これらの endpoint は、raw YAML、内部 domain object、完全な response payload body は公開しません。
 
