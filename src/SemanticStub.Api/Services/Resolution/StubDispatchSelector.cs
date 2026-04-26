@@ -35,6 +35,7 @@ internal sealed class StubDispatchSelector
     public async Task<StubDispatchSelectionResult> SelectAsync(
         string method,
         string path,
+        string pathPattern,
         PathItemDefinition pathItem,
         OperationDefinition operation,
         IReadOnlyDictionary<string, StringValues> query,
@@ -44,6 +45,9 @@ internal sealed class StubDispatchSelector
         bool includeSemanticCandidates,
         CancellationToken cancellationToken = default)
     {
+        var pathParameters = StubRouteResolver.ExtractPathParameters(pathPattern, path);
+        var templateContext = new TemplateSubstitutionContext(pathParameters, query, headers, body);
+
         var selectedDeterministicCandidate = _matcherService.FindBestMatch(
             pathItem.Parameters,
             operation,
@@ -56,7 +60,7 @@ internal sealed class StubDispatchSelector
         {
             var matchedCandidateIndex = operation.Matches.FindIndex(candidate => ReferenceEquals(candidate, selectedDeterministicCandidate));
 
-            if (!_responseBuilder.TryBuild(selectedDeterministicCandidate.Response, out var deterministicResponse))
+            if (!_responseBuilder.TryBuild(selectedDeterministicCandidate.Response, out var deterministicResponse, templateContext))
             {
                 return new StubDispatchSelectionResult
                 {
@@ -115,7 +119,7 @@ internal sealed class StubDispatchSelector
         {
             var selectedSemanticCandidateIndex = operation.Matches.FindIndex(candidate => ReferenceEquals(candidate, semanticExplanation.SelectedCandidate));
 
-            if (!_responseBuilder.TryBuild(semanticExplanation.SelectedCandidate.Response, out var semanticResponse))
+            if (!_responseBuilder.TryBuild(semanticExplanation.SelectedCandidate.Response, out var semanticResponse, templateContext))
             {
                 return new StubDispatchSelectionResult
                 {
@@ -157,7 +161,7 @@ internal sealed class StubDispatchSelector
             };
         }
 
-        if (_defaultResponseSelector.TrySelect(operation, mutateScenarioState, out var defaultSelection))
+        if (_defaultResponseSelector.TrySelect(operation, mutateScenarioState, out var defaultSelection, templateContext))
         {
             return new StubDispatchSelectionResult
             {

@@ -170,6 +170,7 @@ public sealed class StubService : IStubService
         var selection = await _dispatchSelector.SelectAsync(
             method,
             path,
+            pathPattern,
             pathItem,
             operation,
             query,

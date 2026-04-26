@@ -65,4 +65,39 @@ public sealed class StubRouteResolverTests
 
         Assert.Equal("/orders/123", normalizedPath);
     }
+
+    [Fact]
+    public void ExtractPathParameters_WithSingleParam_ReturnsParam()
+    {
+        var result = StubRouteResolver.ExtractPathParameters("/users/{id}", "/users/42");
+
+        Assert.Single(result);
+        Assert.Equal("42", result["id"]);
+    }
+
+    [Fact]
+    public void ExtractPathParameters_WithMultipleParams_ReturnsAllParams()
+    {
+        var result = StubRouteResolver.ExtractPathParameters("/orders/{orderId}/items/{itemId}", "/orders/99/items/7");
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("99", result["orderId"]);
+        Assert.Equal("7", result["itemId"]);
+    }
+
+    [Fact]
+    public void ExtractPathParameters_WithNoParams_ReturnsEmpty()
+    {
+        var result = StubRouteResolver.ExtractPathParameters("/hello", "/hello");
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ExtractPathParameters_WithMismatchedSegmentCount_ReturnsEmpty()
+    {
+        var result = StubRouteResolver.ExtractPathParameters("/users/{id}", "/users/42/extra");
+
+        Assert.Empty(result);
+    }
 }

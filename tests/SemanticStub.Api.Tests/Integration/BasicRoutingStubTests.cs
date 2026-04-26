@@ -530,6 +530,19 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
         return output.ToArray();
     }
 
+    [Fact]
+    public async Task GetUserById_WithPathParameter_ReturnsBodyWithActualId()
+    {
+        var response = await client.GetAsync("/users/abc-123");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<UserByIdResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("abc-123", payload.Id);
+        Assert.Equal("User abc-123", payload.Name);
+    }
+
     private static string DecompressGzip(byte[] content)
     {
         using var input = new MemoryStream(content);
@@ -538,4 +551,8 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
 
         return reader.ReadToEnd();
     }
+
+    private sealed record UserByIdResponse(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("name")] string Name);
 }

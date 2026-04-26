@@ -449,6 +449,35 @@ paths:
               example:
                 result: complete
 
+  /users/{id}:
+    get:
+      operationId: getUserById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User found by id
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                required:
+                  - id
+                  - name
+              example:
+                id: "{{path.id}}"
+                name: "User {{path.id}}"
+
   /orders/{orderId}:
     get:
       operationId: getOrderById
