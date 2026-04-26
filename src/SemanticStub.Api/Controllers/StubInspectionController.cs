@@ -186,6 +186,61 @@ public sealed class StubInspectionController : ControllerBase
         });
     }
 
+    /// <summary>Analyzes a recorded real request and returns match improvement suggestions.</summary>
+    /// <param name="index">Zero-based index into the recent request history (0 = most recent).</param>
+    [HttpGet("requests/{index:int}/suggest-improvements")]
+    public async Task<IActionResult> SuggestImprovementsForRequest(int index)
+    {
+        if (index < 0)
+        {
+            return NotFoundProblem("Request not found", $"No recorded request at index {index}.");
+        }
+
+        var requests = _inspectionService.GetRecentRequests(index + 1);
+
+        if (index >= requests.Count)
+        {
+            return NotFoundProblem("Request not found", $"No recorded request at index {index}.");
+        }
+
+        var replayRequest = ReplayRequestExporter.Export(requests[index]);
+
+        var matchRequest = new MatchRequestInfo
+        {
+            Method = replayRequest.Method,
+            Path = replayRequest.Path,
+            Query = replayRequest.Query is { Count: > 0 }
+                ? new Dictionary<string, string[]>(replayRequest.Query, StringComparer.Ordinal)
+                : new Dictionary<string, string[]>(),
+            Headers = replayRequest.Headers is { Count: > 0 }
+                ? new Dictionary<string, string>(replayRequest.Headers, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            Body = replayRequest.Body,
+            IncludeCandidates = true,
+        };
+
+        var explanation = await _inspectionService.ExplainMatchAsync(matchRequest, HttpContext.RequestAborted);
+        return Ok(MatchImprovementAnalyzer.Analyze(explanation));
+    }
+
+    /// <summary>Analyzes a virtual request and returns match improvement suggestions.</summary>
+    [HttpPost("suggest-improvements")]
+    public async Task<IActionResult> SuggestImprovements([FromBody] MatchRequestInfo request)
+    {
+        var explainRequest = new MatchRequestInfo
+        {
+            Method = request.Method,
+            Path = request.Path,
+            Query = request.Query,
+            Headers = request.Headers,
+            Body = request.Body,
+            IncludeCandidates = true,
+            IncludeSemanticCandidates = request.IncludeSemanticCandidates,
+        };
+        var explanation = await _inspectionService.ExplainMatchAsync(explainRequest, HttpContext.RequestAborted);
+        return Ok(MatchImprovementAnalyzer.Analyze(explanation));
+    }
+
     /// <summary>Simulates how the runtime would match a virtual request without executing a response.</summary>
     [HttpPost("test-match")]
     public async Task<IActionResult> TestMatch([FromBody] MatchRequestInfo request)
