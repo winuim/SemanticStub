@@ -552,7 +552,30 @@ public sealed class BasicRoutingStubTests : IClassFixture<WebApplicationFactory<
         return reader.ReadToEnd();
     }
 
+    [Fact]
+    public async Task PostCreateOrder_WithNestedBodyTemplate_SubstitutesValue()
+    {
+        using var content = JsonContent.Create(new
+        {
+            order = new { id = "ord-456" },
+            customer = new { profile = new { name = "Bob" } }
+        });
+
+        var response = await client.PostAsync("/create-order", content);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<CreateOrderResponse>();
+        Assert.NotNull(payload);
+        Assert.Equal("ord-456", payload.OrderId);
+        Assert.Equal("Bob", payload.CustomerName);
+    }
+
     private sealed record UserByIdResponse(
         [property: JsonPropertyName("id")] string Id,
         [property: JsonPropertyName("name")] string Name);
+
+    private sealed record CreateOrderResponse(
+        [property: JsonPropertyName("orderId")] string OrderId,
+        [property: JsonPropertyName("customerName")] string CustomerName);
 }

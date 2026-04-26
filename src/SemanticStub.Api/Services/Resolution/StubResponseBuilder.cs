@@ -187,7 +187,7 @@ internal sealed class StubResponseBuilder
             || contentType.EndsWith("+json", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static readonly Regex TemplatePlaceholder = new(@"\{\{(\w+)\.([-\w]+)\}\}", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
+    private static readonly Regex TemplatePlaceholder = new(@"\{\{(\w+)\.([-\w]+(?:\.[-\w]+)*)\}\}", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
 
     private static string ApplySubstitution(string body, TemplateSubstitutionContext context, bool escapeForJson)
     {
@@ -238,7 +238,18 @@ internal sealed class StubResponseBuilder
                 return false;
             }
 
-            if (!doc.RootElement.TryGetProperty(key, out var element))
+            var segments = key.Split('.');
+            var current = doc.RootElement;
+
+            for (var i = 0; i < segments.Length - 1; i++)
+            {
+                if (current.ValueKind != JsonValueKind.Object || !current.TryGetProperty(segments[i], out current))
+                {
+                    return false;
+                }
+            }
+
+            if (current.ValueKind != JsonValueKind.Object || !current.TryGetProperty(segments[^1], out var element))
             {
                 return false;
             }
