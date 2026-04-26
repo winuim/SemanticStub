@@ -124,6 +124,62 @@ Scenario notes:
 - Scenario evaluation and state transitions are serialized per process so a
   single scenario flow advances deterministically across concurrent requests.
 
+### Response template substitution
+
+Response `example` values may contain `{{source.key}}` placeholders that are
+replaced at runtime with values from the incoming request.
+
+| Placeholder | Resolved from |
+| --- | --- |
+| `{{path.name}}` | URL path parameter |
+| `{{query.name}}` | First value of a query-string parameter |
+| `{{header.name}}` | Request header value |
+| `{{body.key}}` | Top-level JSON body field |
+| `{{body.a.b.c}}` | Nested JSON body field using dot-notation |
+
+Example:
+
+```yaml
+paths:
+  /users/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              example:
+                id: "{{path.id}}"
+                name: "User {{path.id}}"
+
+  /orders:
+    post:
+      responses:
+        '201':
+          content:
+            application/json:
+              example:
+                orderId: "{{body.order.id}}"
+                customerName: "{{body.customer.profile.name}}"
+```
+
+Notes:
+
+- If a placeholder cannot be resolved (key is absent, intermediate segment is
+  missing, or an intermediate segment is not a JSON object), it is left as-is in
+  the response body.
+- String values embedded in a JSON response are JSON-escaped automatically.
+- `{{body.*}}` supports dot-notation for arbitrarily deep traversal. Other
+  sources (`path`, `query`, `header`) do not support dot-notation in the key
+  name.
+- Template substitution applies only to inline `example` values. Responses
+  served from `x-response-file` are not processed for substitution.
+
 ### Supported operation extensions
 
 `x-match` can be used on an operation to define conditional matches before the

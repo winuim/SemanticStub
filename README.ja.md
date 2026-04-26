@@ -114,6 +114,60 @@ paths:
 - `x-scenario` は通常の `responses` と `x-match[].response` の両方で使用できます。
 - シナリオ評価と状態遷移はプロセス内で直列化されるため、同一シナリオフローは並行リクエスト下でも決定的に進みます。
 
+### レスポンステンプレート置換
+
+レスポンスの `example` 値に `{{source.key}}` 形式のプレースホルダーを記述すると、
+実行時にリクエストの値へ置換されます。
+
+| プレースホルダー | 参照元 |
+| --- | --- |
+| `{{path.name}}` | URL パスパラメータ |
+| `{{query.name}}` | クエリストリングパラメータの最初の値 |
+| `{{header.name}}` | リクエストヘッダーの値 |
+| `{{body.key}}` | JSON ボディのトップレベルフィールド |
+| `{{body.a.b.c}}` | ドット記法によるネストした JSON ボディフィールド |
+
+例:
+
+```yaml
+paths:
+  /users/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              example:
+                id: "{{path.id}}"
+                name: "User {{path.id}}"
+
+  /orders:
+    post:
+      responses:
+        '201':
+          content:
+            application/json:
+              example:
+                orderId: "{{body.order.id}}"
+                customerName: "{{body.customer.profile.name}}"
+```
+
+注意事項:
+
+- プレースホルダーが解決できない場合（キーが存在しない、中間セグメントが存在しない、
+  中間セグメントが JSON オブジェクトでないなど）、プレースホルダーはそのままレスポンスに残ります。
+- JSON レスポンスに埋め込まれる文字列値は自動的に JSON エスケープされます。
+- `{{body.*}}` はドット記法による任意の深さのトラバースをサポートします。
+  他のソース（`path`、`query`、`header`）はキー名にドット記法を使用できません。
+- テンプレート置換はインラインの `example` 値にのみ適用されます。
+  `x-response-file` で提供されるレスポンスは置換処理の対象外です。
+
 ### サポートしている operation 拡張
 
 `x-match` は operation に対して使用でき、標準 OpenAPI の `responses`
