@@ -1,7 +1,7 @@
 # semantic-stub-mcp
 
 A TypeScript MCP server for SemanticStub's Runtime Inspection API.
-It exposes runtime inspection, match simulation, and scenario reset as tools so it works well with tool-centric clients such as Claude Desktop.
+It exposes runtime inspection, match simulation, stub generation, match improvement suggestions, and scenario reset as tools so it works well with tool-centric clients such as Claude Desktop.
 
 Japanese documentation is available in [README.ja.md](./README.ja.md).
 
@@ -59,14 +59,18 @@ Add this server to `claude_desktop_config.json`.
 | `explain_match` | `POST /_semanticstub/runtime/explain` | Detailed match explanation |
 | `get_last_explain` | `GET /_semanticstub/runtime/explain/last` | Latest real-request explanation |
 | `reset_scenario_state` | `POST /_semanticstub/runtime/scenarios/resets` / `POST /_semanticstub/runtime/scenarios/{name}/resets` | Reset scenario state |
+| `export_stubs_as_yaml` | `GET /_semanticstub/runtime/requests/export/yaml` / `GET /_semanticstub/runtime/requests/{index}/export/yaml` | Export recorded requests as draft YAML stub definitions |
+| `suggest_improvements` | `GET /_semanticstub/runtime/requests/{index}/suggest-improvements` / `POST /_semanticstub/runtime/suggest-improvements` | Suggest YAML improvements for ambiguous or low-quality stub matches |
 
 ## Input Notes
 
-- The `body` field for `test_match` and `explain_match` must be a raw string, not a JSON object.
+- The `body` field for `test_match`, `explain_match`, and `suggest_improvements` must be a raw string, not a JSON object.
 - If you want to send JSON content, stringify it first, for example `"{\"message\":\"hello\"}"`.
 - `test_match` defaults `includeCandidates` to `false`, while `explain_match` defaults it to `true`.
 - Set `includeSemanticCandidates` to include semantic candidate scores when semantic matching is attempted.
 - The result payload for `test_match` and `explain_match` includes selected response metadata such as response id, status code, source (`responses` or `x-match`), and candidate index when applicable.
+- `export_stubs_as_yaml` returns raw YAML text. The output is a reviewable draft — fill in the `TODO` placeholders before activating.
+- `suggest_improvements` accepts either an `index` (to analyze a recorded request) or `method` + `path` (to analyze a virtual request). When using `method`/`path`, both are required.
 
 ## Constraints
 
