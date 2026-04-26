@@ -325,6 +325,13 @@ SemanticStub exposes runtime inspection endpoints under the reserved prefix
 - `GET /_semanticstub/runtime/explain/last` returns the latest explanation captured from a real matched request in the current process.
 - `POST /_semanticstub/runtime/scenarios/resets` resets all configured scenarios back to their initial state. `POST /_semanticstub/runtime/scenarios/reset` remains supported for compatibility.
 - `POST /_semanticstub/runtime/scenarios/{name}/resets` resets one configured scenario back to its initial state. `POST /_semanticstub/runtime/scenarios/{name}/reset` remains supported for compatibility.
+- `GET /_semanticstub/runtime/requests/{index}/export/curl` exports a recorded real request as a runnable curl command.
+- `GET /_semanticstub/runtime/requests/{index}/export/replay` exports a recorded real request as a structured replay model.
+- `POST /_semanticstub/runtime/requests/{index}/replay` replays a recorded real request through the stub matching pipeline and returns the match explanation. This is a dry run — no response is executed and no scenario state is mutated.
+- `GET /_semanticstub/runtime/requests/{index}/export/yaml` exports a single recorded real request as a draft OpenAPI 3.1 YAML stub definition.
+- `GET /_semanticstub/runtime/requests/export/yaml?limit=20` exports recent recorded real requests grouped by path and method as draft YAML stub suggestions.
+- `GET /_semanticstub/runtime/requests/{index}/suggest-improvements` analyzes a recorded real request against the active stub definitions and returns actionable YAML improvement suggestions.
+- `POST /_semanticstub/runtime/suggest-improvements` analyzes a virtual request against the active stub definitions and returns actionable YAML improvement suggestions.
 - YAML stub definitions under `/_semanticstub/runtime/*` are reserved for these inspection endpoints and are not reachable as normal stub routes.
 
 Inspection notes:
@@ -341,6 +348,9 @@ Inspection notes:
 - When semantic fallback is evaluated, `semanticEvaluation.selectionStatus` is `selected`, `belowThreshold`, `ambiguous`, or `unavailable`. Non-selected semantic outcomes also include `nonSelectionReason`, plus best candidate metadata and second-best above-threshold candidate metadata when available so threshold failures and low-margin ambiguity can be compared without changing matching behavior.
 - `/_semanticstub/runtime/explain/last` is process-local and only updates after a real request produces a matched stub response.
 - `/_semanticstub/runtime/scenarios/resets`, `/_semanticstub/runtime/scenarios/reset`, `/_semanticstub/runtime/scenarios/{name}/resets`, and `/_semanticstub/runtime/scenarios/{name}/reset` mutate only in-memory scenario state for the current process.
+- `/_semanticstub/runtime/requests/{index}/export/yaml` and `/_semanticstub/runtime/requests/export/yaml` return raw YAML text (`application/yaml`). The output is a reviewable draft with `TODO` placeholders — it is not a ready-to-activate stub definition.
+- `/_semanticstub/runtime/requests/{index}/replay` evaluates matching in the same pipeline as a real request but does not execute a response or advance scenario state. Bodies longer than 4096 characters and sensitive headers are redacted by the recording pipeline.
+- `/_semanticstub/runtime/suggest-improvements` and `/_semanticstub/runtime/requests/{index}/suggest-improvements` return a `MatchImprovementReportInfo` containing the full match explanation and a list of suggestions. Each suggestion has a `kind` (`NoMatchFound`, `SemanticFallbackUsed`, `NoConditionsOnRoute`, `NearMissCandidate`), a human-readable `reason`, and a `yamlHint` describing what to add or change in the stub YAML. Suggestions are advisory — they never mutate YAML or routing behavior.
 - These endpoints do not expose raw YAML, internal domain objects, or full response payload bodies.
 
 Example request body for `POST /_semanticstub/runtime/test-match` and

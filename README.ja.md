@@ -286,6 +286,13 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
 - `GET /_semanticstub/runtime/explain/last` は、現在のプロセスで最後に実リクエストから記録された explanation を返します。
 - `POST /_semanticstub/runtime/scenarios/resets` は、設定済みの全 scenario を初期状態に戻します。互換性維持のため `POST /_semanticstub/runtime/scenarios/reset` も引き続き利用できます。
 - `POST /_semanticstub/runtime/scenarios/{name}/resets` は、設定済みの 1 scenario を初期状態に戻します。互換性維持のため `POST /_semanticstub/runtime/scenarios/{name}/reset` も引き続き利用できます。
+- `GET /_semanticstub/runtime/requests/{index}/export/curl` は、記録済み実リクエストを実行可能な curl コマンドとして出力します。
+- `GET /_semanticstub/runtime/requests/{index}/export/replay` は、記録済み実リクエストを構造化された replay model として出力します。
+- `POST /_semanticstub/runtime/requests/{index}/replay` は、記録済み実リクエストを stub matching パイプラインで再実行し、match explanation を返します。ドライラン — レスポンスの実行も scenario state の変更も行いません。
+- `GET /_semanticstub/runtime/requests/{index}/export/yaml` は、記録済み実リクエスト 1 件を OpenAPI 3.1 の YAML スタブドラフトとして出力します。
+- `GET /_semanticstub/runtime/requests/export/yaml?limit=20` は、直近の記録済み実リクエストをパス・メソッド別にグループ化した YAML スタブ候補として出力します。
+- `GET /_semanticstub/runtime/requests/{index}/suggest-improvements` は、記録済み実リクエストをアクティブなスタブ定義に対して分析し、YAML 改善候補を返します。
+- `POST /_semanticstub/runtime/suggest-improvements` は、仮想リクエストをアクティブなスタブ定義に対して分析し、YAML 改善候補を返します。
 - `/_semanticstub/runtime/*` 配下の YAML stub 定義は inspection endpoint 用に予約されており、通常の stub route としては到達できません。
 
 補足:
@@ -302,6 +309,9 @@ SemanticStub は、runtime inspection endpoint を予約プレフィックス
 - semantic fallback が評価された場合、`semanticEvaluation.selectionStatus` は `selected`、`belowThreshold`、`ambiguous`、`unavailable` のいずれかです。Semantic candidate が選択されなかった場合は `nonSelectionReason` も含まれ、利用可能な場合は best candidate metadata と second-best above-threshold candidate metadata も返すため、threshold failure と low-margin ambiguity を matching behavior を変えずに比較できます。
 - `/_semanticstub/runtime/explain/last` は process-local で、実リクエストが stub response に match した後だけ更新されます。
 - `/_semanticstub/runtime/scenarios/resets`、`/_semanticstub/runtime/scenarios/reset`、`/_semanticstub/runtime/scenarios/{name}/resets`、`/_semanticstub/runtime/scenarios/{name}/reset` は、現在のプロセスの in-memory scenario state だけを変更します。
+- `/_semanticstub/runtime/requests/{index}/export/yaml` と `/_semanticstub/runtime/requests/export/yaml` は raw YAML テキスト（`application/yaml`）を返します。出力は `TODO` プレースホルダーを含むレビュー用ドラフトで、そのままアクティブ化できる stub 定義ではありません。
+- `/_semanticstub/runtime/requests/{index}/replay` は実リクエストと同じパイプラインでマッチングを評価しますが、レスポンスの実行や scenario state の変更は行いません。4096 文字を超えるボディとセンシティブなヘッダーは記録時に редактировано されます。
+- `/_semanticstub/runtime/suggest-improvements` と `/_semanticstub/runtime/requests/{index}/suggest-improvements` は `MatchImprovementReportInfo` を返します。各改善候補は `kind`（`NoMatchFound`、`SemanticFallbackUsed`、`NoConditionsOnRoute`、`NearMissCandidate`）、人間が読める `reason`、および YAML への変更内容を示す `yamlHint` を持ちます。提案はアドバイザリーです — YAML やルーティングの動作を自動変更しません。
 - これらの endpoint は、raw YAML、内部 domain object、完全な response payload body は公開しません。
 
 `POST /_semanticstub/runtime/test-match` と
