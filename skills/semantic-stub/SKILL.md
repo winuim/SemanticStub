@@ -30,6 +30,8 @@ efficiently — choosing the right tool for the task and minimizing unnecessary 
 | `explain_match` | Full match explanation including semantic evaluation |
 | `get_last_explain` | Explanation from the most recent real matched request |
 | `reset_scenario_state` | Reset all scenarios or one named scenario to its initial state |
+| `export_stubs_as_yaml` | Export recorded requests as draft OpenAPI 3.1 YAML stubs |
+| `suggest_improvements` | Analyze a request and return actionable YAML improvement suggestions |
 
 ## Tool selection guide
 
@@ -57,6 +59,15 @@ Look for items where `matchMode` is `null` or `failureReason` is non-null for un
 → Use `reset_metrics`. It clears aggregate metrics and recent request history only.
 It does not reset scenario state, reload active stub definitions, or clear `get_last_explain`.
 
+### "Generate a stub definition from recent traffic"
+→ Use `export_stubs_as_yaml`. Omit `index` to export all recent requests grouped by path/method, or provide `index` to export a single recorded request.
+The output is a reviewable draft — fill in `TODO` placeholders before activating.
+Call `get_requests` first if you need to identify which index to export.
+
+### "Are my stub conditions good? Any ambiguous matches?"
+→ Use `suggest_improvements`. Provide `index` to analyze a recorded request, or `method`+`path` for a virtual one.
+Returns a list of improvement suggestions (`NoMatchFound`, `SemanticFallbackUsed`, `NoConditionsOnRoute`, `NearMissCandidate`) with YAML-oriented hints.
+
 ### General health check
 → Use `get_config` to confirm the server is running and check route count.
 
@@ -76,6 +87,16 @@ It does not reset scenario state, reload active stub definitions, or clear `get_
 2. `get_metrics` → check matched/unmatched ratio
 3. `get_requests` → spot recent failures
 
+### Generate stub drafts from recorded traffic
+1. `get_requests` → identify relevant requests and their indices
+2. `export_stubs_as_yaml` → export as YAML draft (omit `index` to export all, or provide `index` for one)
+3. Present the YAML to the user and suggest filling in the `TODO` placeholders
+
+### Improve existing stub definitions
+1. `get_requests` → find a request that looks ambiguous (e.g. matched via semantic, or unmatched)
+2. `suggest_improvements` with the request `index` → get improvement suggestions
+3. Present the suggestions with YAML hints to the user
+
 ## Response format
 
 - Always summarize results in Japanese when the user writes in Japanese
@@ -87,4 +108,6 @@ It does not reset scenario state, reload active stub definitions, or clear `get_
 
 - `test_match` and `explain_match` do NOT mutate scenario state — safe to call anytime
 - `reset_metrics` clears metrics and recent requests, but does not change scenario state, active stub definitions, or the latest real-request explanation
+- `export_stubs_as_yaml` returns raw YAML text — always present it as a draft and remind the user to fill in `TODO` placeholders before activating
+- `suggest_improvements` with `index` analyzes a recorded request; without `index`, provide both `method` and `path` for a virtual request
 - All tools fail gracefully if the stub server is not running — inform the user and suggest starting it
