@@ -509,3 +509,9 @@ data/
 
 # Claude Code session state
 .claude/scheduled_tasks.lock
+
+# gh skills
+.claude/skills/
+
+# project mcp
+.mcp.json
