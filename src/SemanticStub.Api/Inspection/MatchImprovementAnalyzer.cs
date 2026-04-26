@@ -105,6 +105,7 @@ public static class MatchImprovementAnalyzer
     }
 
     private static bool IsSemanticMatch(MatchExplanationInfo explanation) =>
+        explanation.Result.Matched &&
         string.Equals(explanation.Result.MatchMode, "semantic", StringComparison.Ordinal);
 
     private static bool IsNoConditionsRoute(MatchExplanationInfo explanation) =>

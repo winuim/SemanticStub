@@ -96,6 +96,16 @@ public sealed class MatchImprovementAnalyzerTests
     }
 
     [Fact]
+    public void Analyze_WhenSemanticModeButResponseNotConfigured_DoesNotSuggestSemanticFallback()
+    {
+        var explanation = MakeExplanation(matchMode: "semantic", matched: false);
+
+        var report = MatchImprovementAnalyzer.Analyze(explanation);
+
+        Assert.DoesNotContain(report.Suggestions, s => s.Kind == "SemanticFallbackUsed");
+    }
+
+    [Fact]
     public void Analyze_WhenNoConditionsOnRoute_SuggestsAddingConditions()
     {
         var explanation = MakeExplanation(matchMode: "fallback", deterministicCandidates: []);
