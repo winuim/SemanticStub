@@ -40,6 +40,39 @@ Accept: application/json
 GET {{host}}/_semanticstub/runtime/requests/export/yaml?limit=5
 Accept: application/yaml
 
+### Runtime inspection export most recent request as curl command
+GET {{host}}/_semanticstub/runtime/requests/0/export/curl
+Accept: text/plain
+
+### Runtime inspection export most recent request as replay model
+GET {{host}}/_semanticstub/runtime/requests/0/export/replay
+Accept: application/json
+
+### Runtime inspection export most recent request as draft YAML stub
+GET {{host}}/_semanticstub/runtime/requests/0/export/yaml
+Accept: application/yaml
+
+### Runtime inspection replay most recent request through the matching pipeline (dry run)
+POST {{host}}/_semanticstub/runtime/requests/0/replay
+Accept: application/json
+
+### Runtime inspection match improvement suggestions for most recent recorded request
+GET {{host}}/_semanticstub/runtime/requests/0/suggest-improvements
+Accept: application/json
+
+### Runtime inspection match improvement suggestions for a virtual request
+POST {{host}}/_semanticstub/runtime/suggest-improvements
+Content-Type: application/json
+Accept: application/json
+
+{
+  "method": "GET",
+  "path": "/users",
+  "query": {
+    "role": ["admin"]
+  }
+}
+
 ### Runtime inspection test-match
 POST {{host}}/_semanticstub/runtime/test-match
 Content-Type: application/json
