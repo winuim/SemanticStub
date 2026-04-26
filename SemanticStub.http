@@ -257,6 +257,29 @@ Accept: application/json
 GET {{host}}/orders/special
 Accept: application/json
 
+### Path parameter substitution in response body ({{path.id}} → actual id)
+GET {{host}}/users/abc-123
+Accept: application/json
+
+### Nested body substitution in response body ({{body.order.id}}, {{body.customer.profile.name}})
+POST {{host}}/create-order
+Content-Type: application/json
+Accept: application/json
+
+{
+  "order": { "id": "ord-456" },
+  "customer": { "profile": { "name": "Alice" } }
+}
+
+### Nested body substitution with missing intermediate key leaves placeholder intact
+POST {{host}}/create-order
+Content-Type: application/json
+Accept: application/json
+
+{
+  "order": { "id": "ord-789" }
+}
+
 ### Download file response
 GET {{host}}/download
 Accept: application/json
