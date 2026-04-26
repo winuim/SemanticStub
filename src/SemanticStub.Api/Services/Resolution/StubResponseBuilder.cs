@@ -48,7 +48,8 @@ internal sealed class StubResponseBuilder
 
         if (context is not null)
         {
-            responseBody = ApplySubstitution(responseBody, context);
+            var isJson = IsJsonContentType(SelectMediaTypeKey(responseDefinition.Content) ?? string.Empty);
+            responseBody = ApplySubstitution(responseBody, context, isJson);
         }
 
         response = CreateStubResponse(
@@ -92,7 +93,8 @@ internal sealed class StubResponseBuilder
 
         if (context is not null)
         {
-            responseBody = ApplySubstitution(responseBody, context);
+            var isJson = IsJsonContentType(SelectMediaTypeKey(responseDefinition.Content) ?? string.Empty);
+            responseBody = ApplySubstitution(responseBody, context, isJson);
         }
 
         response = CreateStubResponse(
@@ -187,22 +189,35 @@ internal sealed class StubResponseBuilder
 
     private static readonly Regex TemplatePlaceholder = new(@"\{\{(\w+)\.([-\w]+)\}\}", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
 
-    private static string ApplySubstitution(string body, TemplateSubstitutionContext context)
+    private static string ApplySubstitution(string body, TemplateSubstitutionContext context, bool escapeForJson)
     {
         return TemplatePlaceholder.Replace(body, match =>
         {
             var source = match.Groups[1].Value;
             var name = match.Groups[2].Value;
 
-            return source switch
+            var resolved = source switch
             {
-                "path" => context.PathParameters.TryGetValue(name, out var pathVal) ? pathVal : match.Value,
-                "query" => context.Query.TryGetValue(name, out var queryVal) ? queryVal.FirstOrDefault() ?? match.Value : match.Value,
-                "header" => context.Headers.TryGetValue(name, out var headerVal) ? headerVal : match.Value,
-                "body" => TryExtractBodyValue(context.Body, name, out var bodyVal) ? bodyVal : match.Value,
-                _ => match.Value,
+                "path" => context.PathParameters.TryGetValue(name, out var pathVal) ? pathVal : null,
+                "query" => context.Query.TryGetValue(name, out var queryVal) ? queryVal.FirstOrDefault() : null,
+                "header" => context.Headers.TryGetValue(name, out var headerVal) ? headerVal : null,
+                "body" => TryExtractBodyValue(context.Body, name, out var bodyVal) ? bodyVal : null,
+                _ => null,
             };
+
+            if (resolved is null)
+            {
+                return match.Value;
+            }
+
+            return escapeForJson ? JsonEncodeStringValue(resolved) : resolved;
         });
+    }
+
+    private static string JsonEncodeStringValue(string value)
+    {
+        var serialized = JsonSerializer.Serialize(value);
+        return serialized[1..^1];
     }
 
     private static bool TryExtractBodyValue(string? body, string key, out string value)

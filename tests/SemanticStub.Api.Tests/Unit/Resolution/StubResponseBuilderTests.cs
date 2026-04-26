@@ -205,6 +205,33 @@ public sealed class StubResponseBuilderTests
     }
 
     [Fact]
+    public void TryBuild_WithSpecialCharsInValue_JsonEscapesInJsonResponse()
+    {
+        var builder = new StubResponseBuilder(_ => throw new InvalidOperationException());
+        var responseDefinition = new ResponseDefinition
+        {
+            Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+            {
+                ["application/json"] = new()
+                {
+                    Example = new Dictionary<object, object> { ["id"] = "{{path.id}}" }
+                }
+            }
+        };
+        var context = new TemplateSubstitutionContext(
+            PathParameters: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["id"] = "foo\"bar\nbaz" },
+            Query: new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            Headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            Body: null);
+
+        var built = builder.TryBuild(200, responseDefinition, out var response, context);
+
+        Assert.True(built);
+        var parsed = System.Text.Json.JsonDocument.Parse(response.Body);
+        Assert.Equal("foo\"bar\nbaz", parsed.RootElement.GetProperty("id").GetString());
+    }
+
+    [Fact]
     public void TryBuild_WithAbsoluteResponseFile_SkipsSubstitution()
     {
         var filePath = Path.Combine(Path.GetTempPath(), $"semanticstub-{Guid.NewGuid():N}.bin");
