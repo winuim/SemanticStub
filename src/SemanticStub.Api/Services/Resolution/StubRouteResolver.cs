@@ -84,6 +84,29 @@ internal static class StubRouteResolver
         return path.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
     }
 
+    public static IReadOnlyDictionary<string, string> ExtractPathParameters(string pathPattern, string requestPath)
+    {
+        var patternSegments = GetPathSegments(pathPattern);
+        var requestSegments = GetPathSegments(requestPath);
+
+        if (patternSegments.Length != requestSegments.Length)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < patternSegments.Length; i++)
+        {
+            if (IsPathParameterSegment(patternSegments[i]))
+            {
+                result[patternSegments[i][1..^1]] = requestSegments[i];
+            }
+        }
+
+        return result;
+    }
+
     private static bool IsPathParameterSegment(string segment)
     {
         return segment.Length > 2 &&

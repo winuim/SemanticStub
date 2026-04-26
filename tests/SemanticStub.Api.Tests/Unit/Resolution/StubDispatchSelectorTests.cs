@@ -50,7 +50,7 @@ public sealed class StubDispatchSelectorTests
             ["role"] = new("admin")
         };
 
-        var result = await selector.SelectAsync(HttpMethods.Get, "/users", pathItem, operation, query, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), null, mutateScenarioState: true, includeSemanticCandidates: false);
+        var result = await selector.SelectAsync(HttpMethods.Get, "/users", "/users", pathItem, operation, query, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), null, mutateScenarioState: true, includeSemanticCandidates: false);
 
         Assert.Equal(StubMatchResult.ResponseNotConfigured, result.Result);
         Assert.Equal("exact", result.MatchMode);
@@ -122,6 +122,7 @@ public sealed class StubDispatchSelectorTests
         var result = await selector.SelectAsync(
             HttpMethods.Get,
             "/users",
+            "/users",
             new PathItemDefinition(),
             operation,
             query,
@@ -168,6 +169,7 @@ public sealed class StubDispatchSelectorTests
 
         var result = await selector.SelectAsync(
             HttpMethods.Get,
+            "/users",
             "/users",
             new PathItemDefinition(),
             new OperationDefinition { Matches = [semanticCandidate] },
@@ -222,6 +224,7 @@ public sealed class StubDispatchSelectorTests
         var dryRun = await selector.SelectAsync(
             HttpMethods.Post,
             "/checkout",
+            "/checkout",
             new PathItemDefinition(),
             operation,
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
@@ -232,6 +235,7 @@ public sealed class StubDispatchSelectorTests
         var snapshotAfterDryRun = scenarioService.GetSnapshot("checkout-flow");
         var liveRun = await selector.SelectAsync(
             HttpMethods.Post,
+            "/checkout",
             "/checkout",
             new PathItemDefinition(),
             operation,
@@ -265,13 +269,14 @@ public sealed class StubDispatchSelectorTests
         await selector.SelectAsync(
             HttpMethods.Get,
             "/users",
+            "/users",
             new PathItemDefinition(),
             new OperationDefinition(),
             new Dictionary<string, StringValues>(StringComparer.Ordinal),
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
             null,
-            mutateScenarioState: false,
-            includeSemanticCandidates: false,
+            false,
+            false,
             cancellationSource.Token);
 
         Assert.Equal(cancellationSource.Token, spy.ReceivedCancellationToken);

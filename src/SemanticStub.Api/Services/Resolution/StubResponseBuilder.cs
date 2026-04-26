@@ -1,8 +1,17 @@
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using Microsoft.Extensions.Primitives;
 using SemanticStub.Api.Models;
 using SemanticStub.Application.Models;
 using SemanticStub.Application.Utilities;
 
 namespace SemanticStub.Api.Services;
+
+internal sealed record TemplateSubstitutionContext(
+    IReadOnlyDictionary<string, string> PathParameters,
+    IReadOnlyDictionary<string, StringValues> Query,
+    IReadOnlyDictionary<string, string> Headers,
+    string? Body);
 
 internal sealed class StubResponseBuilder
 {
@@ -14,7 +23,7 @@ internal sealed class StubResponseBuilder
         _responseFileReader = responseFileReader;
     }
 
-    public bool TryBuild(int statusCode, ResponseDefinition responseDefinition, out StubResponse response)
+    public bool TryBuild(int statusCode, ResponseDefinition responseDefinition, out StubResponse response, TemplateSubstitutionContext? context = null)
     {
         response = null!;
 
@@ -37,6 +46,11 @@ internal sealed class StubResponseBuilder
             return false;
         }
 
+        if (context is not null)
+        {
+            responseBody = ApplySubstitution(responseBody, context);
+        }
+
         response = CreateStubResponse(
             statusCode,
             responseDefinition.DelayMilliseconds,
@@ -48,7 +62,7 @@ internal sealed class StubResponseBuilder
         return true;
     }
 
-    public bool TryBuild(QueryMatchResponseDefinition responseDefinition, out StubResponse response)
+    public bool TryBuild(QueryMatchResponseDefinition responseDefinition, out StubResponse response, TemplateSubstitutionContext? context = null)
     {
         response = null!;
 
@@ -74,6 +88,11 @@ internal sealed class StubResponseBuilder
         if (responseBody is null)
         {
             return false;
+        }
+
+        if (context is not null)
+        {
+            responseBody = ApplySubstitution(responseBody, context);
         }
 
         response = CreateStubResponse(
@@ -164,5 +183,60 @@ internal sealed class StubResponseBuilder
     {
         return contentType.Equals(JsonContentType, StringComparison.OrdinalIgnoreCase)
             || contentType.EndsWith("+json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static readonly Regex TemplatePlaceholder = new(@"\{\{(\w+)\.([-\w]+)\}\}", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
+
+    private static string ApplySubstitution(string body, TemplateSubstitutionContext context)
+    {
+        return TemplatePlaceholder.Replace(body, match =>
+        {
+            var source = match.Groups[1].Value;
+            var name = match.Groups[2].Value;
+
+            return source switch
+            {
+                "path" => context.PathParameters.TryGetValue(name, out var pathVal) ? pathVal : match.Value,
+                "query" => context.Query.TryGetValue(name, out var queryVal) ? queryVal.FirstOrDefault() ?? match.Value : match.Value,
+                "header" => context.Headers.TryGetValue(name, out var headerVal) ? headerVal : match.Value,
+                "body" => TryExtractBodyValue(context.Body, name, out var bodyVal) ? bodyVal : match.Value,
+                _ => match.Value,
+            };
+        });
+    }
+
+    private static bool TryExtractBodyValue(string? body, string key, out string value)
+    {
+        value = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            if (!doc.RootElement.TryGetProperty(key, out var element))
+            {
+                return false;
+            }
+
+            value = element.ValueKind == JsonValueKind.String
+                ? element.GetString() ?? string.Empty
+                : element.GetRawText();
+
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 }

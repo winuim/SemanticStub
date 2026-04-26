@@ -20,7 +20,8 @@ internal sealed class StubDefaultResponseSelector
     public bool TrySelect(
         OperationDefinition operation,
         bool mutateScenarioState,
-        out StubDefaultResponseSelection selection)
+        out StubDefaultResponseSelection selection,
+        TemplateSubstitutionContext? context = null)
     {
         selection = null!;
 
@@ -32,7 +33,7 @@ internal sealed class StubDefaultResponseSelector
             return false;
         }
 
-        if (!_responseBuilder.TryBuild(statusCode, matchedResponse.Value, out var response))
+        if (!_responseBuilder.TryBuild(statusCode, matchedResponse.Value, out var response, context))
         {
             return false;
         }
