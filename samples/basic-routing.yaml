@@ -522,6 +522,29 @@ paths:
               example:
                 result: exact
 
+  /create-order:
+    post:
+      operationId: createOrder
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  orderId:
+                    type: string
+                  customerName:
+                    type: string
+                required:
+                  - orderId
+                  - customerName
+              example:
+                orderId: "{{body.order.id}}"
+                customerName: "{{body.customer.profile.name}}"
+
   /download:
     get:
       operationId: downloadFile

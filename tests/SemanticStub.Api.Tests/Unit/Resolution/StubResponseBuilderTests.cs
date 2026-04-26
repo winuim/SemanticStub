@@ -232,6 +232,110 @@ public sealed class StubResponseBuilderTests
     }
 
     [Fact]
+    public void TryBuild_WithNestedBodyTemplate_TwoLevels_SubstitutesValue()
+    {
+        var builder = new StubResponseBuilder(_ => throw new InvalidOperationException());
+        var responseDefinition = new ResponseDefinition
+        {
+            Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+            {
+                ["application/json"] = new()
+                {
+                    Example = new Dictionary<object, object> { ["orderId"] = "{{body.order.id}}" }
+                }
+            }
+        };
+        var context = new TemplateSubstitutionContext(
+            PathParameters: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            Query: new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            Headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            Body: """{"order":{"id":"abc-123"}}""");
+
+        var built = builder.TryBuild(200, responseDefinition, out var response, context);
+
+        Assert.True(built);
+        Assert.Contains("\"abc-123\"", response.Body);
+    }
+
+    [Fact]
+    public void TryBuild_WithNestedBodyTemplate_ThreeLevels_SubstitutesValue()
+    {
+        var builder = new StubResponseBuilder(_ => throw new InvalidOperationException());
+        var responseDefinition = new ResponseDefinition
+        {
+            Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+            {
+                ["application/json"] = new()
+                {
+                    Example = new Dictionary<object, object> { ["customerName"] = "{{body.customer.profile.name}}" }
+                }
+            }
+        };
+        var context = new TemplateSubstitutionContext(
+            PathParameters: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            Query: new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            Headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            Body: """{"customer":{"profile":{"name":"Alice"}}}""");
+
+        var built = builder.TryBuild(200, responseDefinition, out var response, context);
+
+        Assert.True(built);
+        Assert.Contains("\"Alice\"", response.Body);
+    }
+
+    [Fact]
+    public void TryBuild_WithNestedBodyTemplate_MissingIntermediateKey_LeavesPlaceholderIntact()
+    {
+        var builder = new StubResponseBuilder(_ => throw new InvalidOperationException());
+        var responseDefinition = new ResponseDefinition
+        {
+            Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+            {
+                ["application/json"] = new()
+                {
+                    Example = new Dictionary<object, object> { ["val"] = "{{body.missing.id}}" }
+                }
+            }
+        };
+        var context = new TemplateSubstitutionContext(
+            PathParameters: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            Query: new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            Headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            Body: """{"order":{"id":"abc-123"}}""");
+
+        var built = builder.TryBuild(200, responseDefinition, out var response, context);
+
+        Assert.True(built);
+        Assert.Contains("{{body.missing.id}}", response.Body);
+    }
+
+    [Fact]
+    public void TryBuild_WithNestedBodyTemplate_NonObjectIntermediateNode_LeavesPlaceholderIntact()
+    {
+        var builder = new StubResponseBuilder(_ => throw new InvalidOperationException());
+        var responseDefinition = new ResponseDefinition
+        {
+            Content = new Dictionary<string, MediaTypeDefinition>(StringComparer.Ordinal)
+            {
+                ["application/json"] = new()
+                {
+                    Example = new Dictionary<object, object> { ["val"] = "{{body.order.id.extra}}" }
+                }
+            }
+        };
+        var context = new TemplateSubstitutionContext(
+            PathParameters: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            Query: new Dictionary<string, StringValues>(StringComparer.Ordinal),
+            Headers: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            Body: """{"order":{"id":"abc-123"}}""");
+
+        var built = builder.TryBuild(200, responseDefinition, out var response, context);
+
+        Assert.True(built);
+        Assert.Contains("{{body.order.id.extra}}", response.Body);
+    }
+
+    [Fact]
     public void TryBuild_WithAbsoluteResponseFile_SkipsSubstitution()
     {
         var filePath = Path.Combine(Path.GetTempPath(), $"semanticstub-{Guid.NewGuid():N}.bin");
