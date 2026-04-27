@@ -95,7 +95,7 @@ public sealed class StubServiceCollectionExtensionsTests
         var services = new ServiceCollection();
 
         services.AddLogging();
-        services.AddSingleton(Options.Create(new StubSettings { DefinitionsPath = workspace.SamplesPath }));
+        services.AddSingleton(Options.Create(new StubSettings { DefinitionsPath = workspace.StubsPath }));
         services.AddSingleton<IWebHostEnvironment>(new TestWebHostEnvironment
         {
             ApplicationName = "SemanticStub.Api.Tests",
@@ -140,19 +140,19 @@ public sealed class StubServiceCollectionExtensionsTests
         Assert.Null(descriptor.ImplementationType);
     }
 
-    private sealed class StubWorkspace(string rootPath, string samplesPath) : IDisposable
+    private sealed class StubWorkspace(string rootPath, string stubsPath) : IDisposable
     {
         public string RootPath { get; } = rootPath;
 
-        public string SamplesPath { get; } = samplesPath;
+        public string StubsPath { get; } = stubsPath;
 
         public static StubWorkspace Create()
         {
             var rootPath = Path.Combine(Path.GetTempPath(), "semanticstub-di-tests", Guid.NewGuid().ToString("N"));
-            var samplesPath = Path.Combine(rootPath, "samples");
-            Directory.CreateDirectory(samplesPath);
+            var stubsPath = Path.Combine(rootPath, "stubs");
+            Directory.CreateDirectory(stubsPath);
             File.WriteAllText(
-                Path.Combine(samplesPath, "basic-routing.yaml"),
+                Path.Combine(stubsPath, "basic-routing.yaml"),
                 """
                 openapi: 3.1.0
                 info:
@@ -170,7 +170,7 @@ public sealed class StubServiceCollectionExtensionsTests
                                 status: ok
                 """);
 
-            return new StubWorkspace(rootPath, samplesPath);
+            return new StubWorkspace(rootPath, stubsPath);
         }
 
         public void Dispose()

@@ -14,7 +14,7 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
 {
     private const string DefaultStubFileName = "basic-routing.yaml";
     private static readonly string[] AdditionalStubFilePatterns = ["*.stub.yaml", "*.stub.yml"];
-    private const string DefaultDefinitionsDirectoryName = "samples";
+    private const string DefaultDefinitionsDirectoryName = "stubs";
     private readonly IWebHostEnvironment _environment;
     private readonly StubSettings _settings;
     private readonly IDeserializer _deserializer;
@@ -22,7 +22,7 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
     private readonly StubDefinitionNormalizer _normalizer;
 
     /// <summary>
-    /// Creates a loader that discovers definitions relative to <see cref="IWebHostEnvironment.ContentRootPath"/> and uses the default <c>samples</c> search behavior when no explicit settings are supplied.
+    /// Creates a loader that discovers definitions relative to <see cref="IWebHostEnvironment.ContentRootPath"/> and uses the default <c>stubs</c> search behavior when no explicit settings are supplied.
     /// </summary>
     /// <param name="environment">Supplies the content root used to locate the default definitions directory.</param>
     public StubDefinitionLoader(IWebHostEnvironment environment)
@@ -34,7 +34,7 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
     /// Creates a loader that discovers definitions relative to <see cref="IWebHostEnvironment.ContentRootPath"/> and honors <see cref="StubSettings.DefinitionsPath"/> when configured.
     /// </summary>
     /// <param name="environment">Supplies the content root used as the starting point for relative definitions-path resolution.</param>
-    /// <param name="settings">Supplies the optional definitions directory override. When unset, the nearest ancestor directory containing <c>samples</c> is used.</param>
+    /// <param name="settings">Supplies the optional definitions directory override. When unset, the nearest ancestor directory containing <c>stubs</c> is used.</param>
     public StubDefinitionLoader(IWebHostEnvironment environment, IOptions<StubSettings> settings)
     {
         _environment = environment;
@@ -110,16 +110,16 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
             return File.ReadAllText(fileName);
         }
 
-        var path = ResolveSamplePath(fileName, definitionsPath);
+        var path = ResolveDefinitionRelativePath(fileName, definitionsPath);
 
         return File.ReadAllText(path);
     }
 
     private string[] ResolveDefinitionPaths()
     {
-        var samplesPath = ResolveDefinitionsDirectory();
+        var definitionsPath = ResolveDefinitionsDirectory();
         var paths = new List<string>();
-        var defaultDefinitionPath = Path.Combine(samplesPath, DefaultStubFileName);
+        var defaultDefinitionPath = Path.Combine(definitionsPath, DefaultStubFileName);
 
         if (File.Exists(defaultDefinitionPath))
         {
@@ -129,7 +129,7 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
         foreach (var pattern in AdditionalStubFilePatterns)
         {
             var discoveredPaths = Directory
-                .GetFiles(samplesPath, pattern, SearchOption.AllDirectories)
+                .GetFiles(definitionsPath, pattern, SearchOption.AllDirectories)
                 .OrderBy(path => path, StringComparer.Ordinal);
 
             foreach (var discoveredPath in discoveredPaths)
@@ -146,16 +146,17 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
             return [.. paths];
         }
 
+        var definitionsPathLabel = GetDefinitionsPathLabel(definitionsPath);
         throw new FileNotFoundException(
-            $"Could not locate {Path.Combine(GetDefinitionsPathLabel(), DefaultStubFileName)} from the current content root.",
-            Path.Combine(GetDefinitionsPathLabel(), DefaultStubFileName));
+            $"Could not locate {Path.Combine(definitionsPathLabel, DefaultStubFileName)} from the current content root.",
+            Path.Combine(definitionsPathLabel, DefaultStubFileName));
     }
 
-    private string ResolveSamplePath(string fileName, string? resolvedDefinitionsPath = null)
+    private string ResolveDefinitionRelativePath(string fileName, string? resolvedDefinitionsPath = null)
     {
-        var samplesPath = resolvedDefinitionsPath ?? ResolveDefinitionsDirectory();
-        var root = Path.GetFullPath(samplesPath);
-        var candidate = Path.GetFullPath(Path.Combine(samplesPath, fileName));
+        var definitionsPath = resolvedDefinitionsPath ?? ResolveDefinitionsDirectory();
+        var root = Path.GetFullPath(definitionsPath);
+        var candidate = Path.GetFullPath(Path.Combine(definitionsPath, fileName));
 
         EnsurePathWithinDefinitionsDirectory(root, candidate, fileName);
 
@@ -164,9 +165,10 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
             return candidate;
         }
 
+        var definitionsPathLabel = GetDefinitionsPathLabel(definitionsPath);
         throw new FileNotFoundException(
-            $"Could not locate {Path.Combine(GetDefinitionsPathLabel(), fileName)} from the current content root.",
-            Path.Combine(GetDefinitionsPathLabel(), fileName));
+            $"Could not locate {Path.Combine(definitionsPathLabel, fileName)} from the current content root.",
+            Path.Combine(definitionsPathLabel, fileName));
     }
 
     private static void EnsurePathWithinDefinitionsDirectory(string root, string candidate, string originalPath)
@@ -232,11 +234,14 @@ public sealed class StubDefinitionLoader : IStubDefinitionLoader
         throw new FileNotFoundException($"Could not locate {DefaultDefinitionsDirectoryName} from the current content root.", DefaultDefinitionsDirectoryName);
     }
 
-    private string GetDefinitionsPathLabel()
+    private string GetDefinitionsPathLabel(string resolvedDefinitionsPath)
     {
-        return string.IsNullOrWhiteSpace(_settings.DefinitionsPath)
-            ? DefaultDefinitionsDirectoryName
-            : _settings.DefinitionsPath!;
+        if (!string.IsNullOrWhiteSpace(_settings.DefinitionsPath))
+        {
+            return _settings.DefinitionsPath!;
+        }
+
+        return Path.GetFileName(Path.TrimEndingDirectorySeparator(resolvedDefinitionsPath));
     }
 
     private static StubDocument MergeDefinitions(IReadOnlyCollection<(string Path, string Label, StubDocument Document)> sources)

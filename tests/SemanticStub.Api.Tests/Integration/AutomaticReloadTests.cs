@@ -300,20 +300,20 @@ public sealed class AutomaticReloadTests
         public static ReloadWorkspace Create(string yaml)
         {
             var rootPath = Path.Combine(Path.GetTempPath(), "semanticstub-reload-tests", Guid.NewGuid().ToString("N"));
-            var samplesPath = Path.Combine(rootPath, "samples");
-            Directory.CreateDirectory(samplesPath);
-            File.WriteAllText(Path.Combine(samplesPath, "basic-routing.yaml"), yaml);
+            var stubsPath = Path.Combine(rootPath, "stubs");
+            Directory.CreateDirectory(stubsPath);
+            File.WriteAllText(Path.Combine(stubsPath, "basic-routing.yaml"), yaml);
             return new ReloadWorkspace(rootPath);
         }
 
         public void WriteDefaultDefinition(string yaml)
         {
-            File.WriteAllText(Path.Combine(RootPath, "samples", "basic-routing.yaml"), yaml);
+            File.WriteAllText(Path.Combine(RootPath, "stubs", "basic-routing.yaml"), yaml);
         }
 
         public void WriteAdditionalStubFile(string fileName, string yaml)
         {
-            File.WriteAllText(Path.Combine(RootPath, "samples", fileName), yaml);
+            File.WriteAllText(Path.Combine(RootPath, "stubs", fileName), yaml);
         }
 
         public void Dispose()

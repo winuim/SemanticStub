@@ -19,5 +19,5 @@ RUN dotnet publish "./SemanticStub.Api.csproj" -c $BUILD_CONFIGURATION -o /app/p
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-COPY --from=build /src/samples ./samples
+COPY --from=build /src/stubs ./stubs
 ENTRYPOINT ["dotnet", "SemanticStub.Api.dll"]

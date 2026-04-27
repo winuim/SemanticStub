@@ -228,9 +228,9 @@ public sealed class HttpLoggingTests
         public static HttpLoggingWorkspace Create(string yaml)
         {
             var rootPath = Path.Combine(Path.GetTempPath(), "semanticstub-http-logging-tests", Guid.NewGuid().ToString("N"));
-            var samplesPath = Path.Combine(rootPath, "samples");
-            Directory.CreateDirectory(samplesPath);
-            File.WriteAllText(Path.Combine(samplesPath, "basic-routing.yaml"), yaml);
+            var stubsPath = Path.Combine(rootPath, "stubs");
+            Directory.CreateDirectory(stubsPath);
+            File.WriteAllText(Path.Combine(stubsPath, "basic-routing.yaml"), yaml);
 
             return new HttpLoggingWorkspace(rootPath);
         }
