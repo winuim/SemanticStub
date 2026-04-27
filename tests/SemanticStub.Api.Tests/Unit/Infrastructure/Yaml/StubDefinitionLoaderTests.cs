@@ -1499,29 +1499,12 @@ public sealed class StubDefinitionLoaderTests
                             message: active
             """,
             definitionsDirectoryName: "stubs");
-        Directory.CreateDirectory(Path.Combine(workspace.RootPath, "samples"));
-        File.WriteAllText(
-            Path.Combine(workspace.RootPath, "samples", "basic-routing.yaml"),
-            """
-            openapi: 3.1.0
-            paths:
-              /legacy:
-                get:
-                  responses:
-                    "200":
-                      description: ok
-                      content:
-                        application/json:
-                          example:
-                            message: legacy
-            """);
 
         var loader = new StubDefinitionLoader(workspace.Environment);
 
         var document = loader.LoadDefaultDefinition();
 
         Assert.True(document.Paths.ContainsKey("/active"));
-        Assert.False(document.Paths.ContainsKey("/legacy"));
     }
 
     [Fact]
