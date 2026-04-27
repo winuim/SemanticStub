@@ -466,7 +466,7 @@ Semantic fallback detail には machine-readable な比較 metadata が含まれ
 
 - Source: `src/`
 - Tests: `tests/`
-- Samples: `samples/`
+- Stub definitions: `stubs/`
 
 設定に関する補足:
 
@@ -477,8 +477,8 @@ Semantic fallback detail には machine-readable な比較 metadata が含まれ
 
 サンプルファイル:
 
-- `samples/basic-routing.yaml` は基本的な routing、matching、scenario、file response の動作例です。
-- `samples/semantic-search.stub.yaml` は semantic matching の動作例で、`SemanticMatching` 設定をローカルで試すときに便利です。
+- `stubs/basic-routing.yaml` は基本的な routing、matching、scenario、file response の動作例です。
+- `stubs/semantic-search.stub.yaml` は semantic matching の動作例で、`SemanticMatching` 設定をローカルで試すときに便利です。
 
 ## 実行
 
@@ -509,7 +509,7 @@ docker compose up -d
 ```
 
 この構成では SemanticStub を `http://localhost:8080` で公開します。
-`samples/` ディレクトリはコンテナへマウントされるため、stub YAML を編集しても
+`stubs/` ディレクトリはコンテナへマウントされるため、stub YAML を編集しても
 イメージの再ビルドは不要です。TEI は Docker 内部ネットワークだけで使用され、
 ホストには公開しません。
 

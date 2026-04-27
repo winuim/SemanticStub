@@ -289,7 +289,7 @@ GET {{host}}/missing
 Accept: application/json
 
 ### Semantic search examples
-### These requests assume `samples/semantic-search.stub.yaml` is the active stub definition.
+### These requests assume `stubs/semantic-search.stub.yaml` is the active stub definition.
 
 ### Semantic search matches the admin-user candidate
 POST {{host}}/semantic-search

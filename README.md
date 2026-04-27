@@ -506,7 +506,7 @@ Example response body for `GET /_semanticstub/runtime/requests?limit=1`:
 ## Development
 - Source: `src/`
 - Tests: `tests/`
-- Samples: `samples/`
+- Stub definitions: `stubs/`
 
 Configuration notes:
 
@@ -517,8 +517,8 @@ Configuration notes:
 
 Sample files:
 
-- `samples/basic-routing.yaml` demonstrates the core routing, matching, scenario, and file-response features.
-- `samples/semantic-search.stub.yaml` demonstrates semantic matching routes and is useful when testing the `SemanticMatching` settings locally.
+- `stubs/basic-routing.yaml` demonstrates the core routing, matching, scenario, and file-response features.
+- `stubs/semantic-search.stub.yaml` demonstrates semantic matching routes and is useful when testing the `SemanticMatching` settings locally.
 
 ## Run
 
@@ -548,7 +548,7 @@ Run SemanticStub and the embedding service in the background:
 docker compose up -d
 ```
 
-This setup exposes SemanticStub on `http://localhost:8080`. The `samples/`
+This setup exposes SemanticStub on `http://localhost:8080`. The `stubs/`
 directory is mounted into the container, so editing stub YAML files does not
 require rebuilding the image. The TEI service stays on the internal Docker
 network only.

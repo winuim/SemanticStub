@@ -1482,6 +1482,49 @@ public sealed class StubDefinitionLoaderTests
     }
 
     [Fact]
+    public void LoadDefaultDefinition_UsesStubsDirectoryByDefault()
+    {
+        using var workspace = TestWorkspace.Create(
+            """
+            openapi: 3.1.0
+            paths:
+              /active:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: active
+            """,
+            definitionsDirectoryName: "stubs");
+        Directory.CreateDirectory(Path.Combine(workspace.RootPath, "samples"));
+        File.WriteAllText(
+            Path.Combine(workspace.RootPath, "samples", "basic-routing.yaml"),
+            """
+            openapi: 3.1.0
+            paths:
+              /legacy:
+                get:
+                  responses:
+                    "200":
+                      description: ok
+                      content:
+                        application/json:
+                          example:
+                            message: legacy
+            """);
+
+        var loader = new StubDefinitionLoader(workspace.Environment);
+
+        var document = loader.LoadDefaultDefinition();
+
+        Assert.True(document.Paths.ContainsKey("/active"));
+        Assert.False(document.Paths.ContainsKey("/legacy"));
+    }
+
+    [Fact]
     public void LoadDefaultDefinition_ThrowsWhenConfiguredAbsoluteDefinitionsPathDoesNotExist()
     {
         using var workspace = TestWorkspace.Create(
@@ -1520,7 +1563,7 @@ public sealed class StubDefinitionLoaderTests
 
         var exception = Assert.Throws<FileNotFoundException>(() => loader.LoadDefaultDefinition());
 
-        Assert.Equal("samples/basic-routing.yaml", exception.FileName);
+        Assert.Equal("stubs/basic-routing.yaml", exception.FileName);
     }
 
     [Fact]
@@ -1548,7 +1591,7 @@ public sealed class StubDefinitionLoaderTests
         var responseFile = document.Paths["/users"].Get!.Responses["200"].ResponseFile;
 
         Assert.Equal(
-            Path.Combine(workspace.RootPath, "samples", "responses", "users.json"),
+            Path.Combine(workspace.RootPath, "stubs", "responses", "users.json"),
             responseFile);
     }
 
@@ -1591,7 +1634,7 @@ public sealed class StubDefinitionLoaderTests
         var responseFile = document.Paths["/orders"].Get!.Responses["200"].ResponseFile;
 
         Assert.Equal(
-            Path.Combine(workspace.RootPath, "samples", "features", "responses", "orders.json"),
+            Path.Combine(workspace.RootPath, "stubs", "features", "responses", "orders.json"),
             responseFile);
     }
 
@@ -1906,7 +1949,7 @@ public sealed class StubDefinitionLoaderTests
         var body = loader.LoadResponseFileContent("payloads/users.json");
 
         Assert.Equal(
-            Path.Combine(workspace.RootPath, "samples", "payloads", "users.json"),
+            Path.Combine(workspace.RootPath, "stubs", "payloads", "users.json"),
             response.ResponseFile);
         Assert.Equal("loader", response.Headers["X-Stub-Source"].Example);
         Assert.Equal("{\"users\":[{\"id\":1,\"name\":\"Alice\"}]}", body);
@@ -2026,31 +2069,31 @@ public sealed class StubDefinitionLoaderTests
             string yaml,
             (string FileName, string Content)[]? sampleFiles = null,
             (string FileName, string Content)[]? additionalStubFiles = null,
-            string definitionsDirectoryName = "samples")
+            string definitionsDirectoryName = "stubs")
         {
             var rootPath = Path.Combine(Path.GetTempPath(), "semanticstub-tests", Guid.NewGuid().ToString("N"));
-            var samplesPath = Path.Combine(rootPath, definitionsDirectoryName);
-            Directory.CreateDirectory(samplesPath);
-            WriteFile(samplesPath, "basic-routing.yaml", yaml);
+            var definitionsPath = Path.Combine(rootPath, definitionsDirectoryName);
+            Directory.CreateDirectory(definitionsPath);
+            WriteFile(definitionsPath, "basic-routing.yaml", yaml);
 
             foreach (var (fileName, content) in sampleFiles ?? [])
             {
-                WriteFile(samplesPath, fileName, content);
+                WriteFile(definitionsPath, fileName, content);
             }
 
             foreach (var (fileName, content) in additionalStubFiles ?? [])
             {
-                WriteFile(samplesPath, fileName, content);
+                WriteFile(definitionsPath, fileName, content);
             }
 
             return new TestWorkspace(rootPath);
         }
 
-        public static TestWorkspace CreateEmpty(string definitionsDirectoryName = "samples")
+        public static TestWorkspace CreateEmpty(string definitionsDirectoryName = "stubs")
         {
             var rootPath = Path.Combine(Path.GetTempPath(), "semanticstub-tests", Guid.NewGuid().ToString("N"));
-            var samplesPath = Path.Combine(rootPath, definitionsDirectoryName);
-            Directory.CreateDirectory(samplesPath);
+            var definitionsPath = Path.Combine(rootPath, definitionsDirectoryName);
+            Directory.CreateDirectory(definitionsPath);
 
             return new TestWorkspace(rootPath);
         }
